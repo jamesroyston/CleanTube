@@ -1,0 +1,33 @@
+import type { Metadata } from "next";
+import { Roboto } from "next/font/google";
+import { AppProviders } from "@/app/providers";
+import { AppShell } from "@/components/AppShell";
+import "./globals.css";
+
+const roboto = Roboto({
+  weight: ["300", "400", "500", "700"],
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-roboto",
+});
+
+export const metadata: Metadata = {
+  title: "CleanTube",
+  description: "Search and watch YouTube videos with a clean, lightweight player",
+};
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="en" className={roboto.variable} suppressHydrationWarning>
+      <body style={{ margin: 0 }}>
+        <AppProviders>
+          <AppShell>{children}</AppShell>
+        </AppProviders>
+      </body>
+    </html>
+  );
+}
