@@ -31,6 +31,10 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+CleanTube is set up to deploy on **[Vercel](https://vercel.com)** like any standard Next.js app: connect the repo and use the default **Build Command** (`next build` / `npm run build`).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Build-time icons:** `npm run build` runs **`prebuild`**, which executes `scripts/generate-app-icons.mjs` (Sharp) and writes `favicon.ico`, `icon.png`, and `apple-icon.png` under `src/app/`. That runs on Vercel’s build image without extra configuration, so Safari-friendly raster favicons are produced on every production build. To change the artwork, edit `scripts/app-icon-source.svg` and commit; the next Vercel build will regenerate the binaries.
+
+You can still run `npm run generate-icons` locally after changing the SVG. Committing the generated files is optional but keeps `npm run dev` in sync without relying on a prior build.
+
+More detail: [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying).
