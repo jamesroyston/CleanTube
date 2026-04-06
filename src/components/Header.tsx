@@ -16,11 +16,17 @@ import { FormEvent, useEffect, useState, type ReactNode } from "react";
 
 import { useThemeMode } from "@/app/providers";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
-import { ThemePresetPanel } from "@/components/ThemePresetPanel";
+import { SettingsDrawer } from "@/components/SettingsDrawer";
 import { setLastSearchQuery } from "@/lib/lastSearchSession";
 import { normalizeSortParam } from "@/lib/uploadedAtSort";
 
-export function Header({ leading }: { leading?: ReactNode }) {
+type HeaderProps = {
+  leading?: ReactNode;
+  /** Desktop: toggle library drawer (shown before logo). */
+  desktopLibraryToggle?: ReactNode;
+};
+
+export function Header({ leading, desktopLibraryToggle }: HeaderProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qParam = searchParams.get("q") ?? "";
@@ -54,6 +60,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
     <AppBar position="sticky" elevation={0} color="transparent">
       <Toolbar sx={{ gap: 2, flexWrap: "wrap", py: 1 }}>
         {leading}
+        {desktopLibraryToggle}
         <Box
           component={Link}
           href="/"
@@ -102,7 +109,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
           />
         </Box>
         <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5 }}>
-          <ThemePresetPanel />
+          <SettingsDrawer />
           <IconButton
             onClick={toggleMode}
             aria-label={
