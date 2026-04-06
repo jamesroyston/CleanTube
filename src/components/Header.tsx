@@ -15,9 +15,10 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 
 import { useThemeMode } from "@/app/providers";
-import { setLastSearchQuery } from "@/lib/lastSearchSession";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
 import { ThemePresetPanel } from "@/components/ThemePresetPanel";
+import { setLastSearchQuery } from "@/lib/lastSearchSession";
+import { normalizeSortParam } from "@/lib/uploadedAtSort";
 
 export function Header({ leading }: { leading?: ReactNode }) {
   const router = useRouter();
@@ -30,6 +31,14 @@ export function Header({ leading }: { leading?: ReactNode }) {
     setQuery(qParam);
   }, [qParam]);
 
+  function buildResultsHref(trimmed: string) {
+    const qs = new URLSearchParams();
+    qs.set("q", trimmed);
+    const sort = normalizeSortParam(searchParams.get("sort"));
+    if (sort !== "relevance") qs.set("sort", sort);
+    return `/?${qs.toString()}`;
+  }
+
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const trimmed = query.trim();
@@ -38,7 +47,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
       return;
     }
     setLastSearchQuery(trimmed);
-    router.push(`/?q=${encodeURIComponent(trimmed)}`);
+    router.push(buildResultsHref(trimmed));
   }
 
   return (

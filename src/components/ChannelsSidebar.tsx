@@ -21,6 +21,7 @@ import { FormEvent, useState } from "react";
 import { HoverMarqueeTitle } from "@/components/HoverMarqueeTitle";
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
+import { getLastSearchSort } from "@/lib/lastSearchSession";
 
 const DRAWER_WIDTH = 280;
 
@@ -33,7 +34,7 @@ function formatStartLabel(seconds: number): string {
 }
 
 type ChannelsSidebarProps = {
-  variant: "permanent" | "temporary";
+  variant: "permanent" | "persistent" | "temporary";
   open: boolean;
   onClose: () => void;
 };
@@ -49,7 +50,11 @@ export function ChannelsSidebar({
   const [draft, setDraft] = useState("");
 
   function quickSearch(q: string) {
-    router.push(`/?q=${encodeURIComponent(q)}`);
+    const sort = getLastSearchSort();
+    const qs = new URLSearchParams();
+    qs.set("q", q);
+    if (sort !== "relevance") qs.set("sort", sort);
+    router.push(`/?${qs.toString()}`);
     onClose();
   }
 
