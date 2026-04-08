@@ -1,10 +1,9 @@
 "use client";
 
-import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import MenuIcon from "@mui/icons-material/Menu";
-import ViewSidebarIcon from "@mui/icons-material/ViewSidebar";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
+import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { Suspense, useState } from "react";
 
@@ -21,60 +20,41 @@ function HeaderFallback() {
 }
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
-  const mdUp = useMediaQuery((t) => t.breakpoints.up("md"));
+  const theme = useTheme();
+  const mdUp = useMediaQuery(theme.breakpoints.up("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopLibraryOpen, setDesktopLibraryOpen] = useState(true);
 
-  const mobileSidebarButton = !mdUp ? (
-    <IconButton
-      color="inherit"
-      edge="start"
-      aria-label="Open library"
-      onClick={() => setMobileOpen(true)}
-    >
-      <MenuIcon />
-    </IconButton>
-  ) : null;
-
-  const desktopLibraryToggle = mdUp ? (
-    <IconButton
-      color="inherit"
-      edge="start"
-      aria-label={desktopLibraryOpen ? "Hide library" : "Show library"}
-      onClick={() => setDesktopLibraryOpen((v) => !v)}
-      sx={{ mr: 0.5 }}
-    >
-      {desktopLibraryOpen ? <ChevronLeftIcon /> : <ViewSidebarIcon />}
-    </IconButton>
-  ) : null;
+  const headerLeading =
+    !mdUp ? (
+      <IconButton
+        color="inherit"
+        edge="start"
+        aria-label="Open saved channels"
+        onClick={() => setMobileOpen(true)}
+      >
+        <MenuIcon />
+      </IconButton>
+    ) : null;
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh" }}>
       <ChannelsSidebar
-        variant={mdUp ? "persistent" : "temporary"}
-        open={mdUp ? desktopLibraryOpen : mobileOpen}
-        onClose={() =>
-          mdUp ? setDesktopLibraryOpen(false) : setMobileOpen(false)
-        }
+        variant={mdUp ? "permanent" : "temporary"}
+        open={mdUp || mobileOpen}
+        onClose={() => setMobileOpen(false)}
       />
       <Box
         component="div"
         sx={{
           flexGrow: 1,
-          width:
-            mdUp && desktopLibraryOpen
-              ? `calc(100% - ${CHANNELS_DRAWER_WIDTH}px)`
-              : "100%",
+          width: mdUp ? `calc(100% - ${CHANNELS_DRAWER_WIDTH}px)` : "100%",
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
         }}
       >
         <Suspense fallback={<HeaderFallback />}>
-          <Header
-            leading={mobileSidebarButton}
-            desktopLibraryToggle={desktopLibraryToggle}
-          />
+          <Header leading={headerLeading} />
         </Suspense>
         {children}
       </Box>
