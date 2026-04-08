@@ -7,7 +7,6 @@ import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { setLastSearchSort } from "@/lib/lastSearchSession";
 import type { UploadDateSortMode } from "@/lib/uploadedAtSort";
 import { normalizeSortParam } from "@/lib/uploadedAtSort";
 
@@ -21,7 +20,6 @@ export function SearchSortBar({ query }: SearchSortBarProps) {
   const sort = normalizeSortParam(searchParams.get("sort"));
 
   function commit(next: UploadDateSortMode) {
-    setLastSearchSort(next);
     const qs = new URLSearchParams();
     qs.set("q", query);
     if (next !== "relevance") qs.set("sort", next);
