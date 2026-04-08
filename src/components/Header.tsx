@@ -10,8 +10,6 @@ import InputAdornment from "@mui/material/InputAdornment";
 import Toolbar from "@mui/material/Toolbar";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import { useTheme } from "@mui/material/styles";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
@@ -34,8 +32,6 @@ export function Header({ leading, desktopLibraryToggle }: HeaderProps) {
   const qParam = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(qParam);
   const { mode, toggleMode } = useThemeMode();
-  const muiTheme = useTheme();
-  const isMobile = useMediaQuery(muiTheme.breakpoints.down("md"));
 
   useEffect(() => {
     setQuery(qParam);
@@ -62,7 +58,7 @@ export function Header({ leading, desktopLibraryToggle }: HeaderProps) {
 
   return (
     <AppBar position="sticky" elevation={0} color="transparent">
-      <Toolbar sx={{ gap: { xs: 1, sm: 2 }, flexWrap: "wrap", py: 1 }}>
+      <Toolbar sx={{ gap: 2, flexWrap: "wrap", py: 1 }}>
         {leading}
         {desktopLibraryToggle}
         <Box
@@ -75,16 +71,14 @@ export function Header({ leading, desktopLibraryToggle }: HeaderProps) {
             color: "text.primary",
             textDecoration: "none",
             whiteSpace: "nowrap",
-            flexShrink: 0,
           }}
         >
-          <RetroTvLogo size={isMobile ? 30 : 34} />
+          <RetroTvLogo size={34} />
           <Typography
             variant="h6"
             sx={{
               fontWeight: 700,
               letterSpacing: "-0.02em",
-              display: { xs: "none", md: "block" },
             }}
           >
             CleanTube
@@ -93,12 +87,7 @@ export function Header({ leading, desktopLibraryToggle }: HeaderProps) {
         <Box
           component="form"
           onSubmit={onSubmit}
-          sx={{
-            flex: 1,
-            minWidth: { xs: "100%", sm: 200 },
-            maxWidth: { xs: "none", sm: 560 },
-            order: { xs: 3, md: 0 },
-          }}
+          sx={{ flex: 1, minWidth: 200, maxWidth: 560 }}
         >
           <TextField
             name="q"
@@ -119,26 +108,16 @@ export function Header({ leading, desktopLibraryToggle }: HeaderProps) {
             }}
           />
         </Box>
-        <Box
-          sx={{
-            ml: { xs: "auto", md: "auto" },
-            display: "flex",
-            alignItems: "center",
-            gap: 0.5,
-            order: { xs: 2, md: 0 },
-          }}
-        >
+        <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5 }}>
           <SettingsDrawer />
-          {!isMobile ? (
-            <IconButton
-              onClick={toggleMode}
-              aria-label={
-                mode === "dark" ? "Switch to light mode" : "Switch to dark mode"
-              }
-            >
-              {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-            </IconButton>
-          ) : null}
+          <IconButton
+            onClick={toggleMode}
+            aria-label={
+              mode === "dark" ? "Switch to light mode" : "Switch to dark mode"
+            }
+          >
+            {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
+          </IconButton>
         </Box>
       </Toolbar>
     </AppBar>
