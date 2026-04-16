@@ -69,3 +69,28 @@ Use one epic prefix in commit subjects, e.g. **`[CLOUD-LIB-01]`** … **`[CLOUD-
 | **CLOUD-LIB-12** | **Watch later resume**: pass `?t=` from stored progress when launching from WL if progress exists. |
 
 **Revert tips:** Prefer **one chunk per PR** or one sequential merge; to roll back a slice, `git revert <commit>` for that chunk’s SHA. If two chunks touch the same file heavily, revert newer chunk first. Keep **CLOUD-LIB-03** and **CLOUD-LIB-04** separate so infra can be reverted without dropping UI, and vice versa.
+
+### Principal-engineer implementation plan
+
+Build this as a set of narrow, understandable seams instead of a broad rewrite:
+
+1. **Infra first, but inert by default.**
+   Add Supabase packages, env placeholders, SSR/browser helpers, and `proxy.ts`, but make the app behave exactly as it does today when env vars are missing. A branch deploy should still build and run in local-only mode.
+2. **One library contract, two backing stores.**
+   Introduce a typed library/auth layer that exposes the app’s actual domain concepts:
+   `savedChannels`, `watchLater`, `watchProgress`, `history`, and auth session state.
+   Local storage remains the logged-out implementation; Supabase becomes the signed-in implementation.
+3. **Bridge state at auth boundaries.**
+   On login/sign-up, merge local watch-later, saved channels, and progress into the user’s cloud rows with deterministic dedupe rules, then hydrate UI from cloud.
+4. **Add product UI after the seam exists.**
+   Auth page, account actions, history page/sidebar, home in-progress row, and watch-later resume should all consume the shared contract instead of talking to storage directly.
+5. **Track progress from the player with best-effort writes.**
+   Persist on interval, pause-ish transitions, and unmount; throttle writes so navigation stays responsive.
+
+### Proposed build order
+
+- **CLOUD-LIB-01/02**: install dependencies, add env placeholders, expand README, and record this plan.
+- **CLOUD-LIB-03/04**: add Supabase client helpers, `proxy.ts`, and SQL schema/RLS migrations.
+- **CLOUD-LIB-05/07/08**: add typed auth + library services and refactor current contexts to dual local/cloud behavior with login-time merge.
+- **CLOUD-LIB-06**: add auth route and account affordances in the header/sidebar.
+- **CLOUD-LIB-09/10/11/12**: add progress tracking, history UI, home in-progress row, and watch-later resume from saved progress.

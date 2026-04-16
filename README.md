@@ -33,6 +33,27 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 CleanTube is set up to deploy on **[Vercel](https://vercel.com)** like any standard Next.js app: connect the repo and use the default **Build Command** (`next build` / `npm run build`).
 
+## Supabase Setup
+
+Cloud library, auth, and watch progress use Supabase when these env vars are present:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=
+```
+
+For local work, copy `.env.example` to `.env.local` and fill in your own project values. Do not commit real credentials or `.env.local`.
+
+The app is intentionally safe to deploy without those env vars. In that case it stays in local-only mode, so preview builds still succeed while backend infra is being wired up.
+
+Database schema lives under `supabase/migrations/` and is designed for:
+
+- `saved_channels`
+- `watch_later_entries`
+- `watch_progress`
+
+Each table is user-scoped with RLS enabled.
+
 **Build-time icons:** `npm run build` runs **`prebuild`**, which executes `scripts/generate-app-icons.mjs` (Sharp) and writes `favicon.ico`, `icon.png`, and `apple-icon.png` under `src/app/`. That runs on Vercel’s build image without extra configuration, so Safari-friendly raster favicons are produced on every production build. To change the artwork, edit `scripts/app-icon-source.svg` and commit; the next Vercel build will regenerate the binaries.
 
 You can still run `npm run generate-icons` locally after changing the SVG. Committing the generated files is optional but keeps `npm run dev` in sync without relying on a prior build.
