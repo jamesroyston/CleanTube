@@ -12,11 +12,11 @@ import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import Image from "next/image";
 import Link from "next/link";
 
 import type { VideoSummary } from "@/components/VideoSummary";
 import { WatchLaterCardButton } from "@/components/WatchLaterCardButton";
+import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 
 type VideoResultsGridProps = {
   videos: VideoSummary[];
@@ -60,8 +60,9 @@ function VideoCard({ video }: { video: VideoSummary }) {
                 bgcolor: "action.hover",
               }}
             >
-              <Image
+              <YouTubeThumbnailImage
                 src={video.thumbnailUrl}
+                fallbacks={video.thumbnailFallbackUrls}
                 alt=""
                 fill
                 sizes="(max-width: 600px) 100vw, (max-width: 900px) 50vw, 480px"

@@ -14,13 +14,15 @@ import IconButton from "@mui/material/IconButton";
 import Toolbar from "@mui/material/Toolbar";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { HoverMarqueeTitle } from "@/components/HoverMarqueeTitle";
+import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
+import { getLastSearchSort } from "@/lib/lastSearchSession";
+import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
 
 const DRAWER_WIDTH = 280;
 
@@ -49,7 +51,11 @@ export function ChannelsSidebar({
   const [draft, setDraft] = useState("");
 
   function quickSearch(q: string) {
-    router.push(`/?q=${encodeURIComponent(q)}`);
+    const sort = getLastSearchSort();
+    const qs = new URLSearchParams();
+    qs.set("q", q);
+    if (sort !== "relevance") qs.set("sort", sort);
+    router.push(`/?${qs.toString()}`);
     onClose();
   }
 
@@ -124,8 +130,13 @@ export function ChannelsSidebar({
                     bgcolor: "action.hover",
                   }}
                 >
-                  <Image
+                  <YouTubeThumbnailImage
                     src={e.thumbnailUrl}
+                    fallbacks={youtubeThumbnailFallbackUrls(
+                      e.videoId,
+                      undefined,
+                      e.thumbnailUrl,
+                    )}
                     alt=""
                     fill
                     sizes="72px"
