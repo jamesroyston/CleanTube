@@ -54,6 +54,14 @@ Database schema lives under `supabase/migrations/` and is designed for:
 
 Each table is user-scoped with RLS enabled.
 
+### OAuth (Google, Apple, Facebook)
+
+1. In the Supabase dashboard, open **Authentication → Providers** and enable **Google**, **Apple**, and/or **Facebook** with each provider’s client ID and secret (Apple needs the Services ID / key setup described in Supabase’s docs).
+2. Under **Authentication → URL configuration**, add these **Redirect URLs** (adjust the production origin):
+   - `http://localhost:3000/auth/callback`
+   - `https://<your-production-domain>/auth/callback`
+3. The app sends users to `/auth/callback` after the provider redirects back; that route exchanges the auth `code` for a session cookie.
+
 **Build-time icons:** `npm run build` runs **`prebuild`**, which executes `scripts/generate-app-icons.mjs` (Sharp) and writes `favicon.ico`, `icon.png`, and `apple-icon.png` under `src/app/`. That runs on Vercel’s build image without extra configuration, so Safari-friendly raster favicons are produced on every production build. To change the artwork, edit `scripts/app-icon-source.svg` and commit; the next Vercel build will regenerate the binaries.
 
 You can still run `npm run generate-icons` locally after changing the SVG. Committing the generated files is optional but keeps `npm run dev` in sync without relying on a prior build.

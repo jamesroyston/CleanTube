@@ -14,9 +14,11 @@ import {
 import {
   fetchCloudSnapshot,
   getInitialSession,
+  type OAuthProvider,
   replaceSavedChannels,
   replaceWatchLaterEntries,
   resetPasswordForEmail,
+  signInWithOAuthProvider,
   signInWithPassword,
   signOut,
   signUpWithPassword,
@@ -25,6 +27,9 @@ import {
 } from "@/lib/cloudLibrary/cloudStore";
 import {
   readLocalSnapshot,
+  SAVED_CHANNELS_STORAGE_KEY,
+  WATCH_LATER_STORAGE_KEY,
+  WATCH_PROGRESS_STORAGE_KEY,
   writeLocalSavedChannels,
   writeLocalWatchLater,
   writeLocalWatchProgress,
@@ -65,6 +70,7 @@ type CloudLibraryContextValue = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
+  signInWithOAuth: (provider: OAuthProvider) => Promise<{ error: string | null }>;
   signOutUser: () => Promise<void>;
   addSavedChannel: (input: {
     name: string;
@@ -150,9 +156,13 @@ export function CloudLibraryProvider({
       savedChannels?: SavedChannel[];
       watchProgress?: WatchProgressEntry[];
     }) => {
-      if (next.watchLater) writeLocalWatchLater(next.watchLater);
-      if (next.savedChannels) writeLocalSavedChannels(next.savedChannels);
-      if (next.watchProgress) writeLocalWatchProgress(next.watchProgress);
+      if (next.watchLater !== undefined) writeLocalWatchLater(next.watchLater);
+      if (next.savedChannels !== undefined) {
+        writeLocalSavedChannels(next.savedChannels);
+      }
+      if (next.watchProgress !== undefined) {
+        writeLocalWatchProgress(next.watchProgress);
+      }
     },
     [],
   );
@@ -203,6 +213,22 @@ export function CloudLibraryProvider({
   useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage once on client
     hydrateFromLocal();
+  }, [hydrateFromLocal]);
+
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.storageArea !== localStorage) return;
+      if (
+        e.key !== WATCH_PROGRESS_STORAGE_KEY &&
+        e.key !== WATCH_LATER_STORAGE_KEY &&
+        e.key !== SAVED_CHANNELS_STORAGE_KEY
+      ) {
+        return;
+      }
+      hydrateFromLocal();
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, [hydrateFromLocal]);
 
   useEffect(() => {
@@ -266,6 +292,21 @@ export function CloudLibraryProvider({
     async (email: string) => {
       if (!supabase) return { error: "Supabase is not configured." };
       const { error } = await resetPasswordForEmail(supabase, email);
+      return { error: error?.message ?? null };
+    },
+    [supabase],
+  );
+
+  const signInWithOAuth = useCallback(
+    async (provider: OAuthProvider) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      if (typeof window === "undefined") return { error: "Not available." };
+      const redirectTo = `${window.location.origin}/auth/callback`;
+      const { error } = await signInWithOAuthProvider(
+        supabase,
+        provider,
+        redirectTo,
+      );
       return { error: error?.message ?? null };
     },
     [supabase],
@@ -461,6 +502,7 @@ export function CloudLibraryProvider({
       signIn,
       signUp,
       resetPassword,
+      signInWithOAuth,
       signOutUser,
       addSavedChannel,
       removeSavedChannel,
@@ -485,6 +527,7 @@ export function CloudLibraryProvider({
       savedChannels,
       session,
       signIn,
+      signInWithOAuth,
       signOutUser,
       signUp,
       upsertWatchProgress,

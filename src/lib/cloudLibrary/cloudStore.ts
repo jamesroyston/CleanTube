@@ -152,6 +152,19 @@ export async function signOut(
   return supabase.auth.signOut();
 }
 
+export type OAuthProvider = "google" | "apple" | "facebook";
+
+export async function signInWithOAuthProvider(
+  supabase: SupabaseClient,
+  provider: OAuthProvider,
+  redirectTo: string,
+) {
+  return supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo },
+  });
+}
+
 export async function getInitialSession(
   supabase: SupabaseClient,
 ): Promise<{ session: Session | null; user: User | null }> {

@@ -76,10 +76,18 @@ export function LiteYouTubeEmbed({
 
       try {
         const player = await el.getYTPlayer();
-        const currentSeconds = Math.max(
+        let currentSeconds = Math.max(
           0,
           Math.floor(player.getCurrentTime?.() ?? 0),
         );
+        const lastGood = lastPersistedSecondsRef.current;
+        if (
+          force &&
+          currentSeconds === 0 &&
+          lastGood > 0
+        ) {
+          currentSeconds = lastGood;
+        }
         const durationSecondsRaw = player.getDuration?.();
         const durationSeconds =
           durationSecondsRaw && Number.isFinite(durationSecondsRaw)
