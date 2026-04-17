@@ -9,6 +9,9 @@ import type { LiteYoutubeElement } from "@/types/lite-youtube-element";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
 
+/** Background saves while playing. Play/pause/end also force-save; 5–15s is cheap (one small JSON write). */
+const PROGRESS_POLL_INTERVAL_MS = 15_000;
+
 let liteYtLoad: Promise<unknown> | null = null;
 
 function loadLiteYt() {
@@ -112,9 +115,58 @@ export function LiteYouTubeEmbed({
   useEffect(() => {
     if (!ready) return;
 
+    let cancelled = false;
+    let attachedPlayer: YT.Player | null = null;
+
+    const onStateChange = (event: YT.OnStateChangeEvent) => {
+      const state = event.data;
+      if (
+        state === YT.PlayerState.PLAYING ||
+        state === YT.PlayerState.PAUSED ||
+        state === YT.PlayerState.ENDED
+      ) {
+        void persistProgress(true);
+      }
+    };
+
+    void (async () => {
+      const root = shellRef.current;
+      if (!root) return;
+      for (let i = 0; i < 50 && !cancelled; i++) {
+        const el = root.querySelector("lite-youtube") as LiteYoutubeElement | null;
+        if (el && typeof el.getYTPlayer === "function") {
+          try {
+            const player = await el.getYTPlayer();
+            if (cancelled) return;
+            attachedPlayer = player;
+            player.addEventListener("onStateChange", onStateChange);
+            return;
+          } catch {
+            /* player not ready yet */
+          }
+        }
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      if (attachedPlayer) {
+        try {
+          attachedPlayer.removeEventListener("onStateChange", onStateChange);
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, [persistProgress, ready, startSeconds, videoId]);
+
+  useEffect(() => {
+    if (!ready) return;
+
     const interval = window.setInterval(() => {
       void persistProgress();
-    }, 15000);
+    }, PROGRESS_POLL_INTERVAL_MS);
 
     const flush = () => {
       void persistProgress(true);
