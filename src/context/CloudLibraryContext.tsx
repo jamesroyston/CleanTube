@@ -394,36 +394,47 @@ export function CloudLibraryProvider({
     async (input: WatchProgressInput) => {
       if (!input.videoId.trim()) return;
       const normalized = normalizeProgressInput(input);
-      const existing = watchProgress.find((entry) => entry.videoId === normalized.videoId);
-      const nextEntry: WatchProgressEntry = existing
-        ? {
-            ...existing,
-            ...normalized,
-            lastPositionSeconds: Math.max(
-              existing.lastPositionSeconds,
-              normalized.lastPositionSeconds,
-            ),
-            completed: existing.completed || normalized.completed,
-          }
-        : normalized;
 
-      const updated = [
-        nextEntry,
-        ...watchProgress.filter((entry) => entry.videoId !== normalized.videoId),
-      ].sort(
-        (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
-      );
-      setWatchProgress(updated);
-      persistLocalSnapshot({ watchProgress: updated });
-      if (supabase && user) {
+      let snapshotForDisk: WatchProgressEntry[] = [];
+      let rowForCloud: WatchProgressEntry | null = null;
+
+      setWatchProgress((prev) => {
+        const existing = prev.find(
+          (entry) => entry.videoId === normalized.videoId,
+        );
+        const nextEntry: WatchProgressEntry = existing
+          ? {
+              ...existing,
+              ...normalized,
+              lastPositionSeconds: Math.max(
+                existing.lastPositionSeconds,
+                normalized.lastPositionSeconds,
+              ),
+              completed: existing.completed || normalized.completed,
+            }
+          : normalized;
+
+        rowForCloud = nextEntry;
+        const updated = [
+          nextEntry,
+          ...prev.filter((entry) => entry.videoId !== normalized.videoId),
+        ].sort(
+          (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+        );
+        snapshotForDisk = updated;
+        return updated;
+      });
+
+      persistLocalSnapshot({ watchProgress: snapshotForDisk });
+      if (supabase && user && rowForCloud) {
         try {
-          await upsertWatchProgressEntries(supabase, user.id, [nextEntry]);
+          await upsertWatchProgressEntries(supabase, user.id, [rowForCloud]);
         } catch {
           /* keep local state if cloud sync fails */
         }
       }
     },
-    [persistLocalSnapshot, supabase, user, watchProgress],
+    [persistLocalSnapshot, supabase, user],
   );
 
   const getProgressByVideoId = useCallback(
