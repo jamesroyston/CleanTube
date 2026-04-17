@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
+import { InProgressStrip } from "@/components/InProgressStrip";
 import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchSortBar } from "@/components/SearchSortBar";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
@@ -62,6 +63,7 @@ export default async function Home({ searchParams }: PageProps) {
         <LastSearchSync />
       </Suspense>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
+        {!query ? <InProgressStrip /> : null}
         {!query ? (
           <HomeHeroEmpty />
         ) : errorMessage ? (

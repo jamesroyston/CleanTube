@@ -1,0 +1,499 @@
+"use client";
+
+import type { Session, User } from "@supabase/supabase-js";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useState,
+} from "react";
+
+import {
+  fetchCloudSnapshot,
+  getInitialSession,
+  replaceSavedChannels,
+  replaceWatchLaterEntries,
+  resetPasswordForEmail,
+  signInWithPassword,
+  signOut,
+  signUpWithPassword,
+  subscribeToAuthChanges,
+  upsertWatchProgressEntries,
+} from "@/lib/cloudLibrary/cloudStore";
+import {
+  readLocalSnapshot,
+  writeLocalSavedChannels,
+  writeLocalWatchLater,
+  writeLocalWatchProgress,
+} from "@/lib/cloudLibrary/localStore";
+import {
+  deriveResumeSeconds,
+  isInProgress,
+  mergeSavedChannels,
+  mergeWatchLaterEntries,
+  mergeWatchProgressEntries,
+} from "@/lib/cloudLibrary/sync";
+import { getSupabaseBrowserClient } from "@/utils/supabase/client";
+import type { SavedChannel } from "@/types/savedChannel";
+import type { WatchLaterEntry } from "@/types/watchLater";
+import type { WatchProgressEntry } from "@/types/watchProgress";
+
+type AuthStatus = "loading" | "ready";
+
+type WatchProgressInput = {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string;
+  channelName: string;
+  lastPositionSeconds: number;
+  durationSeconds?: number;
+  completed?: boolean;
+};
+
+type CloudLibraryContextValue = {
+  authStatus: AuthStatus;
+  isCloudConfigured: boolean;
+  session: Session | null;
+  user: User | null;
+  watchLaterEntries: WatchLaterEntry[];
+  savedChannels: SavedChannel[];
+  watchProgress: WatchProgressEntry[];
+  inProgressEntries: WatchProgressEntry[];
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  signOutUser: () => Promise<void>;
+  addSavedChannel: (input: {
+    name: string;
+    channelId?: string;
+    channelUrl?: string;
+    searchQuery?: string;
+  }) => Promise<void>;
+  removeSavedChannel: (id: string) => Promise<void>;
+  addOrUpdateWatchLater: (input: {
+    videoId: string;
+    title: string;
+    thumbnailUrl: string;
+    channelName: string;
+    startSeconds?: number;
+  }) => Promise<void>;
+  removeWatchLaterByVideoId: (videoId: string) => Promise<void>;
+  isInWatchLater: (videoId: string) => boolean;
+  upsertWatchProgress: (input: WatchProgressInput) => Promise<void>;
+  getProgressByVideoId: (videoId: string) => WatchProgressEntry | undefined;
+  getResumeSeconds: (
+    videoId: string,
+    watchLaterStartSeconds?: number,
+  ) => number | undefined;
+};
+
+const CloudLibraryContext = createContext<CloudLibraryContextValue | null>(null);
+
+function randomId(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function sameChannel(a: SavedChannel, b: Partial<SavedChannel>): boolean {
+  if (a.channelId && b.channelId && a.channelId === b.channelId) return true;
+  if (a.channelUrl && b.channelUrl && a.channelUrl === b.channelUrl) return true;
+  if (
+    b.searchQuery &&
+    a.searchQuery.trim().toLowerCase() === b.searchQuery.trim().toLowerCase()
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function normalizeProgressInput(input: WatchProgressInput): WatchProgressEntry {
+  const now = new Date().toISOString();
+  return {
+    videoId: input.videoId,
+    title: input.title.trim() || "Video",
+    thumbnailUrl: input.thumbnailUrl,
+    channelName: input.channelName.trim() || "Unknown channel",
+    lastPositionSeconds: Math.max(0, Math.floor(input.lastPositionSeconds)),
+    durationSeconds:
+      input.durationSeconds != null && input.durationSeconds > 0
+        ? Math.floor(input.durationSeconds)
+        : undefined,
+    completed: input.completed === true,
+    lastWatchedAt: now,
+    updatedAt: now,
+  };
+}
+
+export function CloudLibraryProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const isCloudConfigured = supabase != null;
+  const [authStatus, setAuthStatus] = useState<AuthStatus>(() =>
+    supabase == null ? "ready" : "loading",
+  );
+  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [watchLaterEntries, setWatchLaterEntries] = useState<WatchLaterEntry[]>([]);
+  const [savedChannels, setSavedChannels] = useState<SavedChannel[]>([]);
+  const [watchProgress, setWatchProgress] = useState<WatchProgressEntry[]>([]);
+
+  const persistLocalSnapshot = useCallback(
+    (next: {
+      watchLater?: WatchLaterEntry[];
+      savedChannels?: SavedChannel[];
+      watchProgress?: WatchProgressEntry[];
+    }) => {
+      if (next.watchLater) writeLocalWatchLater(next.watchLater);
+      if (next.savedChannels) writeLocalSavedChannels(next.savedChannels);
+      if (next.watchProgress) writeLocalWatchProgress(next.watchProgress);
+    },
+    [],
+  );
+
+  const hydrateFromLocal = useCallback(() => {
+    const snapshot = readLocalSnapshot();
+    setWatchLaterEntries(snapshot.watchLater);
+    setSavedChannels(snapshot.savedChannels);
+    setWatchProgress(snapshot.watchProgress);
+  }, []);
+
+  const syncFromCloud = useCallback(
+    async (nextUser: User) => {
+      if (!supabase) return;
+      const localSnapshot = readLocalSnapshot();
+      const remoteSnapshot = await fetchCloudSnapshot(supabase);
+      const mergedWatchLater = mergeWatchLaterEntries(
+        localSnapshot.watchLater,
+        remoteSnapshot.watchLater,
+      );
+      const mergedSavedChannels = mergeSavedChannels(
+        localSnapshot.savedChannels,
+        remoteSnapshot.savedChannels,
+      );
+      const mergedWatchProgress = mergeWatchProgressEntries(
+        localSnapshot.watchProgress,
+        remoteSnapshot.watchProgress,
+      );
+
+      await Promise.all([
+        replaceWatchLaterEntries(supabase, nextUser.id, mergedWatchLater),
+        replaceSavedChannels(supabase, nextUser.id, mergedSavedChannels),
+        upsertWatchProgressEntries(supabase, nextUser.id, mergedWatchProgress),
+      ]);
+
+      setWatchLaterEntries(mergedWatchLater);
+      setSavedChannels(mergedSavedChannels);
+      setWatchProgress(mergedWatchProgress);
+      persistLocalSnapshot({
+        watchLater: mergedWatchLater,
+        savedChannels: mergedSavedChannels,
+        watchProgress: mergedWatchProgress,
+      });
+    },
+    [persistLocalSnapshot, supabase],
+  );
+
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage once on client
+    hydrateFromLocal();
+  }, [hydrateFromLocal]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      const initial = await getInitialSession(supabase);
+      if (cancelled) return;
+      setSession(initial.session);
+      setUser(initial.user);
+      if (initial.user) {
+        try {
+          await syncFromCloud(initial.user);
+        } catch {
+          hydrateFromLocal();
+        }
+      }
+      if (!cancelled) setAuthStatus("ready");
+    })();
+
+    const { data } = subscribeToAuthChanges(supabase, (nextSession) => {
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      if (nextSession?.user) {
+        void syncFromCloud(nextSession.user).catch(() => {
+          hydrateFromLocal();
+        });
+      } else {
+        hydrateFromLocal();
+      }
+      setAuthStatus("ready");
+    });
+
+    return () => {
+      cancelled = true;
+      data.subscription.unsubscribe();
+    };
+  }, [hydrateFromLocal, supabase, syncFromCloud]);
+
+  const signIn = useCallback(
+    async (email: string, password: string) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      const { error } = await signInWithPassword(supabase, email, password);
+      return { error: error?.message ?? null };
+    },
+    [supabase],
+  );
+
+  const signUp = useCallback(
+    async (email: string, password: string) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      const { error } = await signUpWithPassword(supabase, email, password);
+      return { error: error?.message ?? null };
+    },
+    [supabase],
+  );
+
+  const resetPassword = useCallback(
+    async (email: string) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      const { error } = await resetPasswordForEmail(supabase, email);
+      return { error: error?.message ?? null };
+    },
+    [supabase],
+  );
+
+  const signOutUser = useCallback(async () => {
+    if (!supabase) return;
+    await signOut(supabase);
+    hydrateFromLocal();
+  }, [hydrateFromLocal, supabase]);
+
+  const addSavedChannel = useCallback(
+    async (input: {
+      name: string;
+      channelId?: string;
+      channelUrl?: string;
+      searchQuery?: string;
+    }) => {
+      const name = input.name.trim();
+      if (!name) return;
+      const next: SavedChannel = {
+        id: randomId(),
+        name,
+        channelId: input.channelId,
+        channelUrl: input.channelUrl,
+        searchQuery: (input.searchQuery ?? name).trim(),
+      };
+
+      const updated = savedChannels.some((channel) =>
+        sameChannel(channel, {
+          channelId: next.channelId,
+          channelUrl: next.channelUrl,
+          searchQuery: next.searchQuery,
+        }),
+      )
+        ? savedChannels
+        : [next, ...savedChannels];
+
+      setSavedChannels(updated);
+      persistLocalSnapshot({ savedChannels: updated });
+      if (supabase && user) {
+        try {
+          await replaceSavedChannels(supabase, user.id, updated);
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [persistLocalSnapshot, savedChannels, supabase, user],
+  );
+
+  const removeSavedChannel = useCallback(
+    async (id: string) => {
+      const updated = savedChannels.filter((channel) => channel.id !== id);
+      setSavedChannels(updated);
+      persistLocalSnapshot({ savedChannels: updated });
+      if (supabase && user) {
+        try {
+          await replaceSavedChannels(supabase, user.id, updated);
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [persistLocalSnapshot, savedChannels, supabase, user],
+  );
+
+  const addOrUpdateWatchLater = useCallback(
+    async (input: {
+      videoId: string;
+      title: string;
+      thumbnailUrl: string;
+      channelName: string;
+      startSeconds?: number;
+    }) => {
+      const videoId = input.videoId.trim();
+      if (!videoId) return;
+      const next: WatchLaterEntry = {
+        entryId: randomId(),
+        videoId,
+        title: input.title.trim() || "Video",
+        thumbnailUrl: input.thumbnailUrl,
+        channelName: input.channelName.trim() || "Unknown channel",
+        startSeconds:
+          input.startSeconds != null && input.startSeconds > 0
+            ? Math.floor(input.startSeconds)
+            : undefined,
+        addedAt: new Date().toISOString(),
+      };
+      const updated = [next, ...watchLaterEntries.filter((e) => e.videoId !== videoId)];
+      setWatchLaterEntries(updated);
+      persistLocalSnapshot({ watchLater: updated });
+      if (supabase && user) {
+        try {
+          await replaceWatchLaterEntries(supabase, user.id, updated);
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [persistLocalSnapshot, supabase, user, watchLaterEntries],
+  );
+
+  const removeWatchLaterByVideoId = useCallback(
+    async (videoId: string) => {
+      const updated = watchLaterEntries.filter((entry) => entry.videoId !== videoId);
+      setWatchLaterEntries(updated);
+      persistLocalSnapshot({ watchLater: updated });
+      if (supabase && user) {
+        try {
+          await replaceWatchLaterEntries(supabase, user.id, updated);
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [persistLocalSnapshot, supabase, user, watchLaterEntries],
+  );
+
+  const isInWatchLaterFn = useCallback(
+    (videoId: string) => watchLaterEntries.some((entry) => entry.videoId === videoId),
+    [watchLaterEntries],
+  );
+
+  const upsertWatchProgress = useCallback(
+    async (input: WatchProgressInput) => {
+      if (!input.videoId.trim()) return;
+      const normalized = normalizeProgressInput(input);
+      const existing = watchProgress.find((entry) => entry.videoId === normalized.videoId);
+      const nextEntry: WatchProgressEntry = existing
+        ? {
+            ...existing,
+            ...normalized,
+            lastPositionSeconds: Math.max(
+              existing.lastPositionSeconds,
+              normalized.lastPositionSeconds,
+            ),
+            completed: existing.completed || normalized.completed,
+          }
+        : normalized;
+
+      const updated = [
+        nextEntry,
+        ...watchProgress.filter((entry) => entry.videoId !== normalized.videoId),
+      ].sort(
+        (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+      );
+      setWatchProgress(updated);
+      persistLocalSnapshot({ watchProgress: updated });
+      if (supabase && user) {
+        try {
+          await upsertWatchProgressEntries(supabase, user.id, [nextEntry]);
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [persistLocalSnapshot, supabase, user, watchProgress],
+  );
+
+  const getProgressByVideoId = useCallback(
+    (videoId: string) => watchProgress.find((entry) => entry.videoId === videoId),
+    [watchProgress],
+  );
+
+  const getResumeSeconds = useCallback(
+    (videoId: string, watchLaterStartSeconds?: number) =>
+      deriveResumeSeconds(getProgressByVideoId(videoId), watchLaterStartSeconds),
+    [getProgressByVideoId],
+  );
+
+  const value = useMemo<CloudLibraryContextValue>(
+    () => ({
+      authStatus,
+      isCloudConfigured,
+      session,
+      user,
+      watchLaterEntries,
+      savedChannels,
+      watchProgress,
+      inProgressEntries: watchProgress.filter(isInProgress),
+      signIn,
+      signUp,
+      resetPassword,
+      signOutUser,
+      addSavedChannel,
+      removeSavedChannel,
+      addOrUpdateWatchLater,
+      removeWatchLaterByVideoId,
+      isInWatchLater: isInWatchLaterFn,
+      upsertWatchProgress,
+      getProgressByVideoId,
+      getResumeSeconds,
+    }),
+    [
+      addOrUpdateWatchLater,
+      addSavedChannel,
+      authStatus,
+      getProgressByVideoId,
+      getResumeSeconds,
+      isCloudConfigured,
+      isInWatchLaterFn,
+      removeSavedChannel,
+      removeWatchLaterByVideoId,
+      resetPassword,
+      savedChannels,
+      session,
+      signIn,
+      signOutUser,
+      signUp,
+      upsertWatchProgress,
+      user,
+      watchLaterEntries,
+      watchProgress,
+    ],
+  );
+
+  return (
+    <CloudLibraryContext.Provider value={value}>
+      {children}
+    </CloudLibraryContext.Provider>
+  );
+}
+
+export function useCloudLibrary() {
+  const value = useContext(CloudLibraryContext);
+  if (!value) {
+    throw new Error("useCloudLibrary must be used within CloudLibraryProvider");
+  }
+  return value;
+}

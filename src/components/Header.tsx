@@ -15,6 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 
 import { useThemeMode } from "@/app/providers";
+import { AccountMenu } from "@/components/AccountMenu";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
 import { getLastSearchSort, setLastSearchQuery } from "@/lib/lastSearchSession";
 import { normalizeSortParam } from "@/lib/uploadedAtSort";
@@ -104,6 +105,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
           />
         </Box>
         <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5 }}>
+          <AccountMenu />
           <ThemePresetPanel />
           <IconButton
             onClick={toggleMode}

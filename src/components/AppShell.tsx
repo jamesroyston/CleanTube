@@ -12,8 +12,7 @@ import {
   CHANNELS_DRAWER_WIDTH,
 } from "@/components/ChannelsSidebar";
 import { Header } from "@/components/Header";
-import { SavedChannelsProvider } from "@/context/SavedChannelsContext";
-import { WatchLaterProvider } from "@/context/WatchLaterContext";
+import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 
 function HeaderFallback() {
   return null;
@@ -64,10 +63,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <SavedChannelsProvider>
-      <WatchLaterProvider>
-        <AppShellInner>{children}</AppShellInner>
-      </WatchLaterProvider>
-    </SavedChannelsProvider>
+    <CloudLibraryProvider>
+      <AppShellInner>{children}</AppShellInner>
+    </CloudLibraryProvider>
   );
 }

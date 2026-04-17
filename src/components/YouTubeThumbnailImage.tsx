@@ -1,7 +1,7 @@
 "use client";
 
 import Image, { type ImageProps } from "next/image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
 type YouTubeThumbnailImageProps = Omit<ImageProps, "src" | "onError"> & {
   src: string;
@@ -9,7 +9,7 @@ type YouTubeThumbnailImageProps = Omit<ImageProps, "src" | "onError"> & {
   fallbacks?: string[];
 };
 
-export function YouTubeThumbnailImage({
+function YouTubeThumbnailImageInner({
   src,
   fallbacks = [],
   alt,
@@ -18,10 +18,6 @@ export function YouTubeThumbnailImage({
   const chain = [src, ...fallbacks];
   const [index, setIndex] = useState(0);
   const current = chain[Math.min(index, chain.length - 1)] ?? src;
-
-  useEffect(() => {
-    setIndex(0);
-  }, [src]);
 
   const onError = useCallback(() => {
     setIndex((i) => (i + 1 < chain.length ? i + 1 : i));
@@ -36,4 +32,9 @@ export function YouTubeThumbnailImage({
       onError={onError}
     />
   );
+}
+
+/** Remounts when `src` changes so fallback index resets without an effect. */
+export function YouTubeThumbnailImage(props: YouTubeThumbnailImageProps) {
+  return <YouTubeThumbnailImageInner key={props.src} {...props} />;
 }

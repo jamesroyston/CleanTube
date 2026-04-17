@@ -69,6 +69,8 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           <LiteYouTubeEmbed
             videoId={id}
             title={title}
+            thumbnailUrl={thumb}
+            channelName={video.channelName}
             startSeconds={startSeconds}
           />
         </Box>

@@ -2,6 +2,7 @@
 
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import SearchIcon from "@mui/icons-material/Search";
 import SubscriptionsIcon from "@mui/icons-material/Subscriptions";
@@ -17,8 +18,10 @@ import Typography from "@mui/material/Typography";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
+import { WatchProgressBar } from "@/components/WatchProgressBar";
 import { HoverMarqueeTitle } from "@/components/HoverMarqueeTitle";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
 import { getLastSearchSort } from "@/lib/lastSearchSession";
@@ -48,6 +51,7 @@ export function ChannelsSidebar({
   const router = useRouter();
   const { channels, addChannel, removeChannel } = useSavedChannels();
   const { entries, removeByVideoId } = useWatchLater();
+  const { inProgressEntries, getResumeSeconds } = useCloudLibrary();
   const [draft, setDraft] = useState("");
 
   function quickSearch(q: string) {
@@ -63,9 +67,10 @@ export function ChannelsSidebar({
     videoId: string;
     startSeconds?: number;
   }) {
+    const resumeSeconds = getResumeSeconds(e.videoId, e.startSeconds);
     const qs =
-      e.startSeconds != null && e.startSeconds > 0
-        ? `?t=${encodeURIComponent(String(Math.floor(e.startSeconds)))}`
+      resumeSeconds != null && resumeSeconds > 0
+        ? `?t=${encodeURIComponent(String(Math.floor(resumeSeconds)))}`
         : "";
     router.push(`/watch/${e.videoId}${qs}`);
     onClose();
@@ -95,6 +100,93 @@ export function ChannelsSidebar({
         </Typography>
       </Toolbar>
       <Box sx={{ flex: 1, overflow: "auto", px: 1, py: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, px: 0.5 }}>
+          <HistoryOutlinedIcon color="action" fontSize="small" />
+          <Typography variant="overline" sx={{ lineHeight: 1.2, letterSpacing: 0.08 }}>
+            History
+          </Typography>
+        </Box>
+        {inProgressEntries.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ px: 1, pb: 2 }}>
+            Start a video and your in-progress history will appear here.
+          </Typography>
+        ) : (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75, mb: 2 }}>
+            {inProgressEntries.slice(0, 5).map((entry) => (
+              <Box
+                key={entry.videoId}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  borderRadius: 1,
+                  p: 0.5,
+                  "&:hover": { bgcolor: "action.hover" },
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "relative",
+                    width: 72,
+                    height: 40,
+                    flexShrink: 0,
+                    borderRadius: 0.5,
+                    overflow: "hidden",
+                    bgcolor: "action.hover",
+                  }}
+                >
+                  <YouTubeThumbnailImage
+                    src={entry.thumbnailUrl}
+                    fallbacks={youtubeThumbnailFallbackUrls(
+                      entry.videoId,
+                      undefined,
+                      entry.thumbnailUrl,
+                    )}
+                    alt=""
+                    fill
+                    sizes="72px"
+                    style={{ objectFit: "cover" }}
+                  />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <HoverMarqueeTitle text={entry.title} variant="body2" />
+                  <Typography variant="caption" color="text.secondary" noWrap>
+                    {entry.channelName}
+                  </Typography>
+                  <WatchProgressBar
+                    positionSeconds={entry.lastPositionSeconds}
+                    durationSeconds={entry.durationSeconds}
+                  />
+                </Box>
+                <IconButton
+                  size="small"
+                  aria-label={`Resume ${entry.title}`}
+                  onClick={() =>
+                    openWatchLaterVideo({
+                      videoId: entry.videoId,
+                      startSeconds: entry.lastPositionSeconds,
+                    })
+                  }
+                >
+                  <PlayArrowIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => {
+                router.push("/history");
+                onClose();
+              }}
+            >
+              View full history
+            </Button>
+          </Box>
+        )}
+
+        <Divider sx={{ my: 1 }} />
+
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, px: 0.5 }}>
           <WatchLaterOutlinedIcon color="action" fontSize="small" />
           <Typography variant="overline" sx={{ lineHeight: 1.2, letterSpacing: 0.08 }}>
