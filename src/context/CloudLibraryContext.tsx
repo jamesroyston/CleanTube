@@ -73,6 +73,11 @@ type WatchProgressInput = {
   completed?: boolean;
 };
 
+type WatchProgressUpsertOptions = {
+  persistLocal?: boolean;
+  syncCloud?: boolean;
+};
+
 type CloudLibraryContextValue = {
   authStatus: AuthStatus;
   isCloudConfigured: boolean;
@@ -103,7 +108,10 @@ type CloudLibraryContextValue = {
   removeWatchLaterByVideoId: (videoId: string) => Promise<void>;
   clearWatchLater: () => Promise<void>;
   isInWatchLater: (videoId: string) => boolean;
-  upsertWatchProgress: (input: WatchProgressInput) => Promise<void>;
+  upsertWatchProgress: (
+    input: WatchProgressInput,
+    options?: WatchProgressUpsertOptions,
+  ) => Promise<void>;
   removeWatchProgressByVideoId: (videoId: string) => Promise<void>;
   clearWatchProgress: () => Promise<void>;
   getProgressByVideoId: (videoId: string) => WatchProgressEntry | undefined;
@@ -554,8 +562,10 @@ export function CloudLibraryProvider({
   );
 
   const upsertWatchProgress = useCallback(
-    async (input: WatchProgressInput) => {
+    async (input: WatchProgressInput, options?: WatchProgressUpsertOptions) => {
       if (!input.videoId.trim()) return;
+      const persistLocal = options?.persistLocal ?? true;
+      const syncCloud = options?.syncCloud ?? true;
       const normalized = normalizeProgressInput(input);
 
       let snapshotForDisk: WatchProgressEntry[] = [];
@@ -588,8 +598,10 @@ export function CloudLibraryProvider({
         return updated;
       });
 
-      persistLocalSnapshot({ watchProgress: snapshotForDisk });
-      if (supabase && user && rowForCloud) {
+      if (persistLocal) {
+        persistLocalSnapshot({ watchProgress: snapshotForDisk });
+      }
+      if (syncCloud && supabase && user && rowForCloud) {
         try {
           await upsertWatchProgressEntries(supabase, user.id, [rowForCloud]);
         } catch {

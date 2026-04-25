@@ -9,8 +9,9 @@ import type { LiteYoutubeElement } from "@/types/lite-youtube-element";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
 
-/** Background saves while playing. Play/pause/end also force-save; 5–15s is cheap (one small JSON write). */
-const PROGRESS_POLL_INTERVAL_MS = 15_000;
+const PROGRESS_SAMPLE_INTERVAL_MS = 1_000;
+const ANONYMOUS_LOCAL_PERSIST_INTERVAL_MS = 10_000;
+const SIGNED_IN_CLOUD_SYNC_INTERVAL_MS = 15_000;
 const MOBILE_LANDSCAPE_QUERY = "(max-width:899px) and (orientation: landscape)";
 const VISUAL_VIEWPORT_HEIGHT_VAR = "--ct-watch-visual-viewport-height";
 const VISUAL_VIEWPORT_TOP_VAR = "--ct-watch-visual-viewport-top";
@@ -48,10 +49,11 @@ export function LiteYouTubeEmbed({
   enableGlobalShortcuts = true,
   fillMobileLandscape = false,
 }: LiteYouTubeEmbedProps) {
-  const { upsertWatchProgress } = useCloudLibrary();
+  const { upsertWatchProgress, user } = useCloudLibrary();
   const [ready, setReady] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
-  const lastPersistedSecondsRef = useRef(-1);
+  const lastRecordedSecondsRef = useRef(-1);
+  const playingRef = useRef(false);
 
   useEffect(() => {
     if (!fillMobileLandscape || typeof window === "undefined") return;
@@ -119,8 +121,16 @@ export function LiteYouTubeEmbed({
   params.set("enablejsapi", "1");
   if (start != null) params.set("start", String(start));
 
-  const persistProgress = useCallback(
-    async (force = false) => {
+  const recordProgress = useCallback(
+    async ({
+      force = false,
+      persistLocal = false,
+      syncCloud = false,
+    }: {
+      force?: boolean;
+      persistLocal?: boolean;
+      syncCloud?: boolean;
+    } = {}) => {
       const root = shellRef.current;
       if (!root) return;
       const el = root.querySelector("lite-youtube") as LiteYoutubeElement | null;
@@ -132,7 +142,7 @@ export function LiteYouTubeEmbed({
           0,
           Math.floor(player.getCurrentTime?.() ?? 0),
         );
-        const lastGood = lastPersistedSecondsRef.current;
+        const lastGood = lastRecordedSecondsRef.current;
         if (
           force &&
           currentSeconds === 0 &&
@@ -150,21 +160,32 @@ export function LiteYouTubeEmbed({
           durationSeconds > 0 &&
           durationSeconds - currentSeconds <= 30;
 
-        if (!force && Math.abs(currentSeconds - lastPersistedSecondsRef.current) < 10) {
+        const writesOut = persistLocal || syncCloud;
+        if (
+          !force &&
+          !writesOut &&
+          Math.abs(currentSeconds - lastRecordedSecondsRef.current) < 1
+        ) {
           return;
         }
 
-        lastPersistedSecondsRef.current = currentSeconds;
-        await upsertWatchProgress({
-          videoId,
-          title: title ?? "Video",
-          thumbnailUrl:
-            thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
-          channelName: channelName ?? "Unknown channel",
-          lastPositionSeconds: currentSeconds,
-          durationSeconds,
-          completed,
-        });
+        lastRecordedSecondsRef.current = currentSeconds;
+        await upsertWatchProgress(
+          {
+            videoId,
+            title: title ?? "Video",
+            thumbnailUrl:
+              thumbnailUrl ?? `https://i.ytimg.com/vi/${videoId}/sddefault.jpg`,
+            channelName: channelName ?? "Unknown channel",
+            lastPositionSeconds: currentSeconds,
+            durationSeconds,
+            completed,
+          },
+          {
+            persistLocal,
+            syncCloud,
+          },
+        );
       } catch {
         /* ignore player readiness issues */
       }
@@ -180,12 +201,13 @@ export function LiteYouTubeEmbed({
 
     const onStateChange = (event: YT.OnStateChangeEvent) => {
       const state = event.data;
-      if (
-        state === YT.PlayerState.PLAYING ||
-        state === YT.PlayerState.PAUSED ||
-        state === YT.PlayerState.ENDED
-      ) {
-        void persistProgress(true);
+      playingRef.current = state === YT.PlayerState.PLAYING;
+      if (state === YT.PlayerState.PLAYING) {
+        void recordProgress();
+        return;
+      }
+      if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.ENDED) {
+        void recordProgress({ force: true, persistLocal: true, syncCloud: true });
       }
     };
 
@@ -219,29 +241,50 @@ export function LiteYouTubeEmbed({
         }
       }
     };
-  }, [persistProgress, ready, startSeconds, videoId]);
+  }, [recordProgress, ready, startSeconds, videoId]);
 
   useEffect(() => {
     if (!ready) return;
 
-    const interval = window.setInterval(() => {
-      void persistProgress();
-    }, PROGRESS_POLL_INTERVAL_MS);
+    const sampleInterval = window.setInterval(() => {
+      if (playingRef.current) void recordProgress();
+    }, PROGRESS_SAMPLE_INTERVAL_MS);
+
+    const persistInterval = window.setInterval(
+      () => {
+        if (!playingRef.current) return;
+        void recordProgress(
+          user
+            ? { syncCloud: true }
+            : { persistLocal: true },
+        );
+      },
+      user
+        ? SIGNED_IN_CLOUD_SYNC_INTERVAL_MS
+        : ANONYMOUS_LOCAL_PERSIST_INTERVAL_MS,
+    );
 
     const flush = () => {
-      void persistProgress(true);
+      void recordProgress({ force: true, persistLocal: true, syncCloud: true });
+    };
+
+    const flushIfHidden = () => {
+      if (document.visibilityState === "hidden") flush();
     };
 
     window.addEventListener("beforeunload", flush);
-    document.addEventListener("visibilitychange", flush);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", flushIfHidden);
 
     return () => {
-      window.clearInterval(interval);
+      window.clearInterval(sampleInterval);
+      window.clearInterval(persistInterval);
       window.removeEventListener("beforeunload", flush);
-      document.removeEventListener("visibilitychange", flush);
-      void persistProgress(true);
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", flushIfHidden);
+      void recordProgress({ force: true, persistLocal: true, syncCloud: true });
     };
-  }, [persistProgress, ready]);
+  }, [recordProgress, ready, user]);
 
   if (!ready) {
     return (
