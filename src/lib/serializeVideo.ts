@@ -1,4 +1,4 @@
-import type { Video } from "youtube-sr";
+import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
 
 import type { VideoSummary } from "@/components/VideoSummary";
 
@@ -26,9 +26,13 @@ export function canonicalYoutubeThumbnailUrl(url: string): string {
   }
 }
 
-export function preferredYoutubeThumbnailPath(id: string, video?: Video): string {
+export function preferredYoutubeThumbnailPath(
+  id: string,
+  video?: VideoLikeForSummary,
+): string {
+  const fromApi = video?.thumbnailUrls?.[0];
   const raw =
-    video?.thumbnail?.displayThumbnailURL(THUMB_VARIANT) ??
+    (fromApi && canonicalYoutubeThumbnailUrl(fromApi)) ||
     `https://i.ytimg.com/vi/${id}/${THUMB_VARIANT}.jpg`;
   return canonicalYoutubeThumbnailUrl(raw);
 }
@@ -62,29 +66,20 @@ function pushIfAllowed(
   if (c !== primary) pushUnique(out, c);
 }
 
-const DEFAULT_FRAME_IDS = ["0", "1", "2", "3", "4"] as const;
-
 /**
  * Ordered fallbacks when the primary thumb URL fails (404 etc.).
- * Uses youtube-sr’s `Video.thumbnail` (raw `url`, per-variant URLs, default frame URLs),
- * then plain `vi` / `vi_webp` paths so we still get distinct tries when InnerTube URLs
- * duplicate after canonicalization.
+ * Uses API-provided URLs first, then plain `vi` / `vi_webp` paths.
  */
 export function youtubeThumbnailFallbackUrls(
   id: string,
-  video: Video | undefined,
+  video: VideoLikeForSummary | undefined,
   primary: string,
 ): string[] {
   const out: string[] = [];
-  const surf = video?.thumbnail?.url;
-  if (surf) pushIfAllowed(out, primary, surf);
 
-  if (video?.thumbnail) {
-    for (const variant of THUMB_FALLBACK_VARIANTS) {
-      pushIfAllowed(out, primary, video.thumbnail.displayThumbnailURL(variant));
-    }
-    for (const frame of DEFAULT_FRAME_IDS) {
-      pushIfAllowed(out, primary, video.thumbnail.defaultThumbnailURL(frame));
+  if (video?.thumbnailUrls?.length) {
+    for (const u of video.thumbnailUrls) {
+      if (u) pushIfAllowed(out, primary, u);
     }
   }
 
@@ -102,23 +97,29 @@ export function youtubeThumbnailFallbackUrls(
   return out;
 }
 
-export function toVideoSummary(video: Video): VideoSummary | null {
+export function toVideoSummary(video: VideoLikeForSummary): VideoSummary | null {
   const id = video.id;
   if (!id) return null;
   const thumbnailUrl = preferredYoutubeThumbnailPath(id, video);
-  const thumbnailFallbackUrls = youtubeThumbnailFallbackUrls(id, video, thumbnailUrl);
+  const thumbnailFallbackUrls = youtubeThumbnailFallbackUrls(
+    id,
+    video,
+    thumbnailUrl,
+  );
   return {
     id,
     title: video.title?.trim() || "Untitled",
     thumbnailUrl,
     thumbnailFallbackUrls,
-    channelName: video.channel?.name?.trim() || "Unknown channel",
+    channelName: video.channelName?.trim() || "Unknown channel",
     durationFormatted: video.live ? "LIVE" : video.durationFormatted || "—",
     uploadedAt: video.uploadedAt,
     live: video.live,
   };
 }
 
-export function toVideoSummaries(videos: Video[]): VideoSummary[] {
+export function toVideoSummaries(
+  videos: VideoLikeForSummary[],
+): VideoSummary[] {
   return videos.map(toVideoSummary).filter(Boolean) as VideoSummary[];
 }

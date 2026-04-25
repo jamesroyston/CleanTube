@@ -1,181 +1,94 @@
-import YouTube, {
-  Formatter,
-  Util,
-  type Channel,
-  type Playlist,
-  type Video,
-} from "youtube-sr";
+import type { Types } from "youtubei.js";
 
-import { YOUTUBE_FETCH_INIT } from "@/lib/youtubeRequest";
+import { canonicalYoutubeThumbnailUrl } from "@/lib/serializeVideo";
+import {
+  feedVideoToVideoLike,
+  formatYoutubeDurationSeconds,
+} from "@/lib/youtubeiAdapters";
+import { getInnertube } from "@/lib/youtubeiClient";
+import type { UploadDateSortMode } from "@/lib/uploadedAtSort";
+import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
+import {
+  extractVideoIdFromUrl as extractVideoIdFromUrlImpl,
+  isLikelyYouTubeUrl as isLikelyYouTubeUrlImpl,
+  isValidYoutubeVideoId,
+} from "@/lib/youtubeUrl";
 
-export type { Video };
+export type { VideoLikeForSummary as Video } from "@/lib/youtubeTypes";
 
-/** True when the user clearly pasted or typed a YouTube link (not a plain keyword). */
-export function isLikelyYouTubeUrl(input: string): boolean {
-  const t = input.trim();
-  if (!t) return false;
-  if (YouTube.validate(t, "VIDEO")) return true;
-  return /youtube\.com|youtu\.be|youtube-nocookie\.com/i.test(t);
-}
+export { extractVideoIdFromUrlImpl as extractVideoIdFromUrl, isLikelyYouTubeUrlImpl as isLikelyYouTubeUrl };
 
-/**
- * Video id from a YouTube watch/embed/short URL only.
- * Does not treat bare 11-character strings as ids so normal searches still work.
- */
-export function extractVideoIdFromUrl(input: string): string | null {
-  const trimmed = input.trim();
-  if (!trimmed) return null;
-  if (YouTube.validate(trimmed, "VIDEO")) {
-    const m = trimmed.match(YouTube.Regex.VIDEO_URL);
-    return m?.[5] ?? null;
-  }
-  return null;
-}
-
-type RawGridItem = Record<string, unknown>;
-
-/**
- * youtube-sr's parseVideo assumes title.runs[0], thumbnail.thumbnails[], and
- * ownerText.runs[0] exist. YouTube's JSON often uses title.simpleText or omits
- * channel rows; that throws and aborts the entire Formatter.formatSearchResult loop.
- */
-function normalizeVideoRendererItem(data: RawGridItem): RawGridItem {
-  const vr = data.videoRenderer as Record<string, unknown> | undefined;
-  if (!vr) return data;
-
-  const videoId = vr.videoId as string | undefined;
-  const nvr: Record<string, unknown> = { ...vr };
-  const next: RawGridItem = { ...data, videoRenderer: nvr };
-
-  const title = nvr.title as Record<string, unknown> | undefined;
-  if (title && !Array.isArray(title.runs) && typeof title.simpleText === "string") {
-    nvr.title = { runs: [{ text: title.simpleText }] };
-  }
-
-  const thumb = nvr.thumbnail as { thumbnails?: unknown[] } | undefined;
-  if ((!thumb?.thumbnails || thumb.thumbnails.length === 0) && videoId) {
-    nvr.thumbnail = {
-      thumbnails: [
-        {
-          url: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-          width: 480,
-          height: 360,
-        },
-      ],
+function searchFiltersForSort(sortMode: UploadDateSortMode): Types.SearchFilters {
+  if (sortMode === "newest") {
+    return {
+      type: "video",
+      upload_date: "week",
+      sort_by: "upload_date",
     };
   }
-
-  const owner = nvr.ownerText as { runs?: unknown[] } | undefined;
-  if (!owner?.runs?.length) {
-    nvr.ownerText = {
-      runs: [
-        {
-          text: "Unknown channel",
-          navigationEndpoint: {
-            browseEndpoint: { browseId: "", canonicalBaseUrl: "" },
-            commandMetadata: { webCommandMetadata: { url: "/" } },
-          },
-        },
-      ],
-    };
-  }
-
-  return next;
+  return { type: "video" };
 }
 
-let youtubeSrFormatterPatched = false;
-
-/**
- * Patch youtube-sr once: per-item try/catch + normalization so one bad renderer
- * does not reject the whole search (and the UI does not fall into the error path).
- */
-function applyYoutubeSrSafeFormatter(): void {
-  if (youtubeSrFormatterPatched) return;
-  youtubeSrFormatterPatched = true;
-
-  Formatter.formatSearchResult = function formatSearchResultSafe(
-    details: unknown,
-    options: { limit?: number; type?: string } = {
-      limit: 100,
-      type: "all",
-    },
-  ): (Video | Channel | Playlist)[] {
-    if (!Array.isArray(details)) return [];
-
-    const opts = { ...options };
-    if (opts.type == null) opts.type = "video";
-    const results: (Video | Channel | Playlist)[] = [];
-
-    for (let i = 0; i < details.length; i++) {
-      if (
-        typeof opts.limit === "number" &&
-        opts.limit > 0 &&
-        results.length >= opts.limit
-      ) {
-        break;
-      }
-
-      const raw = details[i] as RawGridItem;
-      let res: Video | Channel | Playlist | undefined;
-
-      try {
-        let data = raw;
-        if (opts.type === "all") {
-          if (data.videoRenderer) opts.type = "video";
-          else if (data.channelRenderer) opts.type = "channel";
-          else if (data.playlistRenderer) opts.type = "playlist";
-          else continue;
-        }
-
-        if (opts.type === "video" || opts.type === "film") {
-          data = normalizeVideoRendererItem(data);
-          const parsed = Util.parseVideo(data);
-          if (!parsed) continue;
-          res = parsed;
-        } else if (opts.type === "channel") {
-          const parsed = Util.parseChannel(data);
-          if (!parsed) continue;
-          res = parsed;
-        } else if (opts.type === "playlist") {
-          const parsed = Util.parsePlaylist(data);
-          if (!parsed) continue;
-          res = parsed;
-        }
-
-        if (res) results.push(res);
-      } catch {
-        continue;
-      }
-    }
-
-    return results;
-  };
-}
-
-applyYoutubeSrSafeFormatter();
-
-export async function searchVideos(query: string, limit = 24): Promise<Video[]> {
+export async function searchVideos(
+  query: string,
+  limit = 24,
+  sortMode: UploadDateSortMode = "relevance",
+): Promise<VideoLikeForSummary[]> {
   const q = query.trim();
   if (!q) return [];
+
   try {
-    return await YouTube.search(q, {
-      type: "video",
-      limit,
-      requestOptions: YOUTUBE_FETCH_INIT,
-    });
+    const yt = await getInnertube();
+    const filters = searchFiltersForSort(sortMode);
+    let search = await yt.search(q, filters);
+    const out: VideoLikeForSummary[] = [];
+
+    while (out.length < limit) {
+      for (const v of search.videos) {
+        const mapped = feedVideoToVideoLike(v);
+        if (mapped) out.push(mapped);
+        if (out.length >= limit) break;
+      }
+      if (out.length >= limit) break;
+      if (!search.has_continuation) break;
+      search = await search.getContinuation();
+    }
+
+    return out.slice(0, limit);
   } catch {
     return [];
   }
 }
 
 /** @deprecated Prefer getWatchVideoDetails for watch + oEmbed fallback */
-export async function getVideoById(id: string): Promise<Video | null> {
-  if (!id || !YouTube.validate(id, "VIDEO_ID")) return null;
+export async function getVideoById(
+  id: string,
+): Promise<VideoLikeForSummary | null> {
+  if (!id || !isValidYoutubeVideoId(id)) return null;
   try {
-    return await YouTube.getVideo(
-      `https://www.youtube.com/watch?v=${id}`,
-      YOUTUBE_FETCH_INIT,
-    );
+    const yt = await getInnertube();
+    const info = await yt.getBasicInfo(id);
+    const bi = info.basic_info;
+    const live = Boolean(bi.is_live || bi.is_live_content);
+    const thumbs = (bi.thumbnail ?? []).map((t) => ({ url: t.url }));
+    return {
+      id,
+      title: bi.title,
+      channelName:
+        bi.channel?.name?.trim() || bi.author?.trim() || "Unknown channel",
+      durationFormatted: live ? "LIVE" : formatYoutubeDurationSeconds(bi.duration),
+      uploadedAt: info.primary_info?.relative_date?.toString()?.trim(),
+      live,
+      thumbnailUrls: thumbs
+        .map((t) => {
+          try {
+            return canonicalYoutubeThumbnailUrl(t.url);
+          } catch {
+            return "";
+          }
+        })
+        .filter(Boolean),
+    };
   } catch {
     return null;
   }

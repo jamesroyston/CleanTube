@@ -24,13 +24,65 @@
 
 > When I select a different search sort mode and then search again, I want the search mode preserved unless I reset it.
 
+## YouTube Data API v3 migration (not yet implemented)
+
+**Goal:** Replace or complement **youtubei.js** (InnerTube) with the **official [YouTube Data API v3](https://developers.google.com/youtube/v3/docs/search/list)** for search (and optionally metadata), so behavior is **fully documented and stable** (`order=date`, `publishedAfter` / `publishedBefore`, `videoDuration`, `regionCode`, etc.).
+
+**Why:** InnerTube clients depend on undocumented endpoints and parser updates; **`search.list`** is the supported path for granular search—at the cost of a **Google Cloud project**, **API key** (server-only), and **quota** (each `search.list` call is **100 units**; default daily budget is often ~10k units unless increased).
+
+**Current stack:** **`youtubei.js`** (`Innertube.search` / `getBasicInfo`) in `src/lib/youtube.ts`, `youtubeiClient.ts`, `youtubeiAdapters.ts`. “Upload date (newest)” uses **`SearchFilters`** with `sort_by: 'upload_date'` (no hard upload-date window).
+
+**Implementation sketch:** Server-side route or `searchVideos` branch; env e.g. `YOUTUBE_DATA_API_KEY`; map `search.list` + optional **`videos.list`** into **`VideoSummary`**; keep **youtubei.js** as fallback if quota is exhausted.
+
+### youtubei.js hardening notes (pending)
+
+- Add a controlled fallback path when `Innertube.search` fails or parser churn spikes:
+  - first retry with a different youtubei client profile (`WEB` -> `ANDROID`),
+  - then fallback to a stable server-side API path (YouTube Data API when available).
+- Keep parser-noise suppression limited to known non-fatal node mismatches (`VideoSummaryContentView` / `VideoSummaryParagraphView`) and keep logging all other parser errors.
+- Add lightweight runtime telemetry (counter per query for parser/fallback events) so we can detect breakages early without flooding logs.
+- Consider pinning `youtubei.js` and upgrading intentionally after quick smoke tests (`search`, `watch details`, continuations, newest sort).
+
+### Revert plan: re-implement youtube-sr quickly
+
+If we decide to fully revert the youtube backend:
+
+1. Dependencies/config
+   - Remove `youtubei.js`, add `youtube-sr`.
+   - Update `next.config.ts` `serverExternalPackages` back to `youtube-sr`.
+2. Core library files
+   - Replace `src/lib/youtube.ts` with `youtube-sr` search/getVideo implementation.
+   - Restore/adjust `src/lib/youtubeRequest.ts` for request headers used by youtube-sr.
+   - Revert `src/lib/watchVideo.ts` to `YouTube.getVideo(...)` + oEmbed fallback.
+3. Type/adapter layer
+   - Remove `youtubeiClient.ts`, `youtubeiAdapters.ts`, and either:
+     - restore `serializeVideo.ts` to consume youtube-sr `Video`, or
+     - keep current summary shape and add a small youtube-sr -> `VideoLikeForSummary` adapter.
+4. URL/validation
+   - Either keep `youtubeUrl.ts` validation/parser (library-agnostic), or switch back to `YouTube.validate`/regex.
+5. Verify
+   - Run `npm run build`, spot-check queries with relevance/newest sorts, watch page metadata, and thumbnail fallback behavior.
+
+## Passkeys (WebAuthn) — implemented (`@simplewebauthn`)
+
+**What shipped:** **Custom WebAuthn** using **`@simplewebauthn/server`** (Route Handlers) and **`@simplewebauthn/browser`**. Credentials are stored in **`webauthn_credentials`**; challenges in **`webauthn_challenges`**. Passkey sign-in uses **`SUPABASE_SERVICE_ROLE_KEY`** only on the server to exchange a verified assertion for a normal Supabase session (magic-link token + `verifyOtp`).
+
+**Supabase MFA (TOTP / SMS):** Handled in the auth UI after password sign-in (`mfa.challenge` / `challengeAndVerify` / `verify`) when the project requires **AAL2**.
+
+### `/auth/callback` and PKCE-style redirects
+
+OAuth is **not** exposed in the UI. Some Supabase flows (e.g. OAuth or certain email/link flows) still expect a **redirect URL** that receives `?code=` and exchanges it for a session server-side (`exchangeCodeForSession`).
+
+- If the repo **includes** `src/app/(auth)/auth/callback/route.ts` (or similar), keep **Authentication → URL configuration** in Supabase aligned with `http://localhost:3000/auth/callback` and production `/auth/callback` when those flows are used.
+- If that route is **removed** to simplify the codebase, **re-add** it when enabling OAuth, magic-link PKCE, or any redirect-based flow that returns an authorization `code`. Document the redirect URLs whenever that happens.
+
 ---
 
 ## EPIC: Cloud library, auth, watch progress (Supabase) — not yet implemented
 
 **Goal:** Persist saved library (channels, watch later, and later watch progress / history) across devices. Prefer **Supabase** (Auth + Postgres + RLS); **Vercel Postgres** was considered as an alternative if we ever want DB-only without Supabase’s auth/session helpers.
 
-**Auth (expected):** Sign-up, login, reset password; optionally passkeys and/or OAuth later. Anonymous users must still work: **session/local storage** for in-browser-only use when not signed in.
+**Auth (expected):** Sign-up, login, reset password; custom passkeys (see **Passkeys (WebAuthn)** above) plus optional Supabase MFA (TOTP/SMS) in the UI; OAuth not in the UI. Anonymous users must still work: **session/local storage** for in-browser-only use when not signed in.
 
 **Product behaviors (once built):**
 

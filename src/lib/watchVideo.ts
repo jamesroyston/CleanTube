@@ -1,40 +1,14 @@
-import type { Video } from "youtube-sr";
-import YouTube from "youtube-sr";
-
 import {
   fetchYouTubeOEmbed,
   parseChannelIdFromYoutubeUrl,
 } from "@/lib/oembed";
 import { preferredYoutubeThumbnailPath } from "@/lib/serializeVideo";
-import { YOUTUBE_FETCH_INIT } from "@/lib/youtubeRequest";
+import { videoInfoToWatchDetails } from "@/lib/youtubeiAdapters";
+import { getInnertube } from "@/lib/youtubeiClient";
+import type { WatchVideoDetails } from "@/lib/youtubeTypes";
+import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
-export type WatchVideoDetails = {
-  id: string;
-  title: string;
-  channelName: string;
-  channelId?: string;
-  channelUrl?: string;
-  uploadedAt?: string;
-  views: number;
-  description?: string;
-  thumbnailUrl?: string;
-  source: "youtube-sr" | "oembed";
-};
-
-function fromYoutubeSr(video: Video, id: string): WatchVideoDetails {
-  return {
-    id,
-    title: video.title ?? "Video",
-    channelName: video.channel?.name ?? "Unknown channel",
-    channelId: video.channel?.id,
-    channelUrl: video.channel?.url,
-    uploadedAt: video.uploadedAt,
-    views: video.views ?? 0,
-    description: video.description,
-    thumbnailUrl: preferredYoutubeThumbnailPath(id, video),
-    source: "youtube-sr",
-  };
-}
+export type { WatchVideoDetails } from "@/lib/youtubeTypes";
 
 function fromOEmbed(
   id: string,
@@ -61,14 +35,12 @@ function fromOEmbed(
 export async function getWatchVideoDetails(
   id: string,
 ): Promise<WatchVideoDetails | null> {
-  if (!id || !YouTube.validate(id, "VIDEO_ID")) return null;
+  if (!id || !isValidYoutubeVideoId(id)) return null;
 
   try {
-    const video = await YouTube.getVideo(
-      `https://www.youtube.com/watch?v=${id}`,
-      YOUTUBE_FETCH_INIT,
-    );
-    if (video) return fromYoutubeSr(video, id);
+    const yt = await getInnertube();
+    const info = await yt.getBasicInfo(id);
+    return videoInfoToWatchDetails(info, id);
   } catch {
     /* fall through to oEmbed */
   }
