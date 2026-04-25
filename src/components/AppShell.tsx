@@ -13,6 +13,7 @@ import {
   CHANNELS_DRAWER_WIDTH,
 } from "@/components/ChannelsSidebar";
 import { Header } from "@/components/Header";
+import { SavedChannelMigration } from "@/components/SavedChannelMigration";
 
 function HeaderFallback() {
   return null;
@@ -70,6 +71,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         <Suspense fallback={<HeaderFallback />}>
           <Header leading={headerLeading} />
         </Suspense>
+        <SavedChannelMigration />
         {children}
       </Box>
     </Box>

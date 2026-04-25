@@ -99,6 +99,10 @@ type CloudLibraryContextValue = {
     channelUrl?: string;
     searchQuery?: string;
   }) => Promise<void>;
+  updateSavedChannel: (
+    id: string,
+    patch: Partial<Omit<SavedChannel, "id">>,
+  ) => Promise<void>;
   removeSavedChannel: (id: string) => Promise<void>;
   addOrUpdateWatchLater: (input: {
     videoId: string;
@@ -494,6 +498,38 @@ export function CloudLibraryProvider({
     [persistLocalSnapshot, savedChannels, supabase, user],
   );
 
+  const updateSavedChannel = useCallback(
+    async (id: string, patch: Partial<Omit<SavedChannel, "id">>) => {
+      const existing = savedChannels.find((channel) => channel.id === id);
+      if (!existing) return;
+
+      const next: SavedChannel = {
+        ...existing,
+        ...patch,
+        id: existing.id,
+        name: (patch.name ?? existing.name).trim() || existing.name,
+        searchQuery:
+          (patch.searchQuery ?? existing.searchQuery).trim() ||
+          existing.searchQuery,
+      };
+      const updated = mergeSavedChannels(
+        [next, ...savedChannels.filter((channel) => channel.id !== id)],
+        [],
+      );
+
+      setSavedChannels(updated);
+      persistLocalSnapshot({ savedChannels: updated });
+      if (supabase && user) {
+        try {
+          await replaceSavedChannels(supabase, user.id, updated);
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [persistLocalSnapshot, savedChannels, supabase, user],
+  );
+
   const addOrUpdateWatchLater = useCallback(
     async (input: {
       videoId: string;
@@ -668,6 +704,7 @@ export function CloudLibraryProvider({
       resetPassword,
       signOutUser,
       addSavedChannel,
+      updateSavedChannel,
       removeSavedChannel,
       addOrUpdateWatchLater,
       removeWatchLaterByVideoId,
@@ -717,6 +754,7 @@ export function CloudLibraryProvider({
       signOutUser,
       signUp,
       upsertWatchProgress,
+      updateSavedChannel,
       user,
       watchLaterEntries,
       watchProgress,

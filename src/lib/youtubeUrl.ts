@@ -57,6 +57,13 @@ export function extractChannelRouteTokenFromUrl(input: string): string | null {
   return null;
 }
 
+export function extractHighConfidenceChannelLookup(input: string): string | null {
+  const t = input.trim();
+  if (!t) return null;
+  if (isValidYoutubeChannelId(t) || /^@[a-zA-Z0-9._-]+$/.test(t)) return t;
+  return extractChannelRouteTokenFromUrl(t);
+}
+
 export function channelPageHrefFromToken(token: string): string {
   return `/channel/${encodeURIComponent(token)}`;
 }

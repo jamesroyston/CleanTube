@@ -11,6 +11,10 @@ export type SavedChannelsContextValue = {
     channelUrl?: string;
     searchQuery?: string;
   }) => void;
+  updateChannel: (
+    id: string,
+    patch: Partial<Omit<SavedChannel, "id">>,
+  ) => void;
   removeChannel: (id: string) => void;
 };
 
@@ -25,6 +29,12 @@ export function useSavedChannels() {
       searchQuery?: string;
     }) => {
       void library.addSavedChannel(input);
+    },
+    updateChannel: (
+      id: string,
+      patch: Partial<Omit<SavedChannel, "id">>,
+    ) => {
+      void library.updateSavedChannel(id, patch);
     },
     removeChannel: (id: string) => {
       void library.removeSavedChannel(id);
