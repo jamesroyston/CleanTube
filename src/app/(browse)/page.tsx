@@ -47,7 +47,7 @@ export default async function Home({ searchParams }: PageProps) {
 
   if (query) {
     try {
-      const results = await searchVideos(query);
+      const results = await searchVideos(query, 24, sortMode);
       videos = sortVideoSummariesByUploadDate(
         toVideoSummaries(results),
         sortMode,
@@ -93,9 +93,7 @@ export default async function Home({ searchParams }: PageProps) {
                 About {videos.length} result{videos.length === 1 ? "" : "s"}{" "}
                 for <strong>{query}</strong>
               </Typography>
-              <Suspense fallback={null}>
-                <SearchSortBar query={query} />
-              </Suspense>
+              <SearchSortBar query={query} sort={sortMode} />
             </Box>
             <VideoResultsGrid videos={videos} />
           </>

@@ -70,10 +70,18 @@ export async function POST(request: Request) {
       expectedChallenge: challengeRow.challenge,
       expectedOrigin,
       expectedRPID: rpID,
+      requireUserVerification: true,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Verification failed.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: /user not verified/i.test(message)
+          ? "Your device did not verify you with a passcode, PIN, fingerprint, or face unlock. Try registering again and approve the verification prompt."
+          : message,
+      },
+      { status: 400 },
+    );
   }
 
   if (!verification.verified || !verification.registrationInfo) {
@@ -87,7 +95,7 @@ export async function POST(request: Request) {
   const { error: insErr } = await service.from("webauthn_credentials").insert({
     user_id: user.id,
     credential_id: credential.id,
-    public_key: Buffer.from(credential.publicKey),
+    public_key: `\\x${Buffer.from(credential.publicKey).toString("hex")}`,
     counter: credential.counter,
     transports: credential.transports ?? [],
     device_name: deviceName,

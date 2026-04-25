@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     excludeCredentials,
     authenticatorSelection: {
       residentKey: "preferred",
-      userVerification: "preferred",
+      userVerification: "required",
     },
   });
 

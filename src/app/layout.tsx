@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import { AppProviders } from "@/app/providers";
-import { AppShell } from "@/components/AppShell";
+import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 import "./globals.css";
 
 const roboto = Roboto({
@@ -35,7 +35,7 @@ export default function RootLayout({
     <html lang="en" className={roboto.variable} suppressHydrationWarning>
       <body style={{ margin: 0 }}>
         <AppProviders>
-          <AppShell>{children}</AppShell>
+          <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>
       </body>
     </html>

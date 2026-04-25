@@ -85,7 +85,16 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Verification failed.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: /user not verified/i.test(message)
+          ? "Your device did not verify you with a passcode, PIN, fingerprint, or face unlock. Remove this passkey, register it again, and approve the verification prompt."
+          : /well-formed|length not supported|invalid key/i.test(message)
+            ? "This passkey record has an invalid stored public key. Sign in with your password, remove this passkey, then register it again."
+          : message,
+      },
+      { status: 400 },
+    );
   }
 
   if (!verification.verified) {

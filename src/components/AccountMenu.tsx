@@ -61,8 +61,8 @@ export function AccountMenu() {
             />
           </MenuItem>
         ) : user ? (
-          <>
-            <MenuItem disabled>
+          [
+            <MenuItem key="account-state" disabled>
               <ListItemIcon>
                 <CloudDoneOutlinedIcon fontSize="small" />
               </ListItemIcon>
@@ -70,8 +70,9 @@ export function AccountMenu() {
                 primary={user.email ?? "Signed in"}
                 secondary="Library sync is enabled"
               />
-            </MenuItem>
+            </MenuItem>,
             <MenuItem
+              key="passkeys"
               component={Link}
               href="/auth"
               onClick={() => setAnchorEl(null)}
@@ -83,8 +84,9 @@ export function AccountMenu() {
                 primary="Passkeys & account"
                 secondary="Sign-in options and device passkeys"
               />
-            </MenuItem>
+            </MenuItem>,
             <MenuItem
+              key="sign-out"
               onClick={() => {
                 void signOutUser();
                 setAnchorEl(null);
@@ -94,8 +96,8 @@ export function AccountMenu() {
                 <LogoutOutlinedIcon fontSize="small" />
               </ListItemIcon>
               <ListItemText>Sign out</ListItemText>
-            </MenuItem>
-          </>
+            </MenuItem>,
+          ]
         ) : (
           <MenuItem
             component={Link}

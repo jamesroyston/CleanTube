@@ -7,7 +7,7 @@ import {
   createContext,
   useCallback,
   useContext,
-  useLayoutEffect,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -84,14 +84,14 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   const [lightPresetId, setLightPresetIdState] =
     useState<LightPresetId>(DEFAULT_LIGHT_PRESET);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage
     setModeState(readInitialMode());
     setDarkPresetIdState(readInitialDarkPreset());
     setLightPresetIdState(readInitialLightPreset());
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     function onStorage(e: StorageEvent) {
       if (!e.newValue) return;
       if (e.key === STORAGE_MODE) {

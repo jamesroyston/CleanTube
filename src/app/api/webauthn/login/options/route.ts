@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   const options = await generateAuthenticationOptions({
     rpID,
     allowCredentials,
-    userVerification: "preferred",
+    userVerification: "required",
   });
 
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();

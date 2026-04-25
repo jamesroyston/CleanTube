@@ -12,7 +12,6 @@ import {
   CHANNELS_DRAWER_WIDTH,
 } from "@/components/ChannelsSidebar";
 import { Header } from "@/components/Header";
-import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 
 function HeaderFallback() {
   return null;
@@ -62,9 +61,5 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  return (
-    <CloudLibraryProvider>
-      <AppShellInner>{children}</AppShellInner>
-    </CloudLibraryProvider>
-  );
+  return <AppShellInner>{children}</AppShellInner>;
 }

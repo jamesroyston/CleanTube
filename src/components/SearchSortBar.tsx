@@ -5,7 +5,7 @@ import FormControl from "@mui/material/FormControl";
 import InputLabel from "@mui/material/InputLabel";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { setLastSearchSort } from "@/lib/lastSearchSession";
 import type { UploadDateSortMode } from "@/lib/uploadedAtSort";
@@ -13,12 +13,12 @@ import { normalizeSortParam } from "@/lib/uploadedAtSort";
 
 type SearchSortBarProps = {
   query: string;
+  sort: UploadDateSortMode;
 };
 
-export function SearchSortBar({ query }: SearchSortBarProps) {
+export function SearchSortBar({ query, sort }: SearchSortBarProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const sort = normalizeSortParam(searchParams.get("sort"));
+  const selectedSort = normalizeSortParam(sort);
 
   function commit(next: UploadDateSortMode) {
     setLastSearchSort(next);
@@ -35,7 +35,7 @@ export function SearchSortBar({ query }: SearchSortBarProps) {
         <Select<UploadDateSortMode>
           labelId="cleantube-sort-label"
           label="Sort by"
-          value={sort}
+          value={selectedSort}
           onChange={(e) =>
             commit(e.target.value as UploadDateSortMode)
           }
