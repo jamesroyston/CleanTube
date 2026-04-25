@@ -79,18 +79,11 @@ export function useThemeMode() {
 }
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<Mode>("dark");
+  const [mode, setModeState] = useState<Mode>(() => readInitialMode());
   const [darkPresetId, setDarkPresetIdState] =
-    useState<DarkPresetId>(DEFAULT_DARK_PRESET);
+    useState<DarkPresetId>(() => readInitialDarkPreset());
   const [lightPresetId, setLightPresetIdState] =
-    useState<LightPresetId>(DEFAULT_LIGHT_PRESET);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage
-    setModeState(readInitialMode());
-    setDarkPresetIdState(readInitialDarkPreset());
-    setLightPresetIdState(readInitialLightPreset());
-  }, []);
+    useState<LightPresetId>(() => readInitialLightPreset());
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {

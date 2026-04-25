@@ -1,3 +1,11 @@
+import { Suspense } from "react";
+
+import { Header } from "@/components/Header";
+
+function HeaderFallback() {
+  return null;
+}
+
 export default function AuthLayout({
   children,
 }: Readonly<{
@@ -9,13 +17,24 @@ export default function AuthLayout({
         minHeight: "100vh",
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
         boxSizing: "border-box",
       }}
     >
-      {children}
+      <Suspense fallback={<HeaderFallback />}>
+        <Header />
+      </Suspense>
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          boxSizing: "border-box",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

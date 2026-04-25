@@ -20,7 +20,7 @@ function HeaderFallback() {
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
-  const mdUp = useMediaQuery(theme.breakpoints.up("md"));
+  const mdUp = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const desktopDrawerWidth = desktopCollapsed
