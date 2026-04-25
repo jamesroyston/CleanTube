@@ -14,11 +14,9 @@ import {
 import {
   fetchCloudSnapshot,
   getInitialSession,
-  type OAuthProvider,
   replaceSavedChannels,
   replaceWatchLaterEntries,
   resetPasswordForEmail,
-  signInWithOAuthProvider,
   signInWithPassword,
   signOut,
   signUpWithPassword,
@@ -34,6 +32,22 @@ import {
   writeLocalWatchLater,
   writeLocalWatchProgress,
 } from "@/lib/cloudLibrary/localStore";
+import {
+  type ListedFactor,
+  completePhoneMfa,
+  completeTotpMfa,
+  getPendingSupabaseMfa,
+  sendPhoneMfaChallenge,
+} from "@/lib/cloudLibrary/mfaClient";
+import {
+  browserSupportsPasskeys,
+  deletePasskeyFromDb,
+  listPasskeysFromDb,
+  type PasskeyRegistrationStep,
+  registerPasskeyWithApi,
+  signInWithPasskeyApi,
+  type PasskeyRow,
+} from "@/lib/cloudLibrary/webauthnClient";
 import {
   deriveResumeSeconds,
   isInProgress,
@@ -70,7 +84,6 @@ type CloudLibraryContextValue = {
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
-  signInWithOAuth: (provider: OAuthProvider) => Promise<{ error: string | null }>;
   signOutUser: () => Promise<void>;
   addSavedChannel: (input: {
     name: string;
@@ -94,6 +107,32 @@ type CloudLibraryContextValue = {
     videoId: string,
     watchLaterStartSeconds?: number,
   ) => number | undefined;
+  passkeysSupported: boolean;
+  registerPasskey: (
+    friendlyName: string,
+    onStep?: (step: PasskeyRegistrationStep) => void,
+  ) => Promise<{ error: string | null }>;
+  signInWithPasskey: (email: string) => Promise<{ error: string | null }>;
+  deletePasskey: (id: string) => Promise<{ error: string | null }>;
+  listPasskeys: () => Promise<{
+    factors: PasskeyRow[];
+    error: string | null;
+  }>;
+  getPendingSupabaseMfa: () => Promise<{
+    needsMfa: boolean;
+    factors: ListedFactor[];
+    error: string | null;
+  }>;
+  completeTotpMfa: (factorId: string, code: string) => Promise<{ error: string | null }>;
+  sendPhoneMfaChallenge: (factorId: string) => Promise<{
+    challengeId: string | null;
+    error: string | null;
+  }>;
+  completePhoneMfa: (
+    factorId: string,
+    challengeId: string,
+    code: string,
+  ) => Promise<{ error: string | null }>;
 };
 
 const CloudLibraryContext = createContext<CloudLibraryContextValue | null>(null);
@@ -149,6 +188,7 @@ export function CloudLibraryProvider({
   const [watchLaterEntries, setWatchLaterEntries] = useState<WatchLaterEntry[]>([]);
   const [savedChannels, setSavedChannels] = useState<SavedChannel[]>([]);
   const [watchProgress, setWatchProgress] = useState<WatchProgressEntry[]>([]);
+  const [passkeysSupported, setPasskeysSupported] = useState(false);
 
   const persistLocalSnapshot = useCallback(
     (next: {
@@ -214,6 +254,11 @@ export function CloudLibraryProvider({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage once on client
     hydrateFromLocal();
   }, [hydrateFromLocal]);
+
+  useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- detect WebAuthn once on client after mount
+    setPasskeysSupported(browserSupportsPasskeys());
+  }, []);
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
@@ -282,7 +327,16 @@ export function CloudLibraryProvider({
   const signUp = useCallback(
     async (email: string, password: string) => {
       if (!supabase) return { error: "Supabase is not configured." };
-      const { error } = await signUpWithPassword(supabase, email, password);
+      const emailRedirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${window.location.pathname}${window.location.search}`
+          : undefined;
+      const { error } = await signUpWithPassword(
+        supabase,
+        email,
+        password,
+        emailRedirectTo,
+      );
       return { error: error?.message ?? null };
     },
     [supabase],
@@ -297,26 +351,78 @@ export function CloudLibraryProvider({
     [supabase],
   );
 
-  const signInWithOAuth = useCallback(
-    async (provider: OAuthProvider) => {
-      if (!supabase) return { error: "Supabase is not configured." };
-      if (typeof window === "undefined") return { error: "Not available." };
-      const redirectTo = `${window.location.origin}/auth/callback`;
-      const { error } = await signInWithOAuthProvider(
-        supabase,
-        provider,
-        redirectTo,
-      );
-      return { error: error?.message ?? null };
-    },
-    [supabase],
-  );
-
   const signOutUser = useCallback(async () => {
     if (!supabase) return;
     await signOut(supabase);
     hydrateFromLocal();
   }, [hydrateFromLocal, supabase]);
+
+  const registerPasskey = useCallback(
+    async (friendlyName: string, onStep?: (step: PasskeyRegistrationStep) => void) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      return registerPasskeyWithApi(friendlyName, onStep);
+    },
+    [supabase],
+  );
+
+  const signInWithPasskey = useCallback(
+    async (email: string) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      const result = await signInWithPasskeyApi(email);
+      if (result.error) return result;
+      await supabase.auth.getSession();
+      return { error: null };
+    },
+    [supabase],
+  );
+
+  const deletePasskey = useCallback(
+    async (id: string) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      return deletePasskeyFromDb(supabase, id);
+    },
+    [supabase],
+  );
+
+  const listPasskeys = useCallback(async () => {
+    if (!supabase) {
+      return { factors: [], error: "Supabase is not configured." };
+    }
+    return listPasskeysFromDb(supabase);
+  }, [supabase]);
+
+  const getPendingSupabaseMfaCb = useCallback(async () => {
+    if (!supabase) {
+      return { needsMfa: false, factors: [], error: "Supabase is not configured." };
+    }
+    return getPendingSupabaseMfa(supabase);
+  }, [supabase]);
+
+  const completeTotpMfaCb = useCallback(
+    async (factorId: string, code: string) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      return completeTotpMfa(supabase, code, factorId);
+    },
+    [supabase],
+  );
+
+  const sendPhoneMfaChallengeCb = useCallback(
+    async (factorId: string) => {
+      if (!supabase) {
+        return { challengeId: null, error: "Supabase is not configured." };
+      }
+      return sendPhoneMfaChallenge(supabase, factorId);
+    },
+    [supabase],
+  );
+
+  const completePhoneMfaCb = useCallback(
+    async (factorId: string, challengeId: string, code: string) => {
+      if (!supabase) return { error: "Supabase is not configured." };
+      return completePhoneMfa(supabase, factorId, challengeId, code);
+    },
+    [supabase],
+  );
 
   const addSavedChannel = useCallback(
     async (input: {
@@ -502,7 +608,6 @@ export function CloudLibraryProvider({
       signIn,
       signUp,
       resetPassword,
-      signInWithOAuth,
       signOutUser,
       addSavedChannel,
       removeSavedChannel,
@@ -512,22 +617,39 @@ export function CloudLibraryProvider({
       upsertWatchProgress,
       getProgressByVideoId,
       getResumeSeconds,
+      passkeysSupported,
+      registerPasskey,
+      signInWithPasskey,
+      deletePasskey,
+      listPasskeys,
+      getPendingSupabaseMfa: getPendingSupabaseMfaCb,
+      completeTotpMfa: completeTotpMfaCb,
+      sendPhoneMfaChallenge: sendPhoneMfaChallengeCb,
+      completePhoneMfa: completePhoneMfaCb,
     }),
     [
       addOrUpdateWatchLater,
       addSavedChannel,
       authStatus,
+      completePhoneMfaCb,
+      completeTotpMfaCb,
+      deletePasskey,
+      getPendingSupabaseMfaCb,
       getProgressByVideoId,
       getResumeSeconds,
       isCloudConfigured,
       isInWatchLaterFn,
+      listPasskeys,
+      passkeysSupported,
+      registerPasskey,
       removeSavedChannel,
       removeWatchLaterByVideoId,
       resetPassword,
       savedChannels,
+      sendPhoneMfaChallengeCb,
       session,
       signIn,
-      signInWithOAuth,
+      signInWithPasskey,
       signOutUser,
       signUp,
       upsertWatchProgress,

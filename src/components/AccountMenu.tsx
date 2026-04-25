@@ -2,6 +2,7 @@
 
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 import CloudDoneOutlinedIcon from "@mui/icons-material/CloudDoneOutlined";
+import FingerprintOutlinedIcon from "@mui/icons-material/FingerprintOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
@@ -68,6 +69,19 @@ export function AccountMenu() {
               <ListItemText
                 primary={user.email ?? "Signed in"}
                 secondary="Library sync is enabled"
+              />
+            </MenuItem>
+            <MenuItem
+              component={Link}
+              href="/auth"
+              onClick={() => setAnchorEl(null)}
+            >
+              <ListItemIcon>
+                <FingerprintOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText
+                primary="Passkeys & account"
+                secondary="Sign-in options and device passkeys"
               />
             </MenuItem>
             <MenuItem

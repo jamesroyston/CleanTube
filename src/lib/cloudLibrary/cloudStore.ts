@@ -135,8 +135,15 @@ export async function signUpWithPassword(
   supabase: SupabaseClient,
   email: string,
   password: string,
+  emailRedirectTo?: string,
 ) {
-  return supabase.auth.signUp({ email, password });
+  return supabase.auth.signUp({
+    email,
+    password,
+    ...(emailRedirectTo
+      ? { options: { emailRedirectTo } }
+      : {}),
+  });
 }
 
 export async function resetPasswordForEmail(
@@ -150,19 +157,6 @@ export async function signOut(
   supabase: SupabaseClient,
 ) {
   return supabase.auth.signOut();
-}
-
-export type OAuthProvider = "google" | "apple" | "facebook";
-
-export async function signInWithOAuthProvider(
-  supabase: SupabaseClient,
-  provider: OAuthProvider,
-  redirectTo: string,
-) {
-  return supabase.auth.signInWithOAuth({
-    provider,
-    options: { redirectTo },
-  });
 }
 
 export async function getInitialSession(

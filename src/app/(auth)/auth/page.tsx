@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { AuthPageClient } from "@/app/auth/AuthPageClient";
+import { AuthPageClient } from "./AuthPageClient";
 
 export default function AuthPage() {
   return (

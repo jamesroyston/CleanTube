@@ -9,12 +9,12 @@ export async function GET(request: NextRequest) {
   const nextPath =
     nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
 
-  const oauthError =
+  const authError =
     requestUrl.searchParams.get("error_description") ??
     requestUrl.searchParams.get("error");
-  if (oauthError) {
+  if (authError) {
     return NextResponse.redirect(
-      new URL(`/auth?error=${encodeURIComponent(oauthError)}`, request.url),
+      new URL(`/auth?error=${encodeURIComponent(authError)}`, request.url),
     );
   }
 

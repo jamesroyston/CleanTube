@@ -40,7 +40,10 @@ Cloud library, auth, and watch progress use Supabase when these env vars are pre
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 ```
+
+`SUPABASE_SERVICE_ROLE_KEY` is **server-only** and is required for **passkey (WebAuthn) sign-in**: after the browser proves possession of a registered credential, the API exchanges a Supabase magic-link token for a normal session. Do not prefix it with `NEXT_PUBLIC_`.
 
 For local work, copy `.env.example` to `.env.local` and fill in your own project values. Do not commit real credentials or `.env.local`.
 
@@ -54,13 +57,11 @@ Database schema lives under `supabase/migrations/` and is designed for:
 
 Each table is user-scoped with RLS enabled.
 
-### OAuth (Google, Apple, Facebook)
+### Passkeys (custom WebAuthn)
 
-1. In the Supabase dashboard, open **Authentication → Providers** and enable **Google**, **Apple**, and/or **Facebook** with each provider’s client ID and secret (Apple needs the Services ID / key setup described in Supabase’s docs).
-2. Under **Authentication → URL configuration**, add these **Redirect URLs** (adjust the production origin):
-   - `http://localhost:3000/auth/callback`
-   - `https://<your-production-domain>/auth/callback`
-3. The app sends users to `/auth/callback` after the provider redirects back; that route exchanges the auth `code` for a session cookie.
+Passkeys are implemented with **`@simplewebauthn/server`** and **`@simplewebauthn/browser`**. Credentials live in the `webauthn_credentials` table (see `supabase/migrations/`). Sign-in uses the service role to mint a one-time Supabase session via `generateLink` + `verifyOtp` after WebAuthn succeeds. Depending on your Supabase **Auth → Email** settings, generating that link may also send a magic-link email; adjust templates or flows in the dashboard if that is undesirable.
+
+**Supabase MFA (TOTP / SMS):** If you enable MFA in the Supabase dashboard, the sign-in screen collects **authenticator codes** or **SMS codes** after the password step.
 
 **Build-time icons:** `npm run build` runs **`prebuild`**, which executes `scripts/generate-app-icons.mjs` (Sharp) and writes `favicon.ico`, `icon.png`, and `apple-icon.png` under `src/app/`. That runs on Vercel’s build image without extra configuration, so Safari-friendly raster favicons are produced on every production build. To change the artwork, edit `scripts/app-icon-source.svg` and commit; the next Vercel build will regenerate the binaries.
 
