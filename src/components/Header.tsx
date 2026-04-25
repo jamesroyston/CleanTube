@@ -109,7 +109,12 @@ export function Header({ leading }: { leading?: ReactNode }) {
   }
 
   return (
-    <AppBar position="sticky" elevation={0} color="transparent">
+    <AppBar
+      position="sticky"
+      elevation={0}
+      color="transparent"
+      sx={{ position: { xs: "static", md: "sticky" } }}
+    >
       <Toolbar sx={{ gap: 2, flexWrap: "wrap", py: 1 }}>
         {leading}
         <Box

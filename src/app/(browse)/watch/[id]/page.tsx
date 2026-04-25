@@ -66,12 +66,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
       sx={{
         pb: { xs: 4, sm: 6 },
         minHeight: "100vh",
-        "@media (max-width:899px) and (orientation: landscape)": {
-          bgcolor: "black",
-          height: "var(--ct-watch-visual-viewport-height, 100dvh)",
-          overflow: "hidden",
-          p: 0,
-        },
       }}
     >
       <Container
@@ -80,12 +74,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
         sx={{
           pt: { xs: 0, sm: 2 },
           px: { xs: 0, sm: 3 },
-          "@media (max-width:899px) and (orientation: landscape)": {
-            height: "var(--ct-watch-visual-viewport-height, 100dvh)",
-            maxWidth: "none",
-            p: 0,
-            width: "100%",
-          },
         }}
       >
         <Box
@@ -93,9 +81,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           sx={{
             px: { xs: 2, sm: 0 },
             pt: { xs: 1.5, sm: 0 },
-            "@media (max-width:899px) and (orientation: landscape)": {
-              display: "none",
-            },
           }}
         >
           <WatchLaterBanner videoId={id} />
@@ -106,24 +91,15 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
         <Box
           sx={{
             mb: { xs: 2, sm: 3 },
-            "@media (max-width:899px) and (orientation: landscape)": {
-              height: "var(--ct-watch-visual-viewport-height, 100dvh)",
-              left: 0,
-              m: 0,
-              position: "fixed",
-              top: "var(--ct-watch-visual-viewport-top, 0px)",
-              width: "100vw",
-              zIndex: 1301,
-            },
           }}
         >
+          {/* TODO: Revisit mobile landscape full-bleed playback without fighting browser chrome. */}
           <LiteYouTubeEmbed
             videoId={id}
             title={title}
             thumbnailUrl={thumb}
             channelName={video.channelName}
             startSeconds={startSeconds}
-            fillMobileLandscape
           />
         </Box>
 
@@ -132,9 +108,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           spacing={1.5}
           sx={{
             px: { xs: 2, sm: 0 },
-            "@media (max-width:899px) and (orientation: landscape)": {
-              display: "none",
-            },
           }}
         >
           <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
