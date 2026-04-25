@@ -58,13 +58,22 @@ type ChannelBackend = {
 
 function text(value: unknown): string | undefined {
   if (typeof value === "string") return value.trim() || undefined;
+  if (value && typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    for (const key of ["name", "content", "text", "simpleText", "title"]) {
+      const nested = record[key];
+      if (typeof nested === "string" && nested.trim()) {
+        return nested.trim();
+      }
+    }
+  }
   if (
     value &&
     typeof value === "object" &&
     typeof (value as { toString?: () => string }).toString === "function"
   ) {
     const out = String((value as { toString: () => string }).toString()).trim();
-    return out || undefined;
+    return out && out !== "[object Object]" ? out : undefined;
   }
   return undefined;
 }
@@ -262,6 +271,20 @@ function videosFromFeed(feed: FeedLike, limit: number): VideoLikeForSummary[] {
   return out;
 }
 
+function withChannelName(
+  video: VideoLikeForSummary,
+  channel: ChannelDetails,
+): VideoLikeForSummary {
+  const channelName = video.channelName?.trim();
+  if (channelName && channelName !== "N/A" && channelName !== "Unknown channel") {
+    return video;
+  }
+  return {
+    ...video,
+    channelName: channel.title,
+  };
+}
+
 async function loadChannel(lookup: string): Promise<ChannelLike | null> {
   if (!lookup) return null;
   try {
@@ -314,7 +337,9 @@ export const youtubeiChannelBackend: ChannelBackend = {
 
     return {
       channel: details,
-      videos: videosFromFeed(feed, limit),
+      videos: videosFromFeed(feed, limit).map((video) =>
+        withChannelName(video, details),
+      ),
       sort,
       pageToken: String(pageNumber),
       nextPageToken: hasNext ? String(pageNumber + 1) : undefined,

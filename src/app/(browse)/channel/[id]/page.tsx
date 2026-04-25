@@ -1,5 +1,3 @@
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
@@ -10,6 +8,7 @@ import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { ChannelPagination } from "@/components/ChannelPagination";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
 import { toVideoSummaries } from "@/lib/serializeVideo";
@@ -70,7 +69,7 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
   }
 
   const videos = toVideoSummaries(page.videos);
-  const currentPage = page.pageToken ?? "1";
+  const currentPage = Number.parseInt(page.pageToken ?? "1", 10) || 1;
   const metaParts = [
     page.channel.handle,
     page.channel.subscriberText,
@@ -154,9 +153,14 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
               Popular
             </Button>
           </Stack>
-          <Typography variant="body2" color="text.secondary">
-            Page {currentPage}
-          </Typography>
+          <Box sx={{ alignSelf: { xs: "center", sm: "auto" } }}>
+            <ChannelPagination
+              channelId={page.channel.id}
+              sort={sort}
+              currentPage={currentPage}
+              hasNextPage={Boolean(page.nextPageToken)}
+            />
+          </Box>
         </Stack>
 
         {videos.length === 0 ? (
@@ -167,36 +171,13 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
           <VideoResultsGrid videos={videos} />
         )}
 
-        <Stack
-          direction="row"
-          spacing={1}
-          justifyContent="center"
-          sx={{ mt: 4 }}
-        >
-          {page.previousPageToken ? (
-            <Button
-              href={channelHref(page.channel.id, {
-                sort,
-                page: page.previousPageToken,
-              })}
-              startIcon={<ArrowBackIcon />}
-              variant="outlined"
-            >
-              Previous
-            </Button>
-          ) : null}
-          {page.nextPageToken ? (
-            <Button
-              href={channelHref(page.channel.id, {
-                sort,
-                page: page.nextPageToken,
-              })}
-              endIcon={<ArrowForwardIcon />}
-              variant="outlined"
-            >
-              Next
-            </Button>
-          ) : null}
+        <Stack alignItems="center" sx={{ mt: 4 }}>
+          <ChannelPagination
+            channelId={page.channel.id}
+            sort={sort}
+            currentPage={currentPage}
+            hasNextPage={Boolean(page.nextPageToken)}
+          />
         </Stack>
       </Container>
     </Box>
