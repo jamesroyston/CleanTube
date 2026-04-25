@@ -22,6 +22,8 @@ import {
   signOut,
   signUpWithPassword,
   subscribeToAuthChanges,
+  upsertSavedChannels,
+  upsertWatchLaterEntries,
   upsertWatchProgressEntries,
 } from "@/lib/cloudLibrary/cloudStore";
 import {
@@ -245,8 +247,8 @@ export function CloudLibraryProvider({
       );
 
       await Promise.all([
-        replaceWatchLaterEntries(supabase, nextUser.id, mergedWatchLater),
-        replaceSavedChannels(supabase, nextUser.id, mergedSavedChannels),
+        upsertWatchLaterEntries(supabase, nextUser.id, mergedWatchLater),
+        upsertSavedChannels(supabase, nextUser.id, mergedSavedChannels),
         upsertWatchProgressEntries(supabase, nextUser.id, mergedWatchProgress),
       ]);
 
