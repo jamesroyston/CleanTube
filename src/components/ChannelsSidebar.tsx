@@ -49,10 +49,10 @@ export function ChannelsSidebar({
   const drawerWidth = mini ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
 
   function quickSearch(q: string) {
-    const sort = getLastSearchSort();
+    const searchSort = getLastSearchSort();
     const qs = new URLSearchParams();
     qs.set("q", q);
-    if (sort !== "relevance") qs.set("sort", sort);
+    if (searchSort !== "relevance") qs.set("searchSort", searchSort);
     router.push(`/?${qs.toString()}`);
     onClose();
   }

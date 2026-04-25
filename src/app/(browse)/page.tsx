@@ -15,18 +15,27 @@ import {
 } from "@/lib/youtube";
 import { extractStartSecondsFromYoutubeInput } from "@/lib/youtubeTime";
 import {
-  normalizeSortParam,
+  normalizeResultSortParam,
+  normalizeSearchSortParam,
   sortVideoSummariesByUploadDate,
 } from "@/lib/uploadedAtSort";
 import { toVideoSummaries } from "@/lib/serializeVideo";
 
 type PageProps = {
-  searchParams: Promise<{ q?: string; sort?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    searchSort?: string;
+    resultSort?: string;
+    /** @deprecated legacy combined search/results sort param */
+    sort?: string;
+  }>;
 };
 
 export default async function Home({ searchParams }: PageProps) {
-  const { q, sort: sortRaw } = await searchParams;
-  const sortMode = normalizeSortParam(sortRaw);
+  const { q, searchSort: searchSortRaw, resultSort: resultSortRaw, sort: legacySortRaw } =
+    await searchParams;
+  const searchSortMode = normalizeSearchSortParam(searchSortRaw ?? legacySortRaw);
+  const resultSortMode = normalizeResultSortParam(resultSortRaw ?? legacySortRaw);
   const query = q?.trim() ?? "";
 
   if (query && isLikelyYouTubeUrl(query)) {
@@ -46,10 +55,10 @@ export default async function Home({ searchParams }: PageProps) {
 
   if (query) {
     try {
-      const results = await searchVideos(query, 24, sortMode);
+      const results = await searchVideos(query, 24, searchSortMode);
       videos = sortVideoSummariesByUploadDate(
         toVideoSummaries(results),
-        sortMode,
+        resultSortMode,
       );
     } catch {
       errorMessage = "Search could not be completed. Please try again.";
@@ -91,7 +100,11 @@ export default async function Home({ searchParams }: PageProps) {
                 About {videos.length} result{videos.length === 1 ? "" : "s"}{" "}
                 for <strong>{query}</strong>
               </Typography>
-              <SearchSortBar query={query} sort={sortMode} />
+              <SearchSortBar
+                query={query}
+                searchSort={searchSortMode}
+                resultSort={resultSortMode}
+              />
             </Box>
             <VideoResultsGrid videos={videos} />
           </>

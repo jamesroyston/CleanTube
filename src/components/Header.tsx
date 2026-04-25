@@ -3,36 +3,79 @@
 import SearchIcon from "@mui/icons-material/Search";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
+import FormControl from "@mui/material/FormControl";
+import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
+import InputLabel from "@mui/material/InputLabel";
+import MenuItem from "@mui/material/MenuItem";
+import Select from "@mui/material/Select";
 import Toolbar from "@mui/material/Toolbar";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import {
+  FormEvent,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 
 import { AccountMenu } from "@/components/AccountMenu";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
-import { getLastSearchSort, setLastSearchQuery } from "@/lib/lastSearchSession";
-import { normalizeSortParam } from "@/lib/uploadedAtSort";
+import { useNavigationProgress } from "@/context/NavigationProgressContext";
+import { setLastSearchQuery, setLastSearchSort } from "@/lib/lastSearchSession";
+import {
+  normalizeResultSortParam,
+  normalizeSearchSortParam,
+  type SearchSortMode,
+} from "@/lib/uploadedAtSort";
 
 export function Header({ leading }: { leading?: ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { start, done } = useNavigationProgress();
+  const [isPending, startTransition] = useTransition();
+  const hadPendingRef = useRef(false);
   const qParam = searchParams.get("q") ?? "";
+  const legacySortParam = searchParams.get("sort");
+  const searchSortParam = searchParams.get("searchSort") ?? legacySortParam;
   const [query, setQuery] = useState(qParam);
+  const [searchSort, setSearchSort] = useState<SearchSortMode>(() =>
+    normalizeSearchSortParam(searchSortParam),
+  );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync the controlled search form after route changes
     setQuery(qParam);
-  }, [qParam]);
+    setSearchSort(normalizeSearchSortParam(searchSortParam));
+  }, [qParam, searchSortParam]);
+
+  useEffect(() => {
+    if (isPending) {
+      hadPendingRef.current = true;
+      start();
+      return;
+    }
+    if (hadPendingRef.current) {
+      hadPendingRef.current = false;
+      done();
+    }
+  }, [done, isPending, start]);
 
   function buildResultsHref(trimmed: string) {
     const qs = new URLSearchParams();
     qs.set("q", trimmed);
-    const raw = searchParams.get("sort");
-    const sort =
-      raw != null ? normalizeSortParam(raw) : getLastSearchSort();
-    if (sort !== "relevance") qs.set("sort", sort);
+    const resultSort = normalizeResultSortParam(
+      searchParams.get("resultSort") ?? searchParams.get("sort"),
+    );
+    if (searchSort !== "relevance") {
+      qs.set("searchSort", searchSort);
+    }
+    if (resultSort !== "search") qs.set("resultSort", resultSort);
     return `/?${qs.toString()}`;
   }
 
@@ -40,11 +83,29 @@ export function Header({ leading }: { leading?: ReactNode }) {
     e.preventDefault();
     const trimmed = query.trim();
     if (!trimmed) {
-      router.push("/");
+      start();
+      startTransition(() => {
+        if (pathname === "/" && searchParams.toString() === "") {
+          router.refresh();
+        } else {
+          router.push("/");
+        }
+      });
       return;
     }
     setLastSearchQuery(trimmed);
-    router.push(buildResultsHref(trimmed));
+    setLastSearchSort(searchSort);
+    const href = buildResultsHref(trimmed);
+    const currentSearch = searchParams.toString();
+    const currentHref = `${pathname}${currentSearch ? `?${currentSearch}` : ""}`;
+    start();
+    startTransition(() => {
+      if (currentHref === href) {
+        router.refresh();
+      } else {
+        router.push(href);
+      }
+    });
   }
 
   return (
@@ -77,8 +138,27 @@ export function Header({ leading }: { leading?: ReactNode }) {
         <Box
           component="form"
           onSubmit={onSubmit}
-          sx={{ flex: 1, minWidth: 200, maxWidth: 560 }}
+          sx={{
+            flex: 1,
+            minWidth: 240,
+            maxWidth: 720,
+            display: "flex",
+            gap: 1,
+            flexWrap: { xs: "wrap", sm: "nowrap" },
+          }}
         >
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 156 } }}>
+            <InputLabel id="cleantube-search-sort-label">Search type</InputLabel>
+            <Select<SearchSortMode>
+              labelId="cleantube-search-sort-label"
+              label="Search type"
+              value={searchSort}
+              onChange={(e) => setSearchSort(e.target.value as SearchSortMode)}
+            >
+              <MenuItem value="relevance">Relevance</MenuItem>
+              <MenuItem value="newest">Newest uploads</MenuItem>
+            </Select>
+          </FormControl>
           <TextField
             name="q"
             value={query}
@@ -91,7 +171,14 @@ export function Header({ leading }: { leading?: ReactNode }) {
               input: {
                 endAdornment: (
                   <InputAdornment position="end">
-                    <SearchIcon color="action" fontSize="small" />
+                    <IconButton
+                      aria-label="Search"
+                      edge="end"
+                      size="small"
+                      type="submit"
+                    >
+                      <SearchIcon color="action" fontSize="small" />
+                    </IconButton>
                   </InputAdornment>
                 ),
               },

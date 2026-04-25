@@ -4,23 +4,30 @@ import { useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
 import {
+  setLastResultSort,
   setLastSearchQuery,
   setLastSearchSort,
 } from "@/lib/lastSearchSession";
-import { normalizeSortParam } from "@/lib/uploadedAtSort";
+import {
+  normalizeResultSortParam,
+  normalizeSearchSortParam,
+} from "@/lib/uploadedAtSort";
 
 /** Persists the active search query and sort so navigation and “back” keep the same URL shape. */
 export function LastSearchSync() {
   const searchParams = useSearchParams();
   const q = searchParams.get("q")?.trim();
-  const sortRaw = searchParams.get("sort");
+  const legacySortRaw = searchParams.get("sort");
+  const searchSortRaw = searchParams.get("searchSort") ?? legacySortRaw;
+  const resultSortRaw = searchParams.get("resultSort") ?? legacySortRaw;
 
   useEffect(() => {
     if (q) {
       setLastSearchQuery(q);
-      setLastSearchSort(normalizeSortParam(sortRaw));
+      setLastSearchSort(normalizeSearchSortParam(searchSortRaw));
+      setLastResultSort(normalizeResultSortParam(resultSortRaw));
     }
-  }, [q, sortRaw]);
+  }, [q, resultSortRaw, searchSortRaw]);
 
   return null;
 }

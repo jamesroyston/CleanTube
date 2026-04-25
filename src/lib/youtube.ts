@@ -6,7 +6,7 @@ import {
   formatYoutubeDurationSeconds,
 } from "@/lib/youtubeiAdapters";
 import { getInnertube } from "@/lib/youtubeiClient";
-import type { UploadDateSortMode } from "@/lib/uploadedAtSort";
+import type { SearchSortMode } from "@/lib/uploadedAtSort";
 import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
 import {
   extractVideoIdFromUrl as extractVideoIdFromUrlImpl,
@@ -18,11 +18,10 @@ export type { VideoLikeForSummary as Video } from "@/lib/youtubeTypes";
 
 export { extractVideoIdFromUrlImpl as extractVideoIdFromUrl, isLikelyYouTubeUrlImpl as isLikelyYouTubeUrl };
 
-function searchFiltersForSort(sortMode: UploadDateSortMode): Types.SearchFilters {
+function searchFiltersForSort(sortMode: SearchSortMode): Types.SearchFilters {
   if (sortMode === "newest") {
     return {
       type: "video",
-      upload_date: "week",
       sort_by: "upload_date",
     };
   }
@@ -32,7 +31,7 @@ function searchFiltersForSort(sortMode: UploadDateSortMode): Types.SearchFilters
 export async function searchVideos(
   query: string,
   limit = 24,
-  sortMode: UploadDateSortMode = "relevance",
+  sortMode: SearchSortMode = "relevance",
 ): Promise<VideoLikeForSummary[]> {
   const q = query.trim();
   if (!q) return [];
@@ -42,11 +41,15 @@ export async function searchVideos(
     const filters = searchFiltersForSort(sortMode);
     let search = await yt.search(q, filters);
     const out: VideoLikeForSummary[] = [];
+    const seenVideoIds = new Set<string>();
 
     while (out.length < limit) {
       for (const v of search.videos) {
         const mapped = feedVideoToVideoLike(v);
-        if (mapped) out.push(mapped);
+        if (mapped && !seenVideoIds.has(mapped.id)) {
+          seenVideoIds.add(mapped.id);
+          out.push(mapped);
+        }
         if (out.length >= limit) break;
       }
       if (out.length >= limit) break;

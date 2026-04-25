@@ -13,6 +13,16 @@ import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
 export type { WatchVideoDetails } from "@/lib/youtubeTypes";
 
+const FALLBACK_TITLE = "Video";
+const FALLBACK_CHANNEL = "Unknown channel";
+
+function hasUsableWatchMetadata(video: WatchVideoDetails): boolean {
+  return (
+    video.title.trim() !== FALLBACK_TITLE &&
+    video.channelName.trim() !== FALLBACK_CHANNEL
+  );
+}
+
 function fromOEmbed(
   id: string,
   o: Awaited<ReturnType<typeof fetchYouTubeOEmbed>>,
@@ -185,10 +195,14 @@ export async function getWatchVideoDetails(
 ): Promise<WatchVideoDetails | null> {
   if (!id || !isValidYoutubeVideoId(id)) return null;
 
+  let fallbackVideo: WatchVideoDetails | null = null;
+
   try {
     const yt = await getInnertube();
     const info = await yt.getBasicInfo(id);
-    return videoInfoToWatchDetails(info, id);
+    const video = videoInfoToWatchDetails(info, id);
+    if (hasUsableWatchMetadata(video)) return video;
+    fallbackVideo = video;
   } catch {
     /* fall through to HTML / oEmbed fallbacks */
   }
@@ -196,9 +210,12 @@ export async function getWatchVideoDetails(
   const watchHtml = await fetchWatchHtml(id);
   if (watchHtml) {
     const fromHtml = fromWatchHtml(id, watchHtml);
-    if (fromHtml) return fromHtml;
+    if (fromHtml) {
+      if (hasUsableWatchMetadata(fromHtml)) return fromHtml;
+      fallbackVideo ??= fromHtml;
+    }
   }
 
   const oembed = await fetchYouTubeOEmbed(id);
-  return fromOEmbed(id, oembed);
+  return fromOEmbed(id, oembed) ?? fallbackVideo;
 }

@@ -121,5 +121,15 @@ export function toVideoSummary(video: VideoLikeForSummary): VideoSummary | null 
 export function toVideoSummaries(
   videos: VideoLikeForSummary[],
 ): VideoSummary[] {
-  return videos.map(toVideoSummary).filter(Boolean) as VideoSummary[];
+  const out: VideoSummary[] = [];
+  const seenVideoIds = new Set<string>();
+
+  for (const video of videos) {
+    const summary = toVideoSummary(video);
+    if (!summary || seenVideoIds.has(summary.id)) continue;
+    seenVideoIds.add(summary.id);
+    out.push(summary);
+  }
+
+  return out;
 }

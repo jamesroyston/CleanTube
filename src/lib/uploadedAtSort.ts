@@ -50,13 +50,14 @@ function approxAgeForSort(v: VideoSummary): number {
   return parsed;
 }
 
-export type UploadDateSortMode = "relevance" | "newest" | "oldest";
+export type SearchSortMode = "relevance" | "newest";
+export type ResultSortMode = "search" | "newest" | "oldest";
 
 export function sortVideoSummariesByUploadDate(
   videos: VideoSummary[],
-  mode: UploadDateSortMode,
+  mode: ResultSortMode,
 ): VideoSummary[] {
-  if (mode === "relevance") return [...videos];
+  if (mode === "search") return [...videos];
 
   const copy = [...videos];
   copy.sort((a, b) => {
@@ -72,7 +73,20 @@ export function sortVideoSummariesByUploadDate(
 
 export function normalizeSortParam(
   raw: string | undefined | null,
-): UploadDateSortMode {
-  if (raw === "newest" || raw === "oldest") return raw;
+): ResultSortMode {
+  return normalizeResultSortParam(raw);
+}
+
+export function normalizeSearchSortParam(
+  raw: string | undefined | null,
+): SearchSortMode {
+  if (raw === "newest") return raw;
   return "relevance";
+}
+
+export function normalizeResultSortParam(
+  raw: string | undefined | null,
+): ResultSortMode {
+  if (raw === "newest" || raw === "oldest") return raw;
+  return "search";
 }

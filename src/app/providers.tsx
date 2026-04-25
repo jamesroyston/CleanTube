@@ -21,6 +21,7 @@ import {
   type DarkPresetId,
   type LightPresetId,
 } from "@/theme/presets";
+import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
 
 const STORAGE_MODE = "cleantube-theme";
 const STORAGE_DARK_PRESET = "cleantube-theme-dark-preset";
@@ -172,7 +173,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <ThemeModeContext.Provider value={value}>
         <ThemeProvider theme={theme}>
           <CssBaseline enableColorScheme />
-          {children}
+          <NavigationProgressProvider>{children}</NavigationProgressProvider>
         </ThemeProvider>
       </ThemeModeContext.Provider>
     </AppRouterCacheProvider>
