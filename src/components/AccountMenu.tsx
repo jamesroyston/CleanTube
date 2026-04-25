@@ -3,7 +3,6 @@
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 import CloudDoneOutlinedIcon from "@mui/icons-material/CloudDoneOutlined";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import FingerprintOutlinedIcon from "@mui/icons-material/FingerprintOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import LightModeIcon from "@mui/icons-material/LightMode";
@@ -12,12 +11,13 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import PaletteIcon from "@mui/icons-material/Palette";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
-import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
+import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
+import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useState } from "react";
@@ -33,19 +33,17 @@ export function AccountMenu() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const open = Boolean(anchorEl);
 
-  const buttonLabel = user ? user.email ?? "Account" : "Account";
-
   return (
     <>
-      <Button
-        color="inherit"
-        startIcon={<AccountCircleOutlinedIcon />}
-        endIcon={<ExpandMoreIcon fontSize="small" />}
-        onClick={(event) => setAnchorEl(event.currentTarget)}
-        sx={{ textTransform: "none", maxWidth: 220 }}
-      >
-        {buttonLabel}
-      </Button>
+      <Tooltip title="Account">
+        <IconButton
+          aria-label="Account"
+          color="inherit"
+          onClick={(event) => setAnchorEl(event.currentTarget)}
+        >
+          <AccountCircleOutlinedIcon />
+        </IconButton>
+      </Tooltip>
       <Menu
         anchorEl={anchorEl}
         open={open}
