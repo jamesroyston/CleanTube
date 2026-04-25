@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 import {
   ChannelsSidebar,
@@ -21,12 +21,18 @@ function HeaderFallback() {
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
-  const mdUp = useMediaQuery(theme.breakpoints.up("md"), { noSsr: true });
+  const mdUp = useMediaQuery(theme.breakpoints.up("md"));
+  const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const desktopDrawerWidth = desktopCollapsed
     ? CHANNELS_COLLAPSED_DRAWER_WIDTH
     : CHANNELS_DRAWER_WIDTH;
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- delay responsive drawer markup until after hydration
+    setMounted(true);
+  }, []);
 
   const headerLeading = (
     <IconButton
@@ -52,17 +58,20 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         minHeight: "100vh",
       }}
     >
-      <ChannelsSidebar
-        variant={mdUp ? "permanent" : "temporary"}
-        open={mdUp || mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        collapsed={mdUp && desktopCollapsed}
-      />
+      {mounted ? (
+        <ChannelsSidebar
+          variant={mdUp ? "permanent" : "temporary"}
+          open={mdUp || mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          collapsed={mdUp && desktopCollapsed}
+        />
+      ) : null}
       <Box
         component="div"
         sx={{
           flexGrow: 1,
-          width: mdUp ? `calc(100% - ${desktopDrawerWidth}px)` : "100%",
+          width:
+            mounted && mdUp ? `calc(100% - ${desktopDrawerWidth}px)` : "100%",
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
