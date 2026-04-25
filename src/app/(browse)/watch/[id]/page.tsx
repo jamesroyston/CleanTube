@@ -113,7 +113,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
               position: "fixed",
               top: 0,
               width: "100vw",
-              zIndex: (theme) => theme.zIndex.modal + 1,
+              zIndex: 1301,
             },
           }}
         >
