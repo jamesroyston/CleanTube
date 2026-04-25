@@ -4,8 +4,7 @@ import Typography from "@mui/material/Typography";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
-import { InProgressStrip } from "@/components/InProgressStrip";
+import { HomeLandingSections } from "@/components/HomeLandingSections";
 import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchSortBar } from "@/components/SearchSortBar";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
@@ -63,9 +62,8 @@ export default async function Home({ searchParams }: PageProps) {
         <LastSearchSync />
       </Suspense>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
-        {!query ? <InProgressStrip /> : null}
         {!query ? (
-          <HomeHeroEmpty />
+          <HomeLandingSections />
         ) : errorMessage ? (
           <Typography color="error" sx={{ py: 4 }}>
             {errorMessage}

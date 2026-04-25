@@ -13,6 +13,7 @@ export type WatchLaterContextValue = {
     startSeconds?: number;
   }) => void;
   removeByVideoId: (videoId: string) => void;
+  clearEntries: () => void;
   isInWatchLater: (videoId: string) => boolean;
 };
 
@@ -31,6 +32,9 @@ export function useWatchLater() {
     },
     removeByVideoId: (videoId: string) => {
       void library.removeWatchLaterByVideoId(videoId);
+    },
+    clearEntries: () => {
+      void library.clearWatchLater();
     },
     isInWatchLater: library.isInWatchLater,
   };

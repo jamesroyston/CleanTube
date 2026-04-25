@@ -29,7 +29,7 @@ type LiteYouTubeEmbedProps = {
   /** Iframe `start` in seconds (from `?t=` on the watch page). */
   startSeconds?: number;
   /**
-   * When true (default), j/k/l, space, m, and c call the IFrame Player API
+   * When true (default), arrows, j/k/l, space, m, and c call the IFrame Player API
    * from document-level shortcuts (not only when the iframe is focused).
    */
   enableGlobalShortcuts?: boolean;

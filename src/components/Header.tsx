@@ -1,11 +1,8 @@
 "use client";
 
-import DarkModeIcon from "@mui/icons-material/DarkMode";
-import LightModeIcon from "@mui/icons-material/LightMode";
 import SearchIcon from "@mui/icons-material/Search";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
-import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
 import Toolbar from "@mui/material/Toolbar";
 import TextField from "@mui/material/TextField";
@@ -14,19 +11,16 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useState, type ReactNode } from "react";
 
-import { useThemeMode } from "@/app/providers";
 import { AccountMenu } from "@/components/AccountMenu";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
 import { getLastSearchSort, setLastSearchQuery } from "@/lib/lastSearchSession";
 import { normalizeSortParam } from "@/lib/uploadedAtSort";
-import { ThemePresetPanel } from "@/components/ThemePresetPanel";
 
 export function Header({ leading }: { leading?: ReactNode }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const qParam = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(qParam);
-  const { mode, toggleMode } = useThemeMode();
 
   useEffect(() => {
     setQuery(qParam);
@@ -106,15 +100,6 @@ export function Header({ leading }: { leading?: ReactNode }) {
         </Box>
         <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 0.5 }}>
           <AccountMenu />
-          <ThemePresetPanel />
-          <IconButton
-            onClick={toggleMode}
-            aria-label={
-              mode === "dark" ? "Switch to light mode" : "Switch to dark mode"
-            }
-          >
-            {mode === "dark" ? <LightModeIcon /> : <DarkModeIcon />}
-          </IconButton>
         </Box>
       </Toolbar>
     </AppBar>

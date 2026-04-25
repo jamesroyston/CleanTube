@@ -266,3 +266,16 @@ export async function upsertWatchProgressEntries(
   const { error } = await supabase.from("watch_progress").upsert(rows);
   if (error) throw error;
 }
+
+export async function replaceWatchProgressEntries(
+  supabase: SupabaseClient,
+  userId: string,
+  entries: WatchProgressEntry[],
+) {
+  const { error: deleteError } = await supabase
+    .from("watch_progress")
+    .delete()
+    .eq("user_id", userId);
+  if (deleteError) throw deleteError;
+  await upsertWatchProgressEntries(supabase, userId, entries);
+}

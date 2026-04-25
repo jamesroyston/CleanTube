@@ -174,6 +174,17 @@ export function useGlobalYoutubeShortcuts(
         return;
       }
 
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        const delta = e.key === "ArrowLeft" ? -SEEK_STEP_SEC : SEEK_STEP_SEC;
+        void (async () => {
+          const player = await getPlayer();
+          if (!player || cancelled) return;
+          await seekRelative(player, delta);
+        })();
+        return;
+      }
+
       if (e.repeat && (e.key === " " || keyLower === "k")) return;
 
       const mapsMediaShortcut =

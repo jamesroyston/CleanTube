@@ -16,6 +16,7 @@ import {
   getInitialSession,
   replaceSavedChannels,
   replaceWatchLaterEntries,
+  replaceWatchProgressEntries,
   resetPasswordForEmail,
   signInWithPassword,
   signOut,
@@ -100,8 +101,11 @@ type CloudLibraryContextValue = {
     startSeconds?: number;
   }) => Promise<void>;
   removeWatchLaterByVideoId: (videoId: string) => Promise<void>;
+  clearWatchLater: () => Promise<void>;
   isInWatchLater: (videoId: string) => boolean;
   upsertWatchProgress: (input: WatchProgressInput) => Promise<void>;
+  removeWatchProgressByVideoId: (videoId: string) => Promise<void>;
+  clearWatchProgress: () => Promise<void>;
   getProgressByVideoId: (videoId: string) => WatchProgressEntry | undefined;
   getResumeSeconds: (
     videoId: string,
@@ -532,6 +536,18 @@ export function CloudLibraryProvider({
     [persistLocalSnapshot, supabase, user, watchLaterEntries],
   );
 
+  const clearWatchLater = useCallback(async () => {
+    setWatchLaterEntries([]);
+    persistLocalSnapshot({ watchLater: [] });
+    if (supabase && user) {
+      try {
+        await replaceWatchLaterEntries(supabase, user.id, []);
+      } catch {
+        /* keep local state if cloud sync fails */
+      }
+    }
+  }, [persistLocalSnapshot, supabase, user]);
+
   const isInWatchLaterFn = useCallback(
     (videoId: string) => watchLaterEntries.some((entry) => entry.videoId === videoId),
     [watchLaterEntries],
@@ -584,6 +600,34 @@ export function CloudLibraryProvider({
     [persistLocalSnapshot, supabase, user],
   );
 
+  const removeWatchProgressByVideoId = useCallback(
+    async (videoId: string) => {
+      const updated = watchProgress.filter((entry) => entry.videoId !== videoId);
+      setWatchProgress(updated);
+      persistLocalSnapshot({ watchProgress: updated });
+      if (supabase && user) {
+        try {
+          await replaceWatchProgressEntries(supabase, user.id, updated);
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [persistLocalSnapshot, supabase, user, watchProgress],
+  );
+
+  const clearWatchProgress = useCallback(async () => {
+    setWatchProgress([]);
+    persistLocalSnapshot({ watchProgress: [] });
+    if (supabase && user) {
+      try {
+        await replaceWatchProgressEntries(supabase, user.id, []);
+      } catch {
+        /* keep local state if cloud sync fails */
+      }
+    }
+  }, [persistLocalSnapshot, supabase, user]);
+
   const getProgressByVideoId = useCallback(
     (videoId: string) => watchProgress.find((entry) => entry.videoId === videoId),
     [watchProgress],
@@ -613,8 +657,11 @@ export function CloudLibraryProvider({
       removeSavedChannel,
       addOrUpdateWatchLater,
       removeWatchLaterByVideoId,
+      clearWatchLater,
       isInWatchLater: isInWatchLaterFn,
       upsertWatchProgress,
+      removeWatchProgressByVideoId,
+      clearWatchProgress,
       getProgressByVideoId,
       getResumeSeconds,
       passkeysSupported,
@@ -631,6 +678,8 @@ export function CloudLibraryProvider({
       addOrUpdateWatchLater,
       addSavedChannel,
       authStatus,
+      clearWatchLater,
+      clearWatchProgress,
       completePhoneMfaCb,
       completeTotpMfaCb,
       deletePasskey,
@@ -644,6 +693,7 @@ export function CloudLibraryProvider({
       registerPasskey,
       removeSavedChannel,
       removeWatchLaterByVideoId,
+      removeWatchProgressByVideoId,
       resetPassword,
       savedChannels,
       sendPhoneMfaChallengeCb,
