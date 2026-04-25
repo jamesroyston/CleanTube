@@ -55,7 +55,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     <Box
       sx={{
         display: "flex",
-        minHeight: hideBrowseChrome ? "100dvh" : "100vh",
+        minHeight: hideBrowseChrome
+          ? "var(--ct-watch-visual-viewport-height, 100dvh)"
+          : "100vh",
         overflow: hideBrowseChrome ? "hidden" : undefined,
       }}
     >

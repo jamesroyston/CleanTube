@@ -68,7 +68,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
         minHeight: "100vh",
         "@media (max-width:899px) and (orientation: landscape)": {
           bgcolor: "black",
-          height: "100dvh",
+          height: "var(--ct-watch-visual-viewport-height, 100dvh)",
           overflow: "hidden",
           p: 0,
         },
@@ -81,7 +81,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           pt: { xs: 0, sm: 2 },
           px: { xs: 0, sm: 3 },
           "@media (max-width:899px) and (orientation: landscape)": {
-            height: "100dvh",
+            height: "var(--ct-watch-visual-viewport-height, 100dvh)",
             maxWidth: "none",
             p: 0,
             width: "100%",
@@ -107,11 +107,11 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           sx={{
             mb: { xs: 2, sm: 3 },
             "@media (max-width:899px) and (orientation: landscape)": {
-              height: "100dvh",
+              height: "var(--ct-watch-visual-viewport-height, 100dvh)",
               left: 0,
               m: 0,
               position: "fixed",
-              top: 0,
+              top: "var(--ct-watch-visual-viewport-top, 0px)",
               width: "100vw",
               zIndex: 1301,
             },

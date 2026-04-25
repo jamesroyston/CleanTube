@@ -11,6 +11,9 @@ import "lite-youtube-embed/src/lite-yt-embed.css";
 
 /** Background saves while playing. Play/pause/end also force-save; 5–15s is cheap (one small JSON write). */
 const PROGRESS_POLL_INTERVAL_MS = 15_000;
+const MOBILE_LANDSCAPE_QUERY = "(max-width:899px) and (orientation: landscape)";
+const VISUAL_VIEWPORT_HEIGHT_VAR = "--ct-watch-visual-viewport-height";
+const VISUAL_VIEWPORT_TOP_VAR = "--ct-watch-visual-viewport-top";
 
 let liteYtLoad: Promise<unknown> | null = null;
 
@@ -49,6 +52,53 @@ export function LiteYouTubeEmbed({
   const [ready, setReady] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const lastPersistedSecondsRef = useRef(-1);
+
+  useEffect(() => {
+    if (!fillMobileLandscape || typeof window === "undefined") return;
+
+    const media = window.matchMedia(MOBILE_LANDSCAPE_QUERY);
+
+    function setViewportVars() {
+      const viewport = window.visualViewport;
+      const height = viewport?.height ?? window.innerHeight;
+      const top = viewport?.offsetTop ?? 0;
+
+      document.documentElement.style.setProperty(
+        VISUAL_VIEWPORT_HEIGHT_VAR,
+        `${Math.max(0, Math.floor(height))}px`,
+      );
+      document.documentElement.style.setProperty(
+        VISUAL_VIEWPORT_TOP_VAR,
+        `${Math.max(0, Math.floor(top))}px`,
+      );
+    }
+
+    function updateViewportVars() {
+      if (media.matches) {
+        setViewportVars();
+      } else {
+        document.documentElement.style.removeProperty(VISUAL_VIEWPORT_HEIGHT_VAR);
+        document.documentElement.style.removeProperty(VISUAL_VIEWPORT_TOP_VAR);
+      }
+    }
+
+    updateViewportVars();
+    window.visualViewport?.addEventListener("resize", updateViewportVars);
+    window.visualViewport?.addEventListener("scroll", updateViewportVars);
+    window.addEventListener("resize", updateViewportVars);
+    window.addEventListener("orientationchange", updateViewportVars);
+    media.addEventListener("change", updateViewportVars);
+
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateViewportVars);
+      window.visualViewport?.removeEventListener("scroll", updateViewportVars);
+      window.removeEventListener("resize", updateViewportVars);
+      window.removeEventListener("orientationchange", updateViewportVars);
+      media.removeEventListener("change", updateViewportVars);
+      document.documentElement.style.removeProperty(VISUAL_VIEWPORT_HEIGHT_VAR);
+      document.documentElement.style.removeProperty(VISUAL_VIEWPORT_TOP_VAR);
+    };
+  }, [fillMobileLandscape]);
 
   useEffect(() => {
     void loadLiteYt().then(() => setReady(true));
@@ -203,13 +253,13 @@ export function LiteYouTubeEmbed({
           bgcolor: "action.hover",
           ...(fillMobileLandscape
             ? {
-              "@media (max-width:599px)": {
-                borderRadius: 0,
-              },
-                "@media (max-width:899px) and (orientation: landscape)": {
+                "@media (max-width:599px)": {
+                  borderRadius: 0,
+                },
+                [MOBILE_LANDSCAPE_QUERY]: {
                   aspectRatio: "auto",
                   borderRadius: 0,
-                  height: "100dvh",
+                  height: `var(${VISUAL_VIEWPORT_HEIGHT_VAR}, 100dvh)`,
                 },
               }
             : {}),
@@ -230,14 +280,14 @@ export function LiteYouTubeEmbed({
                   borderRadius: "0 !important",
                 },
               },
-              "@media (max-width:899px) and (orientation: landscape)": {
-                height: "100dvh",
+              [MOBILE_LANDSCAPE_QUERY]: {
+                height: `var(${VISUAL_VIEWPORT_HEIGHT_VAR}, 100dvh)`,
                 overflow: "hidden",
                 bgcolor: "black",
                 "& lite-youtube": {
                   aspectRatio: "auto",
                   borderRadius: "0 !important",
-                  height: "100dvh",
+                  height: `var(${VISUAL_VIEWPORT_HEIGHT_VAR}, 100dvh)`,
                 },
                 "& lite-youtube iframe": {
                   height: "100%",
