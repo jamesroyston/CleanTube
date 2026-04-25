@@ -38,6 +38,22 @@ export type ChannelVideosPage = {
   previousPageToken?: string;
 };
 
+export type ChannelSearchResult = {
+  id: string;
+  title: string;
+  handle?: string;
+  description?: string;
+  channelUrl: string;
+  thumbnailUrl?: string;
+  subscriberText?: string;
+  videoCountText?: string;
+};
+
+export type MixedSearchResults = {
+  channels: ChannelSearchResult[];
+  videos: VideoLikeForSummary[];
+};
+
 export type WatchVideoDetails = {
   id: string;
   title: string;

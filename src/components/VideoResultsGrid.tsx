@@ -22,7 +22,7 @@ type VideoResultsGridProps = {
   videos: VideoSummary[];
 };
 
-function VideoCard({ video }: { video: VideoSummary }) {
+export function VideoCard({ video }: { video: VideoSummary }) {
   return (
     <Card
       variant="outlined"

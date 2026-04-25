@@ -6,14 +6,14 @@ import { Suspense } from "react";
 
 import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
 import { LastSearchSync } from "@/components/LastSearchSync";
+import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 import { SearchSortBar } from "@/components/SearchSortBar";
-import { VideoResultsGrid } from "@/components/VideoResultsGrid";
 import {
   channelPageHrefFromToken,
   extractChannelRouteTokenFromUrl,
   extractVideoIdFromUrl,
   isLikelyYouTubeUrl,
-  searchVideos,
+  searchMixedResults,
 } from "@/lib/youtube";
 import { extractStartSecondsFromYoutubeInput } from "@/lib/youtubeTime";
 import {
@@ -57,13 +57,15 @@ export default async function Home({ searchParams }: PageProps) {
   }
 
   let errorMessage: string | null = null;
+  let channels: Awaited<ReturnType<typeof searchMixedResults>>["channels"] = [];
   let videos = toVideoSummaries([]);
 
   if (query) {
     try {
-      const results = await searchVideos(query, 24, searchSortMode);
+      const results = await searchMixedResults(query, 24, searchSortMode);
+      channels = results.channels;
       videos = sortVideoSummariesByUploadDate(
-        toVideoSummaries(results),
+        toVideoSummaries(results.videos),
         resultSortMode,
       );
     } catch {
@@ -83,7 +85,7 @@ export default async function Home({ searchParams }: PageProps) {
           <Typography color="error" sx={{ py: 4 }}>
             {errorMessage}
           </Typography>
-        ) : videos.length === 0 ? (
+        ) : channels.length === 0 && videos.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 4 }}>
             No videos found for &ldquo;{query}&rdquo;.
           </Typography>
@@ -103,7 +105,8 @@ export default async function Home({ searchParams }: PageProps) {
                 color="text.secondary"
                 sx={{ flex: "1 1 200px", minWidth: 0, pt: 0.5 }}
               >
-                About {videos.length} result{videos.length === 1 ? "" : "s"}{" "}
+                About {channels.length + videos.length} result
+                {channels.length + videos.length === 1 ? "" : "s"}{" "}
                 for <strong>{query}</strong>
               </Typography>
               <SearchSortBar
@@ -112,7 +115,7 @@ export default async function Home({ searchParams }: PageProps) {
                 resultSort={resultSortMode}
               />
             </Box>
-            <VideoResultsGrid videos={videos} />
+            <SearchResultsGrid channels={channels} videos={videos} />
           </>
         )}
       </Container>
