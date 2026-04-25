@@ -5,6 +5,7 @@ import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { usePathname } from "next/navigation";
 import { Suspense, useState } from "react";
 
 import {
@@ -19,13 +20,19 @@ function HeaderFallback() {
 }
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
+  const mobileLandscape = useMediaQuery(
+    "(max-width:899px) and (orientation: landscape)",
+  );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const desktopDrawerWidth = desktopCollapsed
     ? CHANNELS_COLLAPSED_DRAWER_WIDTH
     : CHANNELS_DRAWER_WIDTH;
+  const hideBrowseChrome =
+    pathname.startsWith("/watch/") && !mdUp && mobileLandscape;
 
   const headerLeading = (
     <IconButton
@@ -45,26 +52,39 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
-      <ChannelsSidebar
-        variant={mdUp ? "permanent" : "temporary"}
-        open={mdUp || mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        collapsed={mdUp && desktopCollapsed}
-      />
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: hideBrowseChrome ? "100dvh" : "100vh",
+        overflow: hideBrowseChrome ? "hidden" : undefined,
+      }}
+    >
+      {!hideBrowseChrome ? (
+        <ChannelsSidebar
+          variant={mdUp ? "permanent" : "temporary"}
+          open={mdUp || mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          collapsed={mdUp && desktopCollapsed}
+        />
+      ) : null}
       <Box
         component="div"
         sx={{
           flexGrow: 1,
-          width: mdUp ? `calc(100% - ${desktopDrawerWidth}px)` : "100%",
+          width:
+            mdUp && !hideBrowseChrome
+              ? `calc(100% - ${desktopDrawerWidth}px)`
+              : "100%",
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
         }}
       >
-        <Suspense fallback={<HeaderFallback />}>
-          <Header leading={headerLeading} />
-        </Suspense>
+        {!hideBrowseChrome ? (
+          <Suspense fallback={<HeaderFallback />}>
+            <Header leading={headerLeading} />
+          </Suspense>
+        ) : null}
         {children}
       </Box>
     </Box>

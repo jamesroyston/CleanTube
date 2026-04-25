@@ -33,6 +33,7 @@ type LiteYouTubeEmbedProps = {
    * from document-level shortcuts (not only when the iframe is focused).
    */
   enableGlobalShortcuts?: boolean;
+  fillMobileLandscape?: boolean;
 };
 
 export function LiteYouTubeEmbed({
@@ -42,6 +43,7 @@ export function LiteYouTubeEmbed({
   channelName,
   startSeconds,
   enableGlobalShortcuts = true,
+  fillMobileLandscape = false,
 }: LiteYouTubeEmbedProps) {
   const { upsertWatchProgress } = useCloudLibrary();
   const [ready, setReady] = useState(false);
@@ -199,13 +201,53 @@ export function LiteYouTubeEmbed({
           aspectRatio: "16 / 9",
           borderRadius: 1,
           bgcolor: "action.hover",
+          ...(fillMobileLandscape
+            ? {
+              "@media (max-width:599px)": {
+                borderRadius: 0,
+              },
+                "@media (max-width:899px) and (orientation: landscape)": {
+                  aspectRatio: "auto",
+                  borderRadius: 0,
+                  height: "100dvh",
+                },
+              }
+            : {}),
         }}
       />
     );
   }
 
   return (
-    <Box ref={shellRef} sx={{ width: "100%" }}>
+    <Box
+      ref={shellRef}
+      sx={{
+        width: "100%",
+        ...(fillMobileLandscape
+          ? {
+              "@media (max-width:599px)": {
+                "& lite-youtube": {
+                  borderRadius: "0 !important",
+                },
+              },
+              "@media (max-width:899px) and (orientation: landscape)": {
+                height: "100dvh",
+                overflow: "hidden",
+                bgcolor: "black",
+                "& lite-youtube": {
+                  aspectRatio: "auto",
+                  borderRadius: "0 !important",
+                  height: "100dvh",
+                },
+                "& lite-youtube iframe": {
+                  height: "100%",
+                  width: "100%",
+                },
+              },
+            }
+          : {}),
+      }}
+    >
       <lite-youtube
         key={`${videoId}-${start ?? 0}`}
         videoid={videoId}

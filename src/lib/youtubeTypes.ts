@@ -22,5 +22,5 @@ export type WatchVideoDetails = {
   views: number;
   description?: string;
   thumbnailUrl?: string;
-  source: "youtubei.js" | "oembed";
+  source: "youtubei.js" | "watch-html" | "oembed";
 };

@@ -19,6 +19,8 @@ type PageProps = {
   searchParams: Promise<{ t?: string; start?: string }>;
 };
 
+export const runtime = "nodejs";
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -59,23 +61,82 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
     `https://i.ytimg.com/vi/${id}/sddefault.jpg`;
 
   return (
-    <Box component="main" sx={{ pb: 6, minHeight: "100vh" }}>
-      <Container maxWidth="md" sx={{ pt: 2 }}>
-        <WatchLaterBanner videoId={id} />
+    <Box
+      component="main"
+      sx={{
+        pb: { xs: 4, sm: 6 },
+        minHeight: "100vh",
+        "@media (max-width:899px) and (orientation: landscape)": {
+          bgcolor: "black",
+          height: "100dvh",
+          overflow: "hidden",
+          p: 0,
+        },
+      }}
+    >
+      <Container
+        maxWidth="md"
+        disableGutters
+        sx={{
+          pt: { xs: 0, sm: 2 },
+          px: { xs: 0, sm: 3 },
+          "@media (max-width:899px) and (orientation: landscape)": {
+            height: "100dvh",
+            maxWidth: "none",
+            p: 0,
+            width: "100%",
+          },
+        }}
+      >
+        <Box
+          className="watch-page-chrome"
+          sx={{
+            px: { xs: 2, sm: 0 },
+            pt: { xs: 1.5, sm: 0 },
+            "@media (max-width:899px) and (orientation: landscape)": {
+              display: "none",
+            },
+          }}
+        >
+          <WatchLaterBanner videoId={id} />
 
-        <BackToSearch />
+          <BackToSearch />
+        </Box>
 
-        <Box sx={{ mb: 3 }}>
+        <Box
+          sx={{
+            mb: { xs: 2, sm: 3 },
+            "@media (max-width:899px) and (orientation: landscape)": {
+              height: "100dvh",
+              left: 0,
+              m: 0,
+              position: "fixed",
+              top: 0,
+              width: "100vw",
+              zIndex: (theme) => theme.zIndex.modal + 1,
+            },
+          }}
+        >
           <LiteYouTubeEmbed
             videoId={id}
             title={title}
             thumbnailUrl={thumb}
             channelName={video.channelName}
             startSeconds={startSeconds}
+            fillMobileLandscape
           />
         </Box>
 
-        <Stack spacing={1.5}>
+        <Stack
+          className="watch-page-chrome"
+          spacing={1.5}
+          sx={{
+            px: { xs: 2, sm: 0 },
+            "@media (max-width:899px) and (orientation: landscape)": {
+              display: "none",
+            },
+          }}
+        >
           <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
             {title}
           </Typography>
