@@ -159,6 +159,7 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
               sort={sort}
               currentPage={currentPage}
               hasNextPage={Boolean(page.nextPageToken)}
+              totalPages={page.totalPages}
             />
           </Box>
         </Stack>
@@ -177,6 +178,7 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
             sort={sort}
             currentPage={currentPage}
             hasNextPage={Boolean(page.nextPageToken)}
+            totalPages={page.totalPages}
           />
         </Stack>
       </Container>

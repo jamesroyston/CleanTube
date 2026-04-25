@@ -36,6 +36,7 @@ export type ChannelVideosPage = {
   pageToken?: string;
   nextPageToken?: string;
   previousPageToken?: string;
+  totalPages?: number;
 };
 
 export type ChannelSearchResult = {

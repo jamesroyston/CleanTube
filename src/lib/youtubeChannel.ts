@@ -228,6 +228,38 @@ function normalizePageToken(pageToken: string | undefined): number {
   return Number.isFinite(pageNumber) && pageNumber > 0 ? pageNumber : 1;
 }
 
+function parseCountText(value: string | undefined): number | undefined {
+  const normalized = value?.replace(/,/g, "").trim().toLowerCase();
+  if (!normalized) return undefined;
+
+  const match = normalized.match(/(\d+(?:\.\d+)?)\s*([kmb])?/);
+  if (!match?.[1]) return undefined;
+
+  const base = Number.parseFloat(match[1]);
+  if (!Number.isFinite(base)) return undefined;
+
+  const multiplier =
+    match[2] === "b"
+      ? 1_000_000_000
+      : match[2] === "m"
+        ? 1_000_000
+        : match[2] === "k"
+          ? 1_000
+          : 1;
+
+  return Math.floor(base * multiplier);
+}
+
+function totalPagesFromVideoCount(
+  videoCountText: string | undefined,
+  pageSize: number,
+): number | undefined {
+  if (pageSize <= 0) return undefined;
+  const totalVideos = parseCountText(videoCountText);
+  if (totalVideos == null || totalVideos <= 0) return undefined;
+  return Math.max(1, Math.ceil(totalVideos / pageSize));
+}
+
 async function sortedVideosFeed(
   feed: FeedLike,
   sort: ChannelSortMode,
@@ -334,6 +366,7 @@ export const youtubeiChannelBackend: ChannelBackend = {
     const feed = await feedAtPage(sortedFeed, pageNumber);
     const hasNext =
       feed.has_continuation && typeof feed.getContinuation === "function";
+    const totalPages = totalPagesFromVideoCount(details.videoCountText, limit);
 
     return {
       channel: details,
@@ -344,6 +377,10 @@ export const youtubeiChannelBackend: ChannelBackend = {
       pageToken: String(pageNumber),
       nextPageToken: hasNext ? String(pageNumber + 1) : undefined,
       previousPageToken: pageNumber > 1 ? String(pageNumber - 1) : undefined,
+      totalPages:
+        totalPages == null
+          ? undefined
+          : Math.max(totalPages, hasNext ? pageNumber + 1 : pageNumber),
     };
   },
 };

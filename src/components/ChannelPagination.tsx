@@ -9,6 +9,7 @@ type ChannelPaginationProps = {
   sort: "latest" | "popular";
   currentPage: number;
   hasNextPage: boolean;
+  totalPages?: number;
 };
 
 function channelHref(
@@ -31,12 +32,14 @@ export function ChannelPagination({
   sort,
   currentPage,
   hasNextPage,
+  totalPages,
 }: ChannelPaginationProps) {
-  const count = hasNextPage ? currentPage + 1 : currentPage;
+  const count = totalPages ?? (hasNextPage ? currentPage + 1 : currentPage);
   if (count <= 1) return null;
 
   return (
     <Pagination
+      boundaryCount={1}
       color="primary"
       count={count}
       page={currentPage}
@@ -48,6 +51,7 @@ export function ChannelPagination({
         />
       )}
       shape="rounded"
+      siblingCount={1}
     />
   );
 }
