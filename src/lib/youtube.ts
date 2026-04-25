@@ -9,6 +9,8 @@ import { getInnertube } from "@/lib/youtubeiClient";
 import type { SearchSortMode } from "@/lib/uploadedAtSort";
 import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
 import {
+  channelPageHrefFromToken as channelPageHrefFromTokenImpl,
+  extractChannelRouteTokenFromUrl as extractChannelRouteTokenFromUrlImpl,
   extractVideoIdFromUrl as extractVideoIdFromUrlImpl,
   isLikelyYouTubeUrl as isLikelyYouTubeUrlImpl,
   isValidYoutubeVideoId,
@@ -16,7 +18,12 @@ import {
 
 export type { VideoLikeForSummary as Video } from "@/lib/youtubeTypes";
 
-export { extractVideoIdFromUrlImpl as extractVideoIdFromUrl, isLikelyYouTubeUrlImpl as isLikelyYouTubeUrl };
+export {
+  channelPageHrefFromTokenImpl as channelPageHrefFromToken,
+  extractChannelRouteTokenFromUrlImpl as extractChannelRouteTokenFromUrl,
+  extractVideoIdFromUrlImpl as extractVideoIdFromUrl,
+  isLikelyYouTubeUrlImpl as isLikelyYouTubeUrl,
+};
 
 function searchFiltersForSort(sortMode: SearchSortMode): Types.SearchFilters {
   if (sortMode === "newest") {

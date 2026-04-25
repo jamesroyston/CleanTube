@@ -9,6 +9,8 @@ import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchSortBar } from "@/components/SearchSortBar";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
 import {
+  channelPageHrefFromToken,
+  extractChannelRouteTokenFromUrl,
   extractVideoIdFromUrl,
   isLikelyYouTubeUrl,
   searchVideos,
@@ -47,6 +49,10 @@ export default async function Home({ searchParams }: PageProps) {
           ? `?t=${encodeURIComponent(String(start))}`
           : "";
       redirect(`/watch/${fromUrl}${qs}`);
+    }
+    const channelToken = extractChannelRouteTokenFromUrl(query);
+    if (channelToken) {
+      redirect(channelPageHrefFromToken(channelToken));
     }
   }
 

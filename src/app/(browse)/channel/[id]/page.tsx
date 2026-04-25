@@ -1,0 +1,204 @@
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Container from "@mui/material/Container";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+
+import { SaveChannelButton } from "@/components/SaveChannelButton";
+import { VideoResultsGrid } from "@/components/VideoResultsGrid";
+import { toVideoSummaries } from "@/lib/serializeVideo";
+import { getChannelVideosPage } from "@/lib/youtubeChannel";
+import type { ChannelSortMode } from "@/lib/youtubeTypes";
+
+type PageProps = {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ sort?: string; page?: string }>;
+};
+
+export const runtime = "nodejs";
+
+function normalizeChannelSort(value: string | undefined): ChannelSortMode {
+  return value === "popular" ? "popular" : "latest";
+}
+
+function channelHref(
+  id: string,
+  options?: { sort?: ChannelSortMode; page?: string },
+): string {
+  const qs = new URLSearchParams();
+  if (options?.sort && options.sort !== "latest") {
+    qs.set("sort", options.sort);
+  }
+  if (options?.page && options.page !== "1") {
+    qs.set("page", options.page);
+  }
+  const query = qs.toString();
+  return `/channel/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const { id } = await params;
+  const page = await getChannelVideosPage({ channelId: id, limit: 1 });
+  return {
+    title: page?.channel.title
+      ? `${page.channel.title} — CleanTube`
+      : "Channel — CleanTube",
+    description: page?.channel.description?.slice(0, 160),
+  };
+}
+
+export default async function ChannelPage({ params, searchParams }: PageProps) {
+  const { id } = await params;
+  const { sort: sortRaw, page: pageRaw } = await searchParams;
+  const sort = normalizeChannelSort(sortRaw);
+  const page = await getChannelVideosPage({
+    channelId: id,
+    sort,
+    pageToken: pageRaw,
+  });
+
+  if (!page) {
+    notFound();
+  }
+
+  const videos = toVideoSummaries(page.videos);
+  const currentPage = page.pageToken ?? "1";
+  const metaParts = [
+    page.channel.handle,
+    page.channel.subscriberText,
+    page.channel.videoCountText,
+  ].filter(Boolean);
+
+  return (
+    <Box component="main" sx={{ pb: 6, minHeight: "100vh" }}>
+      <Container maxWidth="xl" sx={{ pt: 2 }}>
+        {page.channel.bannerUrl ? (
+          <Box
+            sx={{
+              minHeight: { xs: 120, sm: 180 },
+              mb: 2,
+              borderRadius: 3,
+              backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.35), rgba(0,0,0,0)), url(${page.channel.bannerUrl})`,
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+            }}
+          />
+        ) : null}
+
+        <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            alignItems={{ xs: "flex-start", sm: "center" }}
+          >
+            <Avatar
+              src={page.channel.thumbnailUrl}
+              alt=""
+              sx={{ width: 80, height: 80, bgcolor: "primary.main" }}
+            >
+              {page.channel.title.slice(0, 1).toUpperCase()}
+            </Avatar>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="h4" component="h1" sx={{ fontWeight: 800 }}>
+                {page.channel.title}
+              </Typography>
+              {metaParts.length > 0 ? (
+                <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+                  {metaParts.join(" · ")}
+                </Typography>
+              ) : null}
+              {page.channel.description ? (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 1, maxWidth: 820 }}
+                >
+                  {page.channel.description}
+                </Typography>
+              ) : null}
+            </Box>
+            <SaveChannelButton
+              channelName={page.channel.title}
+              channelId={page.channel.id}
+              channelUrl={page.channel.channelUrl}
+            />
+          </Stack>
+        </Paper>
+
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1.5}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          justifyContent="space-between"
+          sx={{ mb: 2 }}
+        >
+          <Stack direction="row" spacing={1}>
+            <Button
+              href={channelHref(page.channel.id, { sort: "latest" })}
+              variant={sort === "latest" ? "contained" : "outlined"}
+            >
+              Latest
+            </Button>
+            <Button
+              href={channelHref(page.channel.id, { sort: "popular" })}
+              variant={sort === "popular" ? "contained" : "outlined"}
+            >
+              Popular
+            </Button>
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Page {currentPage}
+          </Typography>
+        </Stack>
+
+        {videos.length === 0 ? (
+          <Typography color="text.secondary" sx={{ py: 4 }}>
+            No videos found for this channel.
+          </Typography>
+        ) : (
+          <VideoResultsGrid videos={videos} />
+        )}
+
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent="center"
+          sx={{ mt: 4 }}
+        >
+          {page.previousPageToken ? (
+            <Button
+              href={channelHref(page.channel.id, {
+                sort,
+                page: page.previousPageToken,
+              })}
+              startIcon={<ArrowBackIcon />}
+              variant="outlined"
+            >
+              Previous
+            </Button>
+          ) : null}
+          {page.nextPageToken ? (
+            <Button
+              href={channelHref(page.channel.id, {
+                sort,
+                page: page.nextPageToken,
+              })}
+              endIcon={<ArrowForwardIcon />}
+              variant="outlined"
+            >
+              Next
+            </Button>
+          ) : null}
+        </Stack>
+      </Container>
+    </Box>
+  );
+}

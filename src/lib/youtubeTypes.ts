@@ -12,6 +12,32 @@ export type VideoLikeForSummary = {
   thumbnailUrls: string[];
 };
 
+export type ChannelSortMode = "latest" | "popular";
+
+export type ChannelDetails = {
+  id: string;
+  title: string;
+  handle?: string;
+  description?: string;
+  channelUrl: string;
+  thumbnailUrl?: string;
+  bannerUrl?: string;
+  subscriberText?: string;
+  videoCountText?: string;
+  viewCountText?: string;
+  joinedDateText?: string;
+  source: "youtubei.js";
+};
+
+export type ChannelVideosPage = {
+  channel: ChannelDetails;
+  videos: VideoLikeForSummary[];
+  sort: ChannelSortMode;
+  pageToken?: string;
+  nextPageToken?: string;
+  previousPageToken?: string;
+};
+
 export type WatchVideoDetails = {
   id: string;
   title: string;

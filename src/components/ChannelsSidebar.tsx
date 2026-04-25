@@ -20,11 +20,15 @@ import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { getLastSearchSort } from "@/lib/lastSearchSession";
+import {
+  channelPageHrefFromToken,
+  extractChannelRouteTokenFromUrl,
+} from "@/lib/youtubeUrl";
+import type { SavedChannel } from "@/types/savedChannel";
 
 const DRAWER_WIDTH = 280;
 const COLLAPSED_DRAWER_WIDTH = 72;
@@ -42,26 +46,40 @@ export function ChannelsSidebar({
   onClose,
   collapsed = false,
 }: ChannelsSidebarProps) {
-  const router = useRouter();
   const { channels, addChannel, removeChannel } = useSavedChannels();
   const [draft, setDraft] = useState("");
   const mini = collapsed && variant === "permanent";
   const drawerWidth = mini ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
 
-  function quickSearch(q: string) {
+  function searchHref(q: string) {
     const searchSort = getLastSearchSort();
     const qs = new URLSearchParams();
     qs.set("q", q);
     if (searchSort !== "relevance") qs.set("searchSort", searchSort);
-    router.push(`/?${qs.toString()}`);
-    onClose();
+    return `/?${qs.toString()}`;
+  }
+
+  function savedChannelHref(channel: SavedChannel) {
+    if (channel.channelId) return channelPageHrefFromToken(channel.channelId);
+    if (channel.channelUrl) {
+      const token = extractChannelRouteTokenFromUrl(channel.channelUrl);
+      if (token) return channelPageHrefFromToken(token);
+    }
+    return searchHref(channel.searchQuery);
   }
 
   function handleAdd(e: FormEvent) {
     e.preventDefault();
     const v = draft.trim();
     if (!v) return;
-    addChannel({ name: v, searchQuery: v });
+    const channelToken = extractChannelRouteTokenFromUrl(v);
+    const isUrl = /^https?:\/\//i.test(v);
+    addChannel({
+      name: v,
+      channelId: channelToken?.startsWith("UC") ? channelToken : undefined,
+      channelUrl: isUrl && channelToken ? v : undefined,
+      searchQuery: v,
+    });
     setDraft("");
   }
 
@@ -165,9 +183,9 @@ export function ChannelsSidebar({
               >
                 {!mini ? (
                   <Box
-                    component="button"
-                    type="button"
-                    onClick={() => quickSearch(c.searchQuery)}
+                    component={Link}
+                    href={savedChannelHref(c)}
+                    onClick={onClose}
                     sx={{
                       flex: 1,
                       minWidth: 0,
@@ -177,6 +195,7 @@ export function ChannelsSidebar({
                       background: "none",
                       font: "inherit",
                       color: "inherit",
+                      textDecoration: "none",
                       p: 0,
                       m: 0,
                     }}
@@ -192,9 +211,11 @@ export function ChannelsSidebar({
                   </Box>
                 ) : null}
                 <IconButton
-                  aria-label={`Search ${c.name}`}
+                  aria-label={`Open ${c.name}`}
+                  component={Link}
+                  href={savedChannelHref(c)}
                   size="small"
-                  onClick={() => quickSearch(c.searchQuery)}
+                  onClick={onClose}
                 >
                   <Tooltip title={mini ? c.name : ""} placement="right">
                     <SearchIcon fontSize="small" />
