@@ -4,7 +4,7 @@ import Typography from "@mui/material/Typography";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { HomeLandingSections } from "@/components/HomeLandingSections";
+import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
 import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchSortBar } from "@/components/SearchSortBar";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
@@ -63,7 +63,7 @@ export default async function Home({ searchParams }: PageProps) {
       </Suspense>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
         {!query ? (
-          <HomeLandingSections />
+          <HomeHeroEmpty />
         ) : errorMessage ? (
           <Typography color="error" sx={{ py: 4 }}>
             {errorMessage}
