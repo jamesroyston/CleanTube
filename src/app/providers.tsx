@@ -14,25 +14,29 @@ import {
 
 import { createAppTheme } from "@/theme/theme";
 import {
-  DEFAULT_DARK_PRESET,
-  DEFAULT_LIGHT_PRESET,
   normalizeDarkPreset,
   normalizeLightPreset,
   type DarkPresetId,
   type LightPresetId,
 } from "@/theme/presets";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
-
-const STORAGE_MODE = "cleantube-theme";
-const STORAGE_DARK_PRESET = "cleantube-theme-dark-preset";
-const STORAGE_LIGHT_PRESET = "cleantube-theme-light-preset";
-
-type Mode = "light" | "dark";
+import {
+  type InitialThemeSettings,
+  type ThemeMode,
+  THEME_DARK_PRESET_COOKIE,
+  THEME_DARK_PRESET_STORAGE_KEY,
+  THEME_LIGHT_PRESET_COOKIE,
+  THEME_LIGHT_PRESET_STORAGE_KEY,
+  THEME_MODE_COOKIE,
+  THEME_MODE_STORAGE_KEY,
+  createInitialThemeSettings,
+  normalizeThemeMode,
+} from "@/lib/themePersistence";
 
 type ThemeContextValue = {
-  mode: Mode;
+  mode: ThemeMode;
   toggleMode: () => void;
-  setMode: (m: Mode) => void;
+  setMode: (m: ThemeMode) => void;
   darkPresetId: DarkPresetId;
   lightPresetId: LightPresetId;
   setDarkPresetId: (id: DarkPresetId) => void;
@@ -41,34 +45,44 @@ type ThemeContextValue = {
 
 const ThemeModeContext = createContext<ThemeContextValue | null>(null);
 
-function readInitialMode(): Mode {
-  if (typeof window === "undefined") return "dark";
+function readStoredThemeSettings(): InitialThemeSettings {
+  if (typeof window === "undefined") {
+    return createInitialThemeSettings({});
+  }
   try {
-    const stored = localStorage.getItem(STORAGE_MODE) as Mode | null;
-    if (stored === "light" || stored === "dark") return stored;
-    return window.matchMedia("(prefers-color-scheme: light)").matches
-      ? "light"
-      : "dark";
+    const storedMode = normalizeThemeMode(
+      localStorage.getItem(THEME_MODE_STORAGE_KEY),
+    );
+    return createInitialThemeSettings({
+      mode:
+        storedMode ??
+        (window.matchMedia("(prefers-color-scheme: light)").matches
+          ? "light"
+          : "dark"),
+      darkPresetId: localStorage.getItem(THEME_DARK_PRESET_STORAGE_KEY),
+      lightPresetId: localStorage.getItem(THEME_LIGHT_PRESET_STORAGE_KEY),
+    });
   } catch {
-    return "dark";
+    return createInitialThemeSettings({});
   }
 }
 
-function readInitialDarkPreset(): DarkPresetId {
-  if (typeof window === "undefined") return DEFAULT_DARK_PRESET;
+function writeThemeCookie(name: string, value: string): void {
+  if (typeof document === "undefined") return;
   try {
-    return normalizeDarkPreset(localStorage.getItem(STORAGE_DARK_PRESET));
+    document.cookie = `${name}=${encodeURIComponent(
+      value,
+    )}; Max-Age=31536000; Path=/; SameSite=Lax`;
   } catch {
-    return DEFAULT_DARK_PRESET;
+    /* ignore */
   }
 }
 
-function readInitialLightPreset(): LightPresetId {
-  if (typeof window === "undefined") return DEFAULT_LIGHT_PRESET;
+function writeThemeStorage(key: string, value: string): void {
   try {
-    return normalizeLightPreset(localStorage.getItem(STORAGE_LIGHT_PRESET));
+    localStorage.setItem(key, value);
   } catch {
-    return DEFAULT_LIGHT_PRESET;
+    /* ignore */
   }
 }
 
@@ -78,57 +92,72 @@ export function useThemeMode() {
   return ctx;
 }
 
-export function AppProviders({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<Mode>(() => readInitialMode());
+export function AppProviders({
+  children,
+  initialTheme,
+}: {
+  children: React.ReactNode;
+  initialTheme: InitialThemeSettings;
+}) {
+  const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode);
   const [darkPresetId, setDarkPresetIdState] =
-    useState<DarkPresetId>(() => readInitialDarkPreset());
+    useState<DarkPresetId>(initialTheme.darkPresetId);
   const [lightPresetId, setLightPresetIdState] =
-    useState<LightPresetId>(() => readInitialLightPreset());
+    useState<LightPresetId>(initialTheme.lightPresetId);
+
+  useEffect(() => {
+    if (initialTheme.hasStoredCookie) return;
+    const stored = readStoredThemeSettings();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time migration from legacy localStorage-only theme settings
+    setModeState(stored.mode);
+    setDarkPresetIdState(stored.darkPresetId);
+    setLightPresetIdState(stored.lightPresetId);
+    writeThemeCookie(THEME_MODE_COOKIE, stored.mode);
+    writeThemeCookie(THEME_DARK_PRESET_COOKIE, stored.darkPresetId);
+    writeThemeCookie(THEME_LIGHT_PRESET_COOKIE, stored.lightPresetId);
+  }, [initialTheme.hasStoredCookie]);
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
       if (!e.newValue) return;
-      if (e.key === STORAGE_MODE) {
-        if (e.newValue === "light" || e.newValue === "dark") {
-          setModeState(e.newValue);
+      if (e.key === THEME_MODE_STORAGE_KEY) {
+        const next = normalizeThemeMode(e.newValue);
+        if (next) {
+          setModeState(next);
+          writeThemeCookie(THEME_MODE_COOKIE, next);
         }
       }
-      if (e.key === STORAGE_DARK_PRESET) {
-        setDarkPresetIdState(normalizeDarkPreset(e.newValue));
+      if (e.key === THEME_DARK_PRESET_STORAGE_KEY) {
+        const next = normalizeDarkPreset(e.newValue);
+        setDarkPresetIdState(next);
+        writeThemeCookie(THEME_DARK_PRESET_COOKIE, next);
       }
-      if (e.key === STORAGE_LIGHT_PRESET) {
-        setLightPresetIdState(normalizeLightPreset(e.newValue));
+      if (e.key === THEME_LIGHT_PRESET_STORAGE_KEY) {
+        const next = normalizeLightPreset(e.newValue);
+        setLightPresetIdState(next);
+        writeThemeCookie(THEME_LIGHT_PRESET_COOKIE, next);
       }
     }
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const setMode = useCallback((m: Mode) => {
+  const setMode = useCallback((m: ThemeMode) => {
     setModeState(m);
-    try {
-      localStorage.setItem(STORAGE_MODE, m);
-    } catch {
-      /* ignore */
-    }
+    writeThemeStorage(THEME_MODE_STORAGE_KEY, m);
+    writeThemeCookie(THEME_MODE_COOKIE, m);
   }, []);
 
   const setDarkPresetId = useCallback((id: DarkPresetId) => {
     setDarkPresetIdState(id);
-    try {
-      localStorage.setItem(STORAGE_DARK_PRESET, id);
-    } catch {
-      /* ignore */
-    }
+    writeThemeStorage(THEME_DARK_PRESET_STORAGE_KEY, id);
+    writeThemeCookie(THEME_DARK_PRESET_COOKIE, id);
   }, []);
 
   const setLightPresetId = useCallback((id: LightPresetId) => {
     setLightPresetIdState(id);
-    try {
-      localStorage.setItem(STORAGE_LIGHT_PRESET, id);
-    } catch {
-      /* ignore */
-    }
+    writeThemeStorage(THEME_LIGHT_PRESET_STORAGE_KEY, id);
+    writeThemeCookie(THEME_LIGHT_PRESET_COOKIE, id);
   }, []);
 
   const toggleMode = useCallback(() => {

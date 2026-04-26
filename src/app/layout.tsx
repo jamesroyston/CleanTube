@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
+import { cookies } from "next/headers";
 import { AppProviders } from "@/app/providers";
 import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
+import {
+  createInitialThemeSettings,
+  THEME_DARK_PRESET_COOKIE,
+  THEME_LIGHT_PRESET_COOKIE,
+  THEME_MODE_COOKIE,
+} from "@/lib/themePersistence";
 import "./globals.css";
 
 const roboto = Roboto({
@@ -26,15 +33,26 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const mode = cookieStore.get(THEME_MODE_COOKIE)?.value;
+  const darkPresetId = cookieStore.get(THEME_DARK_PRESET_COOKIE)?.value;
+  const lightPresetId = cookieStore.get(THEME_LIGHT_PRESET_COOKIE)?.value;
+  const initialTheme = createInitialThemeSettings({
+    mode,
+    darkPresetId,
+    lightPresetId,
+    hasStoredCookie: Boolean(mode || darkPresetId || lightPresetId),
+  });
+
   return (
     <html lang="en" className={roboto.variable} suppressHydrationWarning>
       <body style={{ margin: 0 }}>
-        <AppProviders>
+        <AppProviders initialTheme={initialTheme}>
           <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>
       </body>
