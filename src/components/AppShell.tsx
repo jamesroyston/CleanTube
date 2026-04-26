@@ -5,7 +5,7 @@ import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 
 import {
   ChannelsSidebar,
@@ -22,17 +22,11 @@ function HeaderFallback() {
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
-  const [mounted, setMounted] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const desktopDrawerWidth = desktopCollapsed
     ? CHANNELS_COLLAPSED_DRAWER_WIDTH
     : CHANNELS_DRAWER_WIDTH;
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- delay responsive drawer markup until after hydration
-    setMounted(true);
-  }, []);
 
   const headerLeading = (
     <IconButton
@@ -58,20 +52,24 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         minHeight: "100vh",
       }}
     >
-      {mounted ? (
-        <ChannelsSidebar
-          variant={mdUp ? "permanent" : "temporary"}
-          open={mdUp || mobileOpen}
-          onClose={() => setMobileOpen(false)}
-          collapsed={mdUp && desktopCollapsed}
-        />
-      ) : null}
+      <ChannelsSidebar
+        variant="permanent"
+        open
+        onClose={() => setMobileOpen(false)}
+        collapsed={desktopCollapsed}
+        sx={{ display: { xs: "none", md: "block" } }}
+      />
+      <ChannelsSidebar
+        variant="temporary"
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        sx={{ display: { xs: "block", md: "none" } }}
+      />
       <Box
         component="div"
         sx={{
           flexGrow: 1,
-          width:
-            mounted && mdUp ? `calc(100% - ${desktopDrawerWidth}px)` : "100%",
+          width: { xs: "100%", md: `calc(100% - ${desktopDrawerWidth}px)` },
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
