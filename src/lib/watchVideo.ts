@@ -170,6 +170,20 @@ function fromWatchHtml(
   };
 }
 
+/** Backfill description: `getBasicInfo` has no `next` payload, so `short_description` may be empty; watch HTML often still has it in `ytInitialPlayerResponse`. */
+async function mergeDescriptionFromWatchHtml(
+  id: string,
+  video: WatchVideoDetails,
+): Promise<WatchVideoDetails> {
+  if (video.description?.trim()) return video;
+  const html = await fetchWatchHtml(id);
+  if (!html) return video;
+  const fromHtml = fromWatchHtml(id, html);
+  const desc = fromHtml?.description?.trim();
+  if (!desc) return video;
+  return { ...video, description: desc };
+}
+
 async function fetchWatchHtml(videoId: string): Promise<string | null> {
   const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`;
   try {
@@ -201,7 +215,9 @@ export async function getWatchVideoDetails(
     const yt = await getInnertube();
     const info = await yt.getBasicInfo(id);
     const video = videoInfoToWatchDetails(info, id);
-    if (hasUsableWatchMetadata(video)) return video;
+    if (hasUsableWatchMetadata(video)) {
+      return await mergeDescriptionFromWatchHtml(id, video);
+    }
     fallbackVideo = video;
   } catch {
     /* fall through to HTML / oEmbed fallbacks */
