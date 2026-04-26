@@ -11,6 +11,7 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import PaletteIcon from "@mui/icons-material/Palette";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
+import TheatersIcon from "@mui/icons-material/Theaters";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -20,15 +21,18 @@ import MenuItem from "@mui/material/MenuItem";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useThemeMode } from "@/app/providers";
+import { useTheatreFocus, useThemeMode } from "@/app/providers";
 import { ThemePresetDialog } from "@/components/ThemePresetPanel";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 export function AccountMenu() {
   const { user, isCloudConfigured, signOutUser, authStatus } = useCloudLibrary();
   const { mode, toggleMode } = useThemeMode();
+  const { enabled: theatreFocus, toggleTheatreFocus } = useTheatreFocus();
+  const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const open = Boolean(anchorEl);
@@ -91,6 +95,26 @@ export function AccountMenu() {
             <PaletteIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Theme palette</ListItemText>
+        </MenuItem>
+        <MenuItem
+          selected={theatreFocus}
+          onClick={() => {
+            toggleTheatreFocus();
+            setAnchorEl(null);
+            router.refresh();
+          }}
+        >
+          <ListItemIcon>
+            <TheatersIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Theatre focus"
+            secondary={
+              theatreFocus
+                ? "Up next is hidden on watch"
+                : "Hides the Up next column on watch"
+            }
+          />
         </MenuItem>
         <Divider />
         {!isCloudConfigured ? (

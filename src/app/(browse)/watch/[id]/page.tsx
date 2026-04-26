@@ -1,8 +1,10 @@
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
+import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { BackToSearch } from "@/components/BackToSearch";
@@ -12,8 +14,15 @@ import { WatchLaterAddButton } from "@/components/WatchLaterAddButton";
 import { WatchLaterBanner } from "@/components/WatchLaterBanner";
 import { WatchComments } from "@/components/WatchComments";
 import { WatchDescription } from "@/components/WatchDescription";
+import { WatchNextSidebar } from "@/components/WatchNextSidebar";
+import { toVideoSummaries } from "@/lib/serializeVideo";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
 import { getWatchVideoComments } from "@/lib/youtubeComments";
+import {
+  FOCUS_MODE_COOKIE,
+  parseFocusModeCookie,
+} from "@/lib/focusModePersistence";
+import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { getWatchVideoDetails } from "@/lib/watchVideo";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
@@ -49,10 +58,19 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
     notFound();
   }
 
-  const [video, comments] = await Promise.all([
+  const cookieStore = await cookies();
+  const theatreFocus = parseFocusModeCookie(
+    cookieStore.get(FOCUS_MODE_COOKIE)?.value,
+  );
+
+  const [video, comments, watchNext] = await Promise.all([
     getWatchVideoDetails(id),
     getWatchVideoComments(id),
+    theatreFocus
+      ? Promise.resolve([])
+      : getWatchNextRelatedVideos(id),
   ]);
+  const watchNextSummaries = toVideoSummaries(watchNext);
   if (!video) {
     notFound();
   }
@@ -78,7 +96,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
       }}
     >
       <Container
-        maxWidth="md"
+        maxWidth="lg"
         disableGutters
         sx={{
           pt: { xs: 0, sm: 2 },
@@ -97,53 +115,60 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           <BackToSearch />
         </Box>
 
-        <Box
-          sx={{
-            mb: { xs: 2, sm: 3 },
-          }}
+        <Grid
+          container
+          spacing={3}
+          sx={{ px: { xs: 2, sm: 0 }, alignItems: "flex-start" }}
         >
-          {/* TODO: Revisit mobile landscape full-bleed playback without fighting browser chrome. */}
-          <LiteYouTubeEmbed
-            videoId={id}
-            title={title}
-            thumbnailUrl={thumb}
-            channelName={video.channelName}
-            startSeconds={startSeconds}
-          />
-        </Box>
+          <Grid size={{ xs: 12, lg: theatreFocus ? 12 : 8 }}>
+            <Stack spacing={1.5}>
+              <Box
+                sx={{
+                  mb: { xs: 2, sm: 3 },
+                }}
+              >
+                {/* TODO: Revisit mobile landscape full-bleed playback without fighting browser chrome. */}
+                <LiteYouTubeEmbed
+                  videoId={id}
+                  title={title}
+                  thumbnailUrl={thumb}
+                  channelName={video.channelName}
+                  startSeconds={startSeconds}
+                />
+              </Box>
 
-        <Stack
-          className="watch-page-chrome"
-          spacing={1.5}
-          sx={{
-            px: { xs: 2, sm: 0 },
-          }}
-        >
-          <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
-            {title}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {metaParts.join(" · ")}
-          </Typography>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-            <SaveChannelButton
-              channelName={video.channelName}
-              channelId={video.channelId}
-              channelUrl={video.channelUrl}
-            />
-            <WatchLaterAddButton
-              videoId={id}
-              title={title}
-              thumbnailUrl={thumb}
-              channelName={video.channelName}
-              startSecondsContext={startSeconds}
-            />
-          </Stack>
-          {video.description?.trim() ? (
-            <WatchDescription description={video.description} />
+              <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
+                {title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {metaParts.join(" · ")}
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <SaveChannelButton
+                  channelName={video.channelName}
+                  channelId={video.channelId}
+                  channelUrl={video.channelUrl}
+                />
+                <WatchLaterAddButton
+                  videoId={id}
+                  title={title}
+                  thumbnailUrl={thumb}
+                  channelName={video.channelName}
+                  startSecondsContext={startSeconds}
+                />
+              </Stack>
+              {video.description?.trim() ? (
+                <WatchDescription description={video.description} />
+              ) : null}
+              <WatchComments videoId={id} initialComments={comments} />
+            </Stack>
+          </Grid>
+          {!theatreFocus ? (
+            <Grid size={{ xs: 12, lg: 4 }}>
+              <WatchNextSidebar videos={watchNextSummaries} />
+            </Grid>
           ) : null}
-          <WatchComments videoId={id} initialComments={comments} />
-        </Stack>
+        </Grid>
       </Container>
     </Box>
   );

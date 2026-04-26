@@ -4,6 +4,10 @@ import { cookies } from "next/headers";
 import { AppProviders } from "@/app/providers";
 import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 import {
+  FOCUS_MODE_COOKIE,
+  parseFocusModeCookie,
+} from "@/lib/focusModePersistence";
+import {
   createInitialThemeSettings,
   THEME_DARK_PRESET_COOKIE,
   THEME_LIGHT_PRESET_COOKIE,
@@ -42,6 +46,10 @@ export default async function RootLayout({
   const mode = cookieStore.get(THEME_MODE_COOKIE)?.value;
   const darkPresetId = cookieStore.get(THEME_DARK_PRESET_COOKIE)?.value;
   const lightPresetId = cookieStore.get(THEME_LIGHT_PRESET_COOKIE)?.value;
+  const focusCookie = cookieStore.get(FOCUS_MODE_COOKIE)?.value;
+  const initialTheatreFocus = parseFocusModeCookie(focusCookie);
+  const hasFocusCookie = focusCookie != null && focusCookie !== "";
+
   const initialTheme = createInitialThemeSettings({
     mode,
     darkPresetId,
@@ -52,7 +60,11 @@ export default async function RootLayout({
   return (
     <html lang="en" className={roboto.variable} suppressHydrationWarning>
       <body style={{ margin: 0 }}>
-        <AppProviders initialTheme={initialTheme}>
+        <AppProviders
+          initialTheme={initialTheme}
+          initialTheatreFocus={initialTheatreFocus}
+          hasFocusCookie={hasFocusCookie}
+        >
           <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>
       </body>
