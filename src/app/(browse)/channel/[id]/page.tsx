@@ -6,13 +6,14 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { ChannelPagination } from "@/components/ChannelPagination";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
 import { toVideoSummaries } from "@/lib/serializeVideo";
-import { getChannelVideosPage } from "@/lib/youtubeChannel";
+import { getChannelDetails, getChannelVideosPage } from "@/lib/youtubeChannel";
+import { isValidYoutubeChannelId } from "@/lib/youtubeUrl";
 import type { ChannelSortMode } from "@/lib/youtubeTypes";
 
 type PageProps = {
@@ -41,23 +42,44 @@ function channelHref(
   return `/channel/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
 }
 
+function decodeRouteToken(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { id } = await params;
-  const page = await getChannelVideosPage({ channelId: id, limit: 1 });
+  const { id: rawId } = await params;
+  const id = decodeRouteToken(rawId);
+  const channel = isValidYoutubeChannelId(id)
+    ? (await getChannelVideosPage({ channelId: id, limit: 1 }))?.channel
+    : await getChannelDetails(id);
+
   return {
-    title: page?.channel.title
-      ? `${page.channel.title} — CleanTube`
+    title: channel?.title
+      ? `${channel.title} — CleanTube`
       : "Channel — CleanTube",
-    description: page?.channel.description?.slice(0, 160),
+    description: channel?.description?.slice(0, 160),
   };
 }
 
 export default async function ChannelPage({ params, searchParams }: PageProps) {
-  const { id } = await params;
+  const { id: rawId } = await params;
   const { sort: sortRaw, page: pageRaw } = await searchParams;
+  const id = decodeRouteToken(rawId);
   const sort = normalizeChannelSort(sortRaw);
+
+  if (!isValidYoutubeChannelId(id)) {
+    const channel = await getChannelDetails(id);
+    if (channel?.id && channel.id !== id) {
+      redirect(channelHref(channel.id, { sort, page: pageRaw }));
+    }
+  }
+
   const page = await getChannelVideosPage({
     channelId: id,
     sort,

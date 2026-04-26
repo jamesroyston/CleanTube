@@ -1,6 +1,14 @@
 const YOUTUBE_VIDEO_ID = /^[a-zA-Z0-9_-]{11}$/;
 const YOUTUBE_CHANNEL_ID = /^UC[a-zA-Z0-9_-]{22}$/;
 
+function decodeUrlSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 /** True for a syntactically valid 11-character YouTube video id. */
 export function isValidYoutubeVideoId(id: string): boolean {
   return YOUTUBE_VIDEO_ID.test(id);
@@ -47,7 +55,7 @@ export function extractChannelRouteTokenFromUrl(input: string): string | null {
   try {
     const url = new URL(t);
     if (!/youtube\.com|youtube-nocookie\.com/i.test(url.hostname)) return null;
-    const parts = url.pathname.split("/").filter(Boolean);
+    const parts = url.pathname.split("/").filter(Boolean).map(decodeUrlSegment);
     if (parts[0] === "channel" && parts[1]) return parts[1];
     if (parts[0]?.startsWith("@")) return parts[0];
   } catch {

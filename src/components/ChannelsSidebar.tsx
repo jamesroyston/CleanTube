@@ -1,13 +1,11 @@
 "use client";
 
-import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import SubscriptionsIcon from "@mui/icons-material/Subscriptions";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
 import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
@@ -16,18 +14,14 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Toolbar from "@mui/material/Toolbar";
-import TextField from "@mui/material/TextField";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
+import type { SxProps, Theme } from "@mui/material/styles";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { getLastSearchSort } from "@/lib/lastSearchSession";
-import {
-  channelPageHrefFromToken,
-  extractChannelRouteTokenFromUrl,
-} from "@/lib/youtubeUrl";
+import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
 import type { SavedChannel } from "@/types/savedChannel";
 
 const DRAWER_WIDTH = 280;
@@ -38,6 +32,7 @@ type ChannelsSidebarProps = {
   open: boolean;
   onClose: () => void;
   collapsed?: boolean;
+  sx?: SxProps<Theme>;
 };
 
 export function ChannelsSidebar({
@@ -45,11 +40,13 @@ export function ChannelsSidebar({
   open,
   onClose,
   collapsed = false,
+  sx,
 }: ChannelsSidebarProps) {
-  const { channels, addChannel, removeChannel } = useSavedChannels();
-  const [draft, setDraft] = useState("");
+  const { channels, removeChannel } = useSavedChannels();
   const mini = collapsed && variant === "permanent";
   const drawerWidth = mini ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
+  const savedChannels = channels.filter((channel) => channel.channelId);
+  const savedSearches = channels.filter((channel) => !channel.channelId);
 
   function searchHref(q: string) {
     const searchSort = getLastSearchSort();
@@ -61,26 +58,7 @@ export function ChannelsSidebar({
 
   function savedChannelHref(channel: SavedChannel) {
     if (channel.channelId) return channelPageHrefFromToken(channel.channelId);
-    if (channel.channelUrl) {
-      const token = extractChannelRouteTokenFromUrl(channel.channelUrl);
-      if (token) return channelPageHrefFromToken(token);
-    }
     return searchHref(channel.searchQuery);
-  }
-
-  function handleAdd(e: FormEvent) {
-    e.preventDefault();
-    const v = draft.trim();
-    if (!v) return;
-    const channelToken = extractChannelRouteTokenFromUrl(v);
-    const isUrl = /^https?:\/\//i.test(v);
-    addChannel({
-      name: v,
-      channelId: channelToken?.startsWith("UC") ? channelToken : undefined,
-      channelUrl: isUrl && channelToken ? v : undefined,
-      searchQuery: v,
-    });
-    setDraft("");
   }
 
   const navLinks = [
@@ -158,16 +136,15 @@ export function ChannelsSidebar({
             </Typography>
           ) : null}
         </Box>
-        {channels.length === 0 ? (
+        {savedChannels.length === 0 ? (
           !mini ? (
             <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
-              Add channels from a video page or type a name below to pin quick
-              searches.
+              Save channels from a channel page to pin them here.
             </Typography>
           ) : null
         ) : (
           <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-            {channels.map((c) => (
+            {savedChannels.map((c) => (
               <Box
                 key={c.id}
                 sx={{
@@ -234,34 +211,89 @@ export function ChannelsSidebar({
             ))}
           </Box>
         )}
-      </Box>
-      {!mini ? (
-        <>
-          <Divider />
-          <Box component="form" onSubmit={handleAdd} sx={{ p: 1.5 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: "block" }}>
-              Add channel (name or @handle)
-            </Typography>
-            <Box sx={{ display: "flex", gap: 1 }}>
-              <TextField
-                size="small"
-                fullWidth
-                placeholder="e.g. Computerphile"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-              />
-              <Button
-                type="submit"
-                variant="contained"
-                sx={{ minWidth: "auto", px: 1.5 }}
-                aria-label="Add channel"
-              >
-                <AddIcon />
-              </Button>
+
+        {savedSearches.length > 0 ? (
+          <>
+            <Divider sx={{ my: 1 }} />
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, px: 0.5 }}>
+              <SearchIcon color="action" fontSize="small" />
+              {!mini ? (
+                <Typography variant="overline" sx={{ lineHeight: 1.2, letterSpacing: 0.08 }}>
+                  Pinned searches
+                </Typography>
+              ) : null}
             </Box>
-          </Box>
-        </>
-      ) : null}
+            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              {savedSearches.map((c) => (
+                <Box
+                  key={c.id}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.5,
+                    borderRadius: 1,
+                    px: mini ? 0 : 1,
+                    py: 0.5,
+                    justifyContent: mini ? "center" : "flex-start",
+                    "&:hover": { bgcolor: "action.hover" },
+                  }}
+                >
+                  {!mini ? (
+                    <Box
+                      component={Link}
+                      href={searchHref(c.searchQuery)}
+                      onClick={onClose}
+                      sx={{
+                        flex: 1,
+                        minWidth: 0,
+                        textAlign: "left",
+                        cursor: "pointer",
+                        border: 0,
+                        background: "none",
+                        font: "inherit",
+                        color: "inherit",
+                        textDecoration: "none",
+                        p: 0,
+                        m: 0,
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
+                        {c.name}
+                      </Typography>
+                      {c.searchQuery !== c.name ? (
+                        <Typography variant="caption" color="text.secondary" noWrap>
+                          Search: {c.searchQuery}
+                        </Typography>
+                      ) : null}
+                    </Box>
+                  ) : null}
+                  <IconButton
+                    aria-label={`Search ${c.name}`}
+                    component={Link}
+                    href={searchHref(c.searchQuery)}
+                    size="small"
+                    onClick={onClose}
+                  >
+                    <Tooltip title={mini ? c.name : ""} placement="right">
+                      <SearchIcon fontSize="small" />
+                    </Tooltip>
+                  </IconButton>
+                  {!mini ? (
+                    <IconButton
+                      aria-label={`Remove ${c.name}`}
+                      size="small"
+                      onClick={() => removeChannel(c.id)}
+                    >
+                      <DeleteOutlineIcon fontSize="small" />
+                    </IconButton>
+                  ) : null}
+                </Box>
+              ))}
+            </Box>
+          </>
+        ) : null}
+      </Box>
     </Box>
   );
 
@@ -271,21 +303,24 @@ export function ChannelsSidebar({
       open={open}
       onClose={onClose}
       ModalProps={{ keepMounted: true }}
-      sx={{
-        width: drawerWidth,
-        flexShrink: 0,
-        [`& .MuiDrawer-paper`]: {
+      sx={[
+        {
           width: drawerWidth,
-          boxSizing: "border-box",
-          borderRight: (t) => `1px solid ${t.palette.divider}`,
-          overflowX: "hidden",
-          transition: (t) =>
-            t.transitions.create("width", {
-              easing: t.transitions.easing.sharp,
-              duration: t.transitions.duration.shorter,
-            }),
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: {
+            width: drawerWidth,
+            boxSizing: "border-box",
+            borderRight: (t) => `1px solid ${t.palette.divider}`,
+            overflowX: "hidden",
+            transition: (t) =>
+              t.transitions.create("width", {
+                easing: t.transitions.easing.sharp,
+                duration: t.transitions.duration.shorter,
+              }),
+          },
         },
-      }}
+        ...(sx ? (Array.isArray(sx) ? sx : [sx]) : []),
+      ]}
     >
       {drawer}
     </Drawer>

@@ -83,6 +83,14 @@ function objectValue(value: unknown, key: string): unknown {
   return (value as Record<string, unknown>)[key];
 }
 
+function decodeUrlSegment(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function firstThumbnailUrl(value: unknown): string | undefined {
   const thumbs = Array.isArray(value) ? (value as Thumbnailish[]) : undefined;
   const raw = thumbs?.find((thumbnail) => thumbnail.url)?.url;
@@ -98,13 +106,13 @@ function lastThumbnailUrl(value: unknown): string | undefined {
 }
 
 function normalizeChannelLookup(input: string): string {
-  const trimmed = input.trim();
+  const trimmed = decodeUrlSegment(input.trim());
   if (!trimmed) return "";
   if (!/^https?:\/\//i.test(trimmed)) return trimmed;
 
   try {
     const url = new URL(trimmed);
-    const parts = url.pathname.split("/").filter(Boolean);
+    const parts = url.pathname.split("/").filter(Boolean).map(decodeUrlSegment);
     if (parts[0] === "channel" && parts[1]) return parts[1];
     if (parts[0]?.startsWith("@")) return parts[0];
     if ((parts[0] === "c" || parts[0] === "user") && parts[1]) {

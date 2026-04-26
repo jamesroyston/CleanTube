@@ -8,6 +8,7 @@ import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
 import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 import { SearchSortBar } from "@/components/SearchSortBar";
+import { SaveSearchButton } from "@/components/SaveSearchButton";
 import {
   channelPageHrefFromToken,
   extractChannelRouteTokenFromUrl,
@@ -34,8 +35,12 @@ type PageProps = {
 };
 
 export default async function Home({ searchParams }: PageProps) {
-  const { q, searchSort: searchSortRaw, resultSort: resultSortRaw, sort: legacySortRaw } =
-    await searchParams;
+  const {
+    q,
+    searchSort: searchSortRaw,
+    resultSort: resultSortRaw,
+    sort: legacySortRaw,
+  } = await searchParams;
   const searchSortMode = normalizeSearchSortParam(searchSortRaw ?? legacySortRaw);
   const resultSortMode = normalizeResultSortParam(resultSortRaw ?? legacySortRaw);
   const query = q?.trim() ?? "";
@@ -85,10 +90,6 @@ export default async function Home({ searchParams }: PageProps) {
           <Typography color="error" sx={{ py: 4 }}>
             {errorMessage}
           </Typography>
-        ) : channels.length === 0 && videos.length === 0 ? (
-          <Typography color="text.secondary" sx={{ py: 4 }}>
-            No videos found for &ldquo;{query}&rdquo;.
-          </Typography>
         ) : (
           <>
             <Box
@@ -109,13 +110,20 @@ export default async function Home({ searchParams }: PageProps) {
                 {channels.length + videos.length === 1 ? "" : "s"}{" "}
                 for <strong>{query}</strong>
               </Typography>
+              <SaveSearchButton query={query} />
               <SearchSortBar
                 query={query}
                 searchSort={searchSortMode}
                 resultSort={resultSortMode}
               />
             </Box>
-            <SearchResultsGrid channels={channels} videos={videos} />
+            {channels.length === 0 && videos.length === 0 ? (
+              <Typography color="text.secondary" sx={{ py: 4 }}>
+                No videos found for &ldquo;{query}&rdquo;.
+              </Typography>
+            ) : (
+              <SearchResultsGrid channels={channels} videos={videos} />
+            )}
           </>
         )}
       </Container>
