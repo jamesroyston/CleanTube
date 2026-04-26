@@ -1,3 +1,5 @@
+"use client";
+
 import FavoriteIcon from "@mui/icons-material/Favorite";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import Avatar from "@mui/material/Avatar";
@@ -9,13 +11,16 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import NextLink from "next/link";
+import { useState } from "react";
 
-import type { WatchVideoComments } from "@/lib/youtubeTypes";
+import type {
+  WatchVideoComments,
+  WatchVideoCommentSort,
+} from "@/lib/youtubeTypes";
 
 type WatchCommentsProps = {
-  baseHref: string;
-  comments: WatchVideoComments | null;
-  startSeconds?: number;
+  videoId: string;
+  initialComments: WatchVideoComments | null;
 };
 
 function authorHref(comment: WatchVideoComments["comments"][number]): string | undefined {
@@ -25,36 +30,54 @@ function authorHref(comment: WatchVideoComments["comments"][number]): string | u
   return comment.authorUrl;
 }
 
+type CommentsResponse = {
+  comments?: WatchVideoComments;
+  error?: string;
+};
+
 const authorLinkStyle = {
   color: "inherit",
   fontWeight: 700,
   textDecoration: "none",
 };
 
-function commentsHref(input: {
-  baseHref: string;
-  sort: "top" | "newest";
-  page?: number;
-  startSeconds?: number;
-}): string {
-  const qs = new URLSearchParams();
-  if (input.startSeconds != null && input.startSeconds > 0) {
-    qs.set("t", String(input.startSeconds));
-  }
-  if (input.sort !== "top") qs.set("commentSort", input.sort);
-  if (input.page && input.page > 1) qs.set("commentPage", String(input.page));
-  const query = qs.toString();
-  return `${input.baseHref}${query ? `?${query}` : ""}`;
-}
-
 export function WatchComments({
-  baseHref,
-  comments,
-  startSeconds,
+  videoId,
+  initialComments,
 }: WatchCommentsProps) {
+  const [comments, setComments] = useState(initialComments);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const entries = comments?.comments ?? [];
   const sort = comments?.sort ?? "top";
   const page = comments?.page ?? 1;
+
+  function loadComments(nextSort: WatchVideoCommentSort, nextPage: number) {
+    setError(null);
+    setLoading(true);
+    void (async () => {
+      const qs = new URLSearchParams();
+      qs.set("sort", nextSort);
+      qs.set("page", String(nextPage));
+
+      try {
+        const response = await fetch(
+          `/api/videos/${encodeURIComponent(videoId)}/comments?${qs.toString()}`,
+        );
+        const payload = (await response.json()) as CommentsResponse;
+        if (!response.ok || !payload.comments) {
+          throw new Error(payload.error || "Comments could not be loaded.");
+        }
+        setComments(payload.comments);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Comments could not be loaded.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }
 
   return (
     <Box
@@ -77,13 +100,15 @@ export function WatchComments({
           </Typography>
           <ButtonGroup size="small" variant="outlined" aria-label="Comment sort">
             <Button
-              href={commentsHref({ baseHref, sort: "top", startSeconds })}
+              disabled={loading}
+              onClick={() => loadComments("top", 1)}
               variant={sort === "top" ? "contained" : "outlined"}
             >
               Top
             </Button>
             <Button
-              href={commentsHref({ baseHref, sort: "newest", startSeconds })}
+              disabled={loading}
+              onClick={() => loadComments("newest", 1)}
               variant={sort === "newest" ? "contained" : "outlined"}
             >
               Newest
@@ -95,6 +120,11 @@ export function WatchComments({
             ? `${comments.countText} · showing ${sort === "newest" ? "newest" : "top"} comments`
             : `${sort === "newest" ? "Newest" : "Top"} comments from YouTube`}
         </Typography>
+        {error ? (
+          <Typography variant="body2" color="error">
+            {error}
+          </Typography>
+        ) : null}
       </Stack>
 
       {entries.length === 0 ? (
@@ -205,16 +235,12 @@ export function WatchComments({
           })}
           {comments?.hasMore ? (
             <Button
-              href={commentsHref({
-                baseHref,
-                sort,
-                page: page + 1,
-                startSeconds,
-              })}
+              disabled={loading}
+              onClick={() => loadComments(sort, page + 1)}
               variant="outlined"
               sx={{ alignSelf: "center" }}
             >
-              Load more comments
+              {loading ? "Loading..." : "Load more comments"}
             </Button>
           ) : null}
         </Stack>

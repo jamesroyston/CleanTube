@@ -13,11 +13,7 @@ import { WatchLaterBanner } from "@/components/WatchLaterBanner";
 import { WatchComments } from "@/components/WatchComments";
 import { WatchDescription } from "@/components/WatchDescription";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
-import {
-  getWatchVideoComments,
-  normalizeCommentPage,
-  normalizeCommentSort,
-} from "@/lib/youtubeComments";
+import { getWatchVideoComments } from "@/lib/youtubeComments";
 import { getWatchVideoDetails } from "@/lib/watchVideo";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
@@ -26,8 +22,6 @@ type PageProps = {
   searchParams: Promise<{
     t?: string;
     start?: string;
-    commentSort?: string;
-    commentPage?: string;
   }>;
 };
 
@@ -57,10 +51,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
 
   const [video, comments] = await Promise.all([
     getWatchVideoDetails(id),
-    getWatchVideoComments(id, {
-      sort: normalizeCommentSort(sp.commentSort),
-      page: normalizeCommentPage(sp.commentPage),
-    }),
+    getWatchVideoComments(id),
   ]);
   if (!video) {
     notFound();
@@ -77,7 +68,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
   const thumb =
     video.thumbnailUrl ??
     `https://i.ytimg.com/vi/${id}/sddefault.jpg`;
-  const watchHref = `/watch/${encodeURIComponent(id)}`;
 
   return (
     <Box
@@ -152,11 +142,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           {video.description?.trim() ? (
             <WatchDescription description={video.description} />
           ) : null}
-          <WatchComments
-            baseHref={watchHref}
-            comments={comments}
-            startSeconds={startSeconds}
-          />
+          <WatchComments videoId={id} initialComments={comments} />
         </Stack>
       </Container>
     </Box>
