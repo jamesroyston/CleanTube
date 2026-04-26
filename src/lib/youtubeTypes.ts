@@ -67,3 +67,28 @@ export type WatchVideoDetails = {
   thumbnailUrl?: string;
   source: "youtubei.js" | "watch-html" | "oembed";
 };
+
+export type WatchVideoComment = {
+  id: string;
+  authorName: string;
+  authorChannelId?: string;
+  authorUrl?: string;
+  authorThumbnailUrl?: string;
+  content: string;
+  publishedTime?: string;
+  likeCount?: string;
+  replyCount?: string;
+  pinned: boolean;
+  hearted: boolean;
+  authorIsChannelOwner: boolean;
+};
+
+export type WatchVideoCommentSort = "top" | "newest";
+
+export type WatchVideoComments = {
+  countText?: string;
+  sort: WatchVideoCommentSort;
+  page: number;
+  hasMore: boolean;
+  comments: WatchVideoComment[];
+};
