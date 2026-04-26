@@ -43,6 +43,19 @@
 - Add lightweight runtime telemetry (counter per query for parser/fallback events) so we can detect breakages early without flooding logs.
 - Consider pinning `youtubei.js` and upgrading intentionally after quick smoke tests (`search`, `watch details`, continuations, newest sort).
 
+### Consolidate one `getInfo` on watch (not yet implemented)
+
+**Problem:** The watch route runs **`getBasicInfo`** in `getWatchVideoDetails` (`src/lib/watchVideo.ts`) and **`getInfo`** in `getWatchNextRelatedVideos` (`src/lib/youtubeWatchNext.ts`) for the same `videoId` when the related sidebar is shown. That is **two Innertube player/next-style round trips** for one page load. `getBasicInfo` also omits the watch **`/next`** payload, so **full description** often depends on `short_description` or the **public watch HTML** parse (`fromWatchHtml` / `mergeDescriptionFromWatchHtml`).
+
+**Preferred direction:** Load **`getInfo` once** per request and derive:
+
+1. **`WatchVideoDetails`** from that result (via `videoInfoToWatchDetails` or equivalent for `getInfo`’s `VideoInfo` — it should carry **`secondary_info`** for the rich description in most cases).
+2. **Related list** from the same `info.watch_next_feed` (already the shape `youtubeWatchNext` uses).
+
+**Edge case:** In **theatre / focus** mode the page skips the related fetch (`WatchPage` uses an empty `watchNext` array). Then no `getInfo` runs; either keep **`getBasicInfo` + optional HTML** for that branch only, or call **`getInfo` once** for details even when the sidebar is hidden (slightly more work than `getBasicInfo` but consistent metadata).
+
+**Optional:** Keep the **HTML / oEmbed** path as a **last-resort** when `getInfo` throws or still lacks description.
+
 ### Revert plan: re-implement youtube-sr quickly
 
 If we decide to fully revert the youtube backend:
