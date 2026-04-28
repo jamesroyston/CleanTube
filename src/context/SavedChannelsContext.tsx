@@ -9,6 +9,7 @@ export type SavedChannelsContextValue = {
     name: string;
     channelId?: string;
     channelUrl?: string;
+    thumbnailUrl?: string;
     searchQuery?: string;
   }) => void;
   updateChannel: (
@@ -26,6 +27,7 @@ export function useSavedChannels() {
       name: string;
       channelId?: string;
       channelUrl?: string;
+      thumbnailUrl?: string;
       searchQuery?: string;
     }) => {
       void library.addSavedChannel(input);

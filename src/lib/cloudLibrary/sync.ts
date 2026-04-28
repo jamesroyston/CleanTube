@@ -60,6 +60,7 @@ function mergeSavedChannel(
     name: preferredName,
     channelId: existing.channelId ?? incoming.channelId,
     channelUrl: existing.channelUrl ?? incoming.channelUrl,
+    thumbnailUrl: existing.thumbnailUrl ?? incoming.thumbnailUrl,
     searchQuery: existing.searchQuery || incoming.searchQuery,
   };
 }

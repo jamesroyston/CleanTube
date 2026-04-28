@@ -1,14 +1,10 @@
 "use client";
 
 import SearchIcon from "@mui/icons-material/Search";
-import TuneIcon from "@mui/icons-material/Tune";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
-import FormControl from "@mui/material/FormControl";
 import IconButton from "@mui/material/IconButton";
 import InputAdornment from "@mui/material/InputAdornment";
-import InputLabel from "@mui/material/InputLabel";
-import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import Toolbar from "@mui/material/Toolbar";
@@ -48,9 +44,6 @@ export function Header({ leading }: { leading?: ReactNode }) {
   const [query, setQuery] = useState(qParam);
   const [searchSort, setSearchSort] = useState<SearchSortMode>(() =>
     normalizeSearchSortParam(searchSortParam),
-  );
-  const [mobileSortAnchor, setMobileSortAnchor] = useState<HTMLElement | null>(
-    null,
   );
 
   useEffect(() => {
@@ -113,109 +106,78 @@ export function Header({ leading }: { leading?: ReactNode }) {
     });
   }
 
-  function selectSearchSort(mode: SearchSortMode) {
-    setSearchSort(mode);
-    setMobileSortAnchor(null);
-  }
-
   return (
     <AppBar
       position="sticky"
       elevation={0}
       color="transparent"
-      sx={{ position: { xs: "static", md: "sticky" } }}
+      sx={{
+        position: { xs: "static", md: "sticky" },
+        zIndex: (t) => t.zIndex.drawer + 1,
+      }}
     >
       <Toolbar
         sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "auto minmax(0, 1fr) auto",
+            sm: "minmax(0, 1fr) minmax(240px, 560px) minmax(0, 1fr)",
+          },
+          alignItems: "center",
           gap: { xs: 0.75, sm: 2 },
-          flexWrap: "nowrap",
           py: { xs: 0.75, sm: 1 },
           px: { xs: 1, sm: 2 },
         }}
       >
-        {leading}
         <Box
-          component={Link}
-          href="/"
           sx={{
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            gap: { xs: 0, sm: 1 },
-            color: "text.primary",
-            textDecoration: "none",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
+            gap: { xs: 0.75, sm: 1 },
+            minWidth: 0,
+            justifySelf: "start",
           }}
         >
-          <RetroTvLogo size={30} />
-          <Typography
-            variant="h6"
+          {leading}
+          <Box
+            component={Link}
+            href="/"
             sx={{
-              display: { xs: "none", sm: "block" },
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: { xs: 0, sm: 1 },
+              color: "text.primary",
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
-            CleanTube
-          </Typography>
+            <RetroTvLogo size={30} />
+            <Typography
+              variant="h6"
+              sx={{
+                display: { xs: "none", sm: "block" },
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              CleanTube
+            </Typography>
+          </Box>
         </Box>
+
         <Box
           component="form"
           onSubmit={onSubmit}
           sx={{
-            flex: 1,
+            width: "100%",
             minWidth: 0,
-            maxWidth: 720,
+            maxWidth: 560,
+            justifySelf: "center",
             display: "flex",
-            gap: { xs: 0.5, sm: 1 },
-            flexWrap: "nowrap",
+            justifyContent: "center",
           }}
         >
-          <IconButton
-            aria-label="Search type"
-            aria-controls={mobileSortAnchor ? "mobile-search-sort-menu" : undefined}
-            aria-haspopup="menu"
-            aria-expanded={mobileSortAnchor ? "true" : undefined}
-            onClick={(event) => setMobileSortAnchor(event.currentTarget)}
-            size="small"
-            sx={{ display: { xs: "inline-flex", sm: "none" }, flexShrink: 0 }}
-          >
-            <TuneIcon fontSize="small" />
-          </IconButton>
-          <Menu
-            id="mobile-search-sort-menu"
-            anchorEl={mobileSortAnchor}
-            open={Boolean(mobileSortAnchor)}
-            onClose={() => setMobileSortAnchor(null)}
-          >
-            <MenuItem
-              selected={searchSort === "relevance"}
-              onClick={() => selectSearchSort("relevance")}
-            >
-              Relevance
-            </MenuItem>
-            <MenuItem
-              selected={searchSort === "newest"}
-              onClick={() => selectSearchSort("newest")}
-            >
-              Newest uploads
-            </MenuItem>
-          </Menu>
-          <FormControl
-            size="small"
-            sx={{ display: { xs: "none", sm: "block" }, minWidth: 156 }}
-          >
-            <InputLabel id="cleantube-search-sort-label">Search type</InputLabel>
-            <Select<SearchSortMode>
-              labelId="cleantube-search-sort-label"
-              label="Search type"
-              value={searchSort}
-              onChange={(e) => setSearchSort(e.target.value as SearchSortMode)}
-            >
-              <MenuItem value="relevance">Relevance</MenuItem>
-              <MenuItem value="newest">Newest uploads</MenuItem>
-            </Select>
-          </FormControl>
           <TextField
             name="q"
             value={query}
@@ -227,6 +189,43 @@ export function Header({ leading }: { leading?: ReactNode }) {
             sx={{ minWidth: 0 }}
             slotProps={{
               input: {
+                startAdornment: (
+                  <InputAdornment
+                    position="start"
+                    sx={{
+                      mr: 0.5,
+                      ml: -0.5,
+                      "& .MuiInputAdornment-root": { marginRight: 0 },
+                    }}
+                  >
+                    <Select<SearchSortMode>
+                      value={searchSort}
+                      onChange={(e) =>
+                        setSearchSort(e.target.value as SearchSortMode)
+                      }
+                      variant="standard"
+                      disableUnderline
+                      MenuProps={{
+                        slotProps: { paper: { sx: { mt: 1 } } },
+                      }}
+                      sx={{
+                        fontSize: "0.8125rem",
+                        minWidth: { xs: 92, sm: 118 },
+                        "& .MuiSelect-select": {
+                          py: 0.5,
+                          pr: "24px !important",
+                          pl: 0.5,
+                          display: "flex",
+                          alignItems: "center",
+                        },
+                        "&:before, &:after": { display: "none" },
+                      }}
+                    >
+                      <MenuItem value="relevance">Relevance</MenuItem>
+                      <MenuItem value="newest">Newest uploads</MenuItem>
+                    </Select>
+                  </InputAdornment>
+                ),
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
@@ -243,7 +242,15 @@ export function Header({ leading }: { leading?: ReactNode }) {
             }}
           />
         </Box>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, flexShrink: 0 }}>
+
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            justifySelf: "end",
+            flexShrink: 0,
+          }}
+        >
           <AccountMenu />
         </Box>
       </Toolbar>

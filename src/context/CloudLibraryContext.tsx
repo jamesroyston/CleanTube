@@ -97,6 +97,7 @@ type CloudLibraryContextValue = {
     name: string;
     channelId?: string;
     channelUrl?: string;
+    thumbnailUrl?: string;
     searchQuery?: string;
   }) => Promise<void>;
   updateSavedChannel: (
@@ -447,6 +448,7 @@ export function CloudLibraryProvider({
       name: string;
       channelId?: string;
       channelUrl?: string;
+      thumbnailUrl?: string;
       searchQuery?: string;
     }) => {
       const name = input.name.trim();
@@ -456,6 +458,7 @@ export function CloudLibraryProvider({
         name,
         channelId: input.channelId,
         channelUrl: input.channelUrl,
+        thumbnailUrl: input.thumbnailUrl?.trim() || undefined,
         searchQuery: (input.searchQuery ?? name).trim(),
       };
 

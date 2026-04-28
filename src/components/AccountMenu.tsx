@@ -1,6 +1,7 @@
 "use client";
 
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
+import CheckIcon from "@mui/icons-material/Check";
 import CloudDoneOutlinedIcon from "@mui/icons-material/CloudDoneOutlined";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import FingerprintOutlinedIcon from "@mui/icons-material/FingerprintOutlined";
@@ -11,27 +12,30 @@ import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import PaletteIcon from "@mui/icons-material/Palette";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
-import TheatersIcon from "@mui/icons-material/Theaters";
+import ViewColumnIcon from "@mui/icons-material/ViewColumn";
+import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
+import ListSubheader from "@mui/material/ListSubheader";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { startTransition, useState } from "react";
 
-import { useTheatreFocus, useThemeMode } from "@/app/providers";
+import { useThemeMode, useWatchLayout } from "@/app/providers";
+import type { WatchLayoutMode } from "@/lib/watchLayoutPersistence";
 import { ThemePresetDialog } from "@/components/ThemePresetPanel";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 export function AccountMenu() {
   const { user, isCloudConfigured, signOutUser, authStatus } = useCloudLibrary();
   const { mode, toggleMode } = useThemeMode();
-  const { enabled: theatreFocus, toggleTheatreFocus } = useTheatreFocus();
+  const { mode: watchLayout, setWatchLayoutMode } = useWatchLayout();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -67,6 +71,15 @@ export function AccountMenu() {
           </ListItemIcon>
           <ListItemText>Watch Later</ListItemText>
         </MenuItem>
+        <MenuItem component={Link} href="/library" onClick={() => setAnchorEl(null)}>
+          <ListItemIcon>
+            <ViewColumnIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Manage saved channels"
+            secondary="Pins, searches, and removals"
+          />
+        </MenuItem>
         <Divider />
         <MenuItem
           onClick={() => {
@@ -96,26 +109,53 @@ export function AccountMenu() {
           </ListItemIcon>
           <ListItemText>Theme palette</ListItemText>
         </MenuItem>
-        <MenuItem
-          selected={theatreFocus}
-          onClick={() => {
-            toggleTheatreFocus();
-            setAnchorEl(null);
-            router.refresh();
+        <ListSubheader
+          disableSticky
+          sx={{
+            px: 2,
+            py: 0.5,
+            lineHeight: 1.5,
+            typography: "caption",
+            color: "text.secondary",
           }}
         >
-          <ListItemIcon>
-            <TheatersIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText
-            primary="Theatre focus"
-            secondary={
-              theatreFocus
-                ? "Up next is hidden on watch"
-                : "Hides the Up next column on watch"
-            }
-          />
-        </MenuItem>
+          Watch layout
+        </ListSubheader>
+        {(
+          [
+            {
+              value: "up_next",
+              label: "Standard + Up next",
+              secondary: "Related videos in the right column",
+            },
+            {
+              value: "theatre",
+              label: "Theatre",
+              secondary: "Standard page width; player sized to fit the viewport",
+            },
+          ] as const
+        ).map((opt) => (
+          <MenuItem
+            key={opt.value}
+            selected={watchLayout === opt.value}
+            onClick={() => {
+              setWatchLayoutMode(opt.value);
+              setAnchorEl(null);
+              startTransition(() => {
+                router.refresh();
+              });
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              {watchLayout === opt.value ? (
+                <CheckIcon fontSize="small" color="primary" />
+              ) : (
+                <Box sx={{ width: 24 }} />
+              )}
+            </ListItemIcon>
+            <ListItemText primary={opt.label} secondary={opt.secondary} />
+          </MenuItem>
+        ))}
         <Divider />
         {!isCloudConfigured ? (
           <MenuItem disabled>

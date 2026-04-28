@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import { canonicalYoutubeThumbnailUrl } from "@/lib/serializeVideo";
 import { feedVideoToVideoLike } from "@/lib/youtubeiAdapters";
 import { getInnertube } from "@/lib/youtubeiClient";
@@ -8,6 +10,7 @@ import type {
   VideoLikeForSummary,
 } from "@/lib/youtubeTypes";
 
+/** InnerTube channel: one `getChannel` per normalized lookup per request (`cache`); metadata uses `getChannelDetails` only, page adds `getVideos`. */
 const DEFAULT_PAGE_SIZE = 24;
 const CHANNEL_ID_PATTERN = /^UC[a-zA-Z0-9_-]{22}$/;
 
@@ -325,7 +328,10 @@ function withChannelName(
   };
 }
 
-async function loadChannel(lookup: string): Promise<ChannelLike | null> {
+/** One `getChannel` per normalized `lookup` per request (e.g. metadata + video grid share it). */
+const loadChannel = cache(async function loadChannel(
+  lookup: string,
+): Promise<ChannelLike | null> {
   if (!lookup) return null;
   try {
     const yt = (await getInnertube()) as InnertubeLike;
@@ -334,7 +340,7 @@ async function loadChannel(lookup: string): Promise<ChannelLike | null> {
   } catch {
     return null;
   }
-}
+});
 
 async function loadAbout(channel: ChannelLike): Promise<unknown> {
   if (typeof channel.getAbout !== "function") return null;
@@ -362,7 +368,9 @@ export const youtubeiChannelBackend: ChannelBackend = {
   }) {
     const lookup = normalizeChannelLookup(channelId);
     const channel = await loadChannel(lookup);
-    if (!channel || typeof channel.getVideos !== "function") return null;
+    if (!channel || typeof channel.getVideos !== "function") {
+      return null;
+    }
 
     const about = await loadAbout(channel);
     const details = detailsFromChannel(channel, about, lookup);
@@ -376,11 +384,13 @@ export const youtubeiChannelBackend: ChannelBackend = {
       feed.has_continuation && typeof feed.getContinuation === "function";
     const totalPages = totalPagesFromVideoCount(details.videoCountText, limit);
 
+    const videos = videosFromFeed(feed, limit).map((video) =>
+      withChannelName(video, details),
+    );
+
     return {
       channel: details,
-      videos: videosFromFeed(feed, limit).map((video) =>
-        withChannelName(video, details),
-      ),
+      videos,
       sort,
       pageToken: String(pageNumber),
       nextPageToken: hasNext ? String(pageNumber + 1) : undefined,
