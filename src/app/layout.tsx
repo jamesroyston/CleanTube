@@ -4,9 +4,10 @@ import { cookies } from "next/headers";
 import { AppProviders } from "@/app/providers";
 import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 import {
-  FOCUS_MODE_COOKIE,
-  parseFocusModeCookie,
-} from "@/lib/focusModePersistence";
+  LEGACY_FOCUS_MODE_COOKIE,
+  WATCH_LAYOUT_COOKIE,
+  parseWatchLayoutCookie,
+} from "@/lib/watchLayoutPersistence";
 import {
   createInitialThemeSettings,
   THEME_DARK_PRESET_COOKIE,
@@ -46,9 +47,13 @@ export default async function RootLayout({
   const mode = cookieStore.get(THEME_MODE_COOKIE)?.value;
   const darkPresetId = cookieStore.get(THEME_DARK_PRESET_COOKIE)?.value;
   const lightPresetId = cookieStore.get(THEME_LIGHT_PRESET_COOKIE)?.value;
-  const focusCookie = cookieStore.get(FOCUS_MODE_COOKIE)?.value;
-  const initialTheatreFocus = parseFocusModeCookie(focusCookie);
-  const hasFocusCookie = focusCookie != null && focusCookie !== "";
+  const layoutCookie = cookieStore.get(WATCH_LAYOUT_COOKIE)?.value;
+  const legacyFocusCookie = cookieStore.get(LEGACY_FOCUS_MODE_COOKIE)?.value;
+  const initialWatchLayoutMode = parseWatchLayoutCookie(
+    layoutCookie,
+    legacyFocusCookie,
+  );
+  const hasWatchLayoutCookie = Boolean(layoutCookie) || Boolean(legacyFocusCookie);
 
   const initialTheme = createInitialThemeSettings({
     mode,
@@ -62,8 +67,8 @@ export default async function RootLayout({
       <body style={{ margin: 0 }}>
         <AppProviders
           initialTheme={initialTheme}
-          initialTheatreFocus={initialTheatreFocus}
-          hasFocusCookie={hasFocusCookie}
+          initialWatchLayoutMode={initialWatchLayoutMode}
+          hasWatchLayoutCookie={hasWatchLayoutCookie}
         >
           <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>

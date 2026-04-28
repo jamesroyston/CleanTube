@@ -55,9 +55,8 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const { id: rawId } = await params;
   const id = decodeRouteToken(rawId);
-  const channel = isValidYoutubeChannelId(id)
-    ? (await getChannelVideosPage({ channelId: id, limit: 1 }))?.channel
-    : await getChannelDetails(id);
+  /** Title/description only: `getChannel` + about — no `getVideos` (grid loads in the page). */
+  const channel = await getChannelDetails(id);
 
   return {
     title: channel?.title
@@ -150,6 +149,7 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
               channelName={page.channel.title}
               channelId={page.channel.id}
               channelUrl={page.channel.channelUrl}
+              thumbnailUrl={page.channel.thumbnailUrl}
             />
           </Stack>
         </Paper>

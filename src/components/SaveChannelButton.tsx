@@ -11,12 +11,14 @@ type SaveChannelButtonProps = {
   channelName: string;
   channelId?: string;
   channelUrl?: string;
+  thumbnailUrl?: string;
 };
 
 export function SaveChannelButton({
   channelName,
   channelId,
   channelUrl,
+  thumbnailUrl,
 }: SaveChannelButtonProps) {
   const { channels, addChannel } = useSavedChannels();
   const trimmedName = channelName.trim();
@@ -62,6 +64,7 @@ export function SaveChannelButton({
           name: trimmedName,
           channelId,
           channelUrl,
+          thumbnailUrl,
           searchQuery,
         })
       }

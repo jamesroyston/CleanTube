@@ -22,6 +22,8 @@ function loadLiteYt() {
   return liteYtLoad;
 }
 
+const THEATRE_VIEWPORT_RESERVE = "152px";
+
 type LiteYouTubeEmbedProps = {
   videoId: string;
   title?: string;
@@ -34,6 +36,11 @@ type LiteYouTubeEmbedProps = {
    * from document-level shortcuts (not only when the iframe is focused).
    */
   enableGlobalShortcuts?: boolean;
+  /**
+   * Watch “theatre” layout: cap player size so it fits below the app bar in the viewport
+   * (16:9 box limited by `100dvh` minus chrome).
+   */
+  theatreMaximize?: boolean;
 };
 
 export function LiteYouTubeEmbed({
@@ -43,6 +50,7 @@ export function LiteYouTubeEmbed({
   channelName,
   startSeconds,
   enableGlobalShortcuts = true,
+  theatreMaximize = false,
 }: LiteYouTubeEmbedProps) {
   const { upsertWatchProgress, user } = useCloudLibrary();
   const [ready, setReady] = useState(false);
@@ -234,26 +242,42 @@ export function LiteYouTubeEmbed({
     };
   }, [recordProgress, ready, user]);
 
+  const shellSx = theatreMaximize
+    ? {
+        width: "100%",
+        maxWidth: `min(100%, calc((100dvh - ${THEATRE_VIEWPORT_RESERVE}) * 16 / 9))`,
+        maxHeight: `calc(100dvh - ${THEATRE_VIEWPORT_RESERVE})`,
+      }
+    : { width: "100%" };
+
   if (!ready) {
-    return (
+    const skeleton = (
       <Box
         sx={{
-          width: "100%",
+          ...shellSx,
           aspectRatio: "16 / 9",
           borderRadius: 1,
           bgcolor: "action.hover",
         }}
       />
     );
+    return theatreMaximize ? (
+      <Box
+        sx={{
+          width: "100%",
+          display: "flex",
+          justifyContent: "center",
+        }}
+      >
+        {skeleton}
+      </Box>
+    ) : (
+      skeleton
+    );
   }
 
-  return (
-    <Box
-      ref={shellRef}
-      sx={{
-        width: "100%",
-      }}
-    >
+  const player = (
+    <Box ref={shellRef} sx={shellSx}>
       <lite-youtube
         key={`${videoId}-${start ?? 0}`}
         videoid={videoId}
@@ -270,5 +294,19 @@ export function LiteYouTubeEmbed({
         }}
       />
     </Box>
+  );
+
+  return theatreMaximize ? (
+    <Box
+      sx={{
+        width: "100%",
+        display: "flex",
+        justifyContent: "center",
+      }}
+    >
+      {player}
+    </Box>
+  ) : (
+    player
   );
 }

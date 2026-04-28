@@ -83,6 +83,10 @@ function parseSavedChannels(raw: string | null): SavedChannel[] {
           typeof entry.channelId === "string" ? entry.channelId : undefined,
         channelUrl:
           typeof entry.channelUrl === "string" ? entry.channelUrl : undefined,
+        thumbnailUrl:
+          typeof entry.thumbnailUrl === "string"
+            ? entry.thumbnailUrl
+            : undefined,
         searchQuery: entry.searchQuery,
       },
     ];

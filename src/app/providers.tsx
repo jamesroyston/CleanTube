@@ -33,9 +33,14 @@ import {
   normalizeThemeMode,
 } from "@/lib/themePersistence";
 import {
-  FOCUS_MODE_COOKIE,
-  FOCUS_MODE_STORAGE_KEY,
-} from "@/lib/focusModePersistence";
+  LEGACY_FOCUS_MODE_COOKIE,
+  WATCH_LAYOUT_COOKIE,
+  WATCH_LAYOUT_STORAGE_KEY,
+  type WatchLayoutMode,
+  isValidWatchLayoutMode,
+  normalizeStoredWatchLayout,
+  watchLayoutToCookieValue,
+} from "@/lib/watchLayoutPersistence";
 
 type ThemeContextValue = {
   mode: ThemeMode;
@@ -49,16 +54,12 @@ type ThemeContextValue = {
 
 const ThemeModeContext = createContext<ThemeContextValue | null>(null);
 
-type TheatreFocusContextValue = {
-  /** When true, the watch page hides the "Up next" column (Theatre focus). */
-  enabled: boolean;
-  setTheatreFocus: (value: boolean) => void;
-  toggleTheatreFocus: () => void;
+type WatchLayoutContextValue = {
+  mode: WatchLayoutMode;
+  setWatchLayoutMode: (mode: WatchLayoutMode) => void;
 };
 
-const TheatreFocusContext = createContext<TheatreFocusContextValue | null>(
-  null,
-);
+const WatchLayoutContext = createContext<WatchLayoutContextValue | null>(null);
 
 function readStoredThemeSettings(): InitialThemeSettings {
   if (typeof window === "undefined") {
@@ -101,10 +102,13 @@ function writeThemeStorage(key: string, value: string): void {
   }
 }
 
-function writeFocusCookie(value: "0" | "1"): void {
+function writeWatchLayoutCookie(mode: WatchLayoutMode): void {
   if (typeof document === "undefined") return;
   try {
-    document.cookie = `${FOCUS_MODE_COOKIE}=${value}; Max-Age=31536000; Path=/; SameSite=Lax`;
+    document.cookie = `${WATCH_LAYOUT_COOKIE}=${watchLayoutToCookieValue(
+      mode,
+    )}; Max-Age=31536000; Path=/; SameSite=Lax`;
+    document.cookie = `${LEGACY_FOCUS_MODE_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
   } catch {
     /* ignore */
   }
@@ -116,10 +120,10 @@ export function useThemeMode() {
   return ctx;
 }
 
-export function useTheatreFocus() {
-  const ctx = useContext(TheatreFocusContext);
+export function useWatchLayout() {
+  const ctx = useContext(WatchLayoutContext);
   if (!ctx) {
-    throw new Error("useTheatreFocus must be used within AppProviders");
+    throw new Error("useWatchLayout must be used within AppProviders");
   }
   return ctx;
 }
@@ -127,34 +131,51 @@ export function useTheatreFocus() {
 export function AppProviders({
   children,
   initialTheme,
-  initialTheatreFocus,
-  hasFocusCookie,
+  initialWatchLayoutMode,
+  hasWatchLayoutCookie,
 }: {
   children: React.ReactNode;
   initialTheme: InitialThemeSettings;
-  initialTheatreFocus: boolean;
-  hasFocusCookie: boolean;
+  initialWatchLayoutMode: WatchLayoutMode;
+  hasWatchLayoutCookie: boolean;
 }) {
   const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode);
   const [darkPresetId, setDarkPresetIdState] =
     useState<DarkPresetId>(initialTheme.darkPresetId);
   const [lightPresetId, setLightPresetIdState] =
     useState<LightPresetId>(initialTheme.lightPresetId);
-  const [theatreFocus, setTheatreFocusState] = useState(initialTheatreFocus);
+  const [watchLayoutMode, setWatchLayoutModeState] = useState(
+    initialWatchLayoutMode,
+  );
 
   useEffect(() => {
-    if (hasFocusCookie) return;
+    if (hasWatchLayoutCookie) return;
     try {
-      const raw = localStorage.getItem(FOCUS_MODE_STORAGE_KEY);
-      if (raw === "1" || raw === "true" || raw === "on") {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time migration from localStorage-only focus setting
-        setTheatreFocusState(true);
-        writeFocusCookie("1");
+      let raw = localStorage.getItem(WATCH_LAYOUT_STORAGE_KEY);
+      const normalized = raw ? normalizeStoredWatchLayout(raw) : undefined;
+      if (normalized && normalized !== raw) {
+        try {
+          localStorage.setItem(WATCH_LAYOUT_STORAGE_KEY, normalized);
+        } catch {
+          /* ignore */
+        }
+        raw = normalized;
+      }
+      if (!raw || !isValidWatchLayoutMode(raw)) {
+        const leg = localStorage.getItem(LEGACY_FOCUS_MODE_COOKIE);
+        if (leg === "1" || leg === "true" || leg === "on") {
+          raw = "theatre";
+        }
+      }
+      if (raw && isValidWatchLayoutMode(raw)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate watch layout from localStorage when no cookie
+        setWatchLayoutModeState(raw);
+        writeWatchLayoutCookie(raw);
       }
     } catch {
       /* ignore */
     }
-  }, [hasFocusCookie]);
+  }, [hasWatchLayoutCookie]);
 
   useEffect(() => {
     if (initialTheme.hasStoredCookie) return;
@@ -170,13 +191,12 @@ export function AppProviders({
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
-      if (e.key === FOCUS_MODE_STORAGE_KEY) {
-        const on =
-          e.newValue === "1" ||
-          e.newValue === "true" ||
-          e.newValue === "on";
-        setTheatreFocusState(on);
-        writeFocusCookie(on ? "1" : "0");
+      if (e.key === WATCH_LAYOUT_STORAGE_KEY && e.newValue) {
+        const next = normalizeStoredWatchLayout(e.newValue);
+        if (next && isValidWatchLayoutMode(next)) {
+          setWatchLayoutModeState(next);
+          writeWatchLayoutCookie(next);
+        }
         return;
       }
       if (!e.newValue) return;
@@ -224,20 +244,15 @@ export function AppProviders({
     setMode(mode === "dark" ? "light" : "dark");
   }, [mode, setMode]);
 
-  const setTheatreFocus = useCallback((value: boolean) => {
-    setTheatreFocusState(value);
-    const encoded = value ? "1" : "0";
+  const setWatchLayoutMode = useCallback((next: WatchLayoutMode) => {
+    setWatchLayoutModeState(next);
     try {
-      localStorage.setItem(FOCUS_MODE_STORAGE_KEY, encoded);
+      localStorage.setItem(WATCH_LAYOUT_STORAGE_KEY, next);
     } catch {
       /* ignore */
     }
-    writeFocusCookie(value ? "1" : "0");
+    writeWatchLayoutCookie(next);
   }, []);
-
-  const toggleTheatreFocus = useCallback(() => {
-    setTheatreFocus(!theatreFocus);
-  }, [setTheatreFocus, theatreFocus]);
 
   const theme = useMemo(
     () => createAppTheme(mode, darkPresetId, lightPresetId),
@@ -265,24 +280,23 @@ export function AppProviders({
     ],
   );
 
-  const theatreValue = useMemo(
+  const watchLayoutValue = useMemo(
     () => ({
-      enabled: theatreFocus,
-      setTheatreFocus,
-      toggleTheatreFocus,
+      mode: watchLayoutMode,
+      setWatchLayoutMode,
     }),
-    [theatreFocus, setTheatreFocus, toggleTheatreFocus],
+    [watchLayoutMode, setWatchLayoutMode],
   );
 
   return (
     <AppRouterCacheProvider options={{ key: "mui" }}>
       <ThemeModeContext.Provider value={value}>
-        <TheatreFocusContext.Provider value={theatreValue}>
+        <WatchLayoutContext.Provider value={watchLayoutValue}>
           <ThemeProvider theme={theme}>
             <CssBaseline enableColorScheme />
             <NavigationProgressProvider>{children}</NavigationProgressProvider>
           </ThemeProvider>
-        </TheatreFocusContext.Provider>
+        </WatchLayoutContext.Provider>
       </ThemeModeContext.Provider>
     </AppRouterCacheProvider>
   );

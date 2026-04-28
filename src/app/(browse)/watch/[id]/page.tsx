@@ -19,9 +19,10 @@ import { toVideoSummaries } from "@/lib/serializeVideo";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
 import { getWatchVideoComments } from "@/lib/youtubeComments";
 import {
-  FOCUS_MODE_COOKIE,
-  parseFocusModeCookie,
-} from "@/lib/focusModePersistence";
+  LEGACY_FOCUS_MODE_COOKIE,
+  WATCH_LAYOUT_COOKIE,
+  parseWatchLayoutCookie,
+} from "@/lib/watchLayoutPersistence";
 import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { getWatchVideoDetails } from "@/lib/watchVideo";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
@@ -59,16 +60,17 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
   }
 
   const cookieStore = await cookies();
-  const theatreFocus = parseFocusModeCookie(
-    cookieStore.get(FOCUS_MODE_COOKIE)?.value,
+  const watchLayout = parseWatchLayoutCookie(
+    cookieStore.get(WATCH_LAYOUT_COOKIE)?.value,
+    cookieStore.get(LEGACY_FOCUS_MODE_COOKIE)?.value,
   );
+  const showUpNext = watchLayout === "up_next";
+  const theatreMaximizePlayer = watchLayout === "theatre";
 
   const [video, comments, watchNext] = await Promise.all([
     getWatchVideoDetails(id),
     getWatchVideoComments(id),
-    theatreFocus
-      ? Promise.resolve([])
-      : getWatchNextRelatedVideos(id),
+    showUpNext ? getWatchNextRelatedVideos(id) : Promise.resolve([]),
   ]);
   const watchNextSummaries = toVideoSummaries(watchNext);
   if (!video) {
@@ -120,7 +122,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
           spacing={3}
           sx={{ px: { xs: 2, sm: 0 }, alignItems: "flex-start" }}
         >
-          <Grid size={{ xs: 12, lg: theatreFocus ? 12 : 8 }}>
+          <Grid size={{ xs: 12, lg: showUpNext ? 8 : 12 }}>
             <Stack spacing={1.5}>
               <Box
                 sx={{
@@ -134,6 +136,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
                   thumbnailUrl={thumb}
                   channelName={video.channelName}
                   startSeconds={startSeconds}
+                  theatreMaximize={theatreMaximizePlayer}
                 />
               </Box>
 
@@ -163,7 +166,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
               <WatchComments videoId={id} initialComments={comments} />
             </Stack>
           </Grid>
-          {!theatreFocus ? (
+          {showUpNext ? (
             <Grid size={{ xs: 12, lg: 4 }}>
               <WatchNextSidebar videos={watchNextSummaries} />
             </Grid>

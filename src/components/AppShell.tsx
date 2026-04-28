@@ -5,12 +5,12 @@ import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { Suspense, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 
 import {
-  ChannelsSidebar,
   CHANNELS_COLLAPSED_DRAWER_WIDTH,
   CHANNELS_DRAWER_WIDTH,
+  ChannelsSidebar,
 } from "@/components/ChannelsSidebar";
 import { Header } from "@/components/Header";
 import { SavedChannelMigration } from "@/components/SavedChannelMigration";
@@ -22,8 +22,16 @@ function HeaderFallback() {
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
+  const smUp = useMediaQuery(theme.breakpoints.up("sm"));
   const [mobileOpen, setMobileOpen] = useState(false);
   const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+
+  const toolbarOffset = useMemo(() => {
+    const raw = theme.mixins.toolbar.minHeight;
+    if (typeof raw === "number") return raw;
+    return smUp ? 64 : 56;
+  }, [smUp, theme.mixins.toolbar.minHeight]);
+
   const desktopDrawerWidth = desktopCollapsed
     ? CHANNELS_COLLAPSED_DRAWER_WIDTH
     : CHANNELS_DRAWER_WIDTH;
@@ -32,10 +40,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     <IconButton
       color="inherit"
       edge="start"
-      aria-label={mdUp ? "Toggle library drawer" : "Open library drawer"}
+      aria-label={mdUp ? "Toggle library rail" : "Open library drawer"}
       onClick={() => {
         if (mdUp) {
-          setDesktopCollapsed((value) => !value);
+          setDesktopCollapsed((v) => !v);
         } else {
           setMobileOpen(true);
         }
@@ -53,17 +61,18 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       }}
     >
       <ChannelsSidebar
-        variant="permanent"
-        open
-        onClose={() => setMobileOpen(false)}
+        surface="permanent"
         collapsed={desktopCollapsed}
-        sx={{ display: { xs: "none", md: "block" } }}
+        open
+        onClose={() => {}}
+        toolbarOffset={toolbarOffset}
       />
       <ChannelsSidebar
-        variant="temporary"
+        surface="temporary"
+        collapsed={false}
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
-        sx={{ display: { xs: "block", md: "none" } }}
+        toolbarOffset={toolbarOffset}
       />
       <Box
         component="div"

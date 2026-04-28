@@ -25,6 +25,7 @@ type SavedChannelRow = {
   channel_id: string | null;
   channel_url: string | null;
   search_query: string;
+  thumbnail_url: string | null;
   created_at: string;
 };
 
@@ -59,6 +60,7 @@ function toSavedChannel(row: SavedChannelRow): SavedChannel {
     name: row.name,
     channelId: row.channel_id ?? undefined,
     channelUrl: row.channel_url ?? undefined,
+    thumbnailUrl: row.thumbnail_url ?? undefined,
     searchQuery: row.search_query,
   };
 }
@@ -191,6 +193,7 @@ export async function upsertSavedChannels(
     channel_id: channel.channelId ?? null,
     channel_url: channel.channelUrl ?? null,
     search_query: channel.searchQuery,
+    thumbnail_url: channel.thumbnailUrl ?? null,
   }));
   const { error } = await supabase.from("saved_channels").upsert(rows);
   if (error) throw error;

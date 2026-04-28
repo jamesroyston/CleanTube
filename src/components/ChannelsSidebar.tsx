@@ -1,15 +1,15 @@
 "use client";
 
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import SearchIcon from "@mui/icons-material/Search";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import SubscriptionsIcon from "@mui/icons-material/Subscriptions";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
+import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import Drawer from "@mui/material/Drawer";
-import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
+import ListItemAvatar from "@mui/material/ListItemAvatar";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -24,29 +24,37 @@ import { getLastSearchSort } from "@/lib/lastSearchSession";
 import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
 import type { SavedChannel } from "@/types/savedChannel";
 
-const DRAWER_WIDTH = 280;
-const COLLAPSED_DRAWER_WIDTH = 72;
+export const CHANNELS_DRAWER_WIDTH = 280;
+export const CHANNELS_COLLAPSED_DRAWER_WIDTH = 72;
 
 type ChannelsSidebarProps = {
-  variant: "permanent" | "temporary";
+  surface: "permanent" | "temporary";
+  /** Narrow rail: icons + channel avatars only (desktop permanent). */
+  collapsed: boolean;
   open: boolean;
   onClose: () => void;
-  collapsed?: boolean;
+  toolbarOffset: number;
   sx?: SxProps<Theme>;
 };
 
 export function ChannelsSidebar({
-  variant,
+  surface,
+  collapsed,
   open,
   onClose,
-  collapsed = false,
+  toolbarOffset,
   sx,
 }: ChannelsSidebarProps) {
-  const { channels, removeChannel } = useSavedChannels();
-  const mini = collapsed && variant === "permanent";
-  const drawerWidth = mini ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
+  const { channels } = useSavedChannels();
   const savedChannels = channels.filter((channel) => channel.channelId);
   const savedSearches = channels.filter((channel) => !channel.channelId);
+  const mini = surface === "permanent" && collapsed;
+  const drawerWidth =
+    surface === "permanent"
+      ? mini
+        ? CHANNELS_COLLAPSED_DRAWER_WIDTH
+        : CHANNELS_DRAWER_WIDTH
+      : CHANNELS_DRAWER_WIDTH;
 
   function searchHref(q: string) {
     const searchSort = getLastSearchSort();
@@ -83,6 +91,7 @@ export function ChannelsSidebar({
           borderColor: "divider",
           justifyContent: mini ? "center" : "flex-start",
           gap: 1,
+          px: mini ? 0.5 : undefined,
         }}
       >
         <SubscriptionsIcon color="primary" />
@@ -92,7 +101,7 @@ export function ChannelsSidebar({
           </Typography>
         ) : null}
       </Toolbar>
-      <Box sx={{ flex: 1, overflow: "auto", px: 1, py: 1 }}>
+      <Box sx={{ flex: 1, overflow: "auto", px: mini ? 0.5 : 1, py: 1 }}>
         <List disablePadding sx={{ mb: 1 }}>
           {navLinks.map((item) => (
             <Tooltip
@@ -108,7 +117,7 @@ export function ChannelsSidebar({
                   borderRadius: 1,
                   minHeight: 44,
                   justifyContent: mini ? "center" : "flex-start",
-                  px: mini ? 1 : 1.5,
+                  px: mini ? 1 : undefined,
                 }}
               >
                 <ListItemIcon
@@ -116,6 +125,7 @@ export function ChannelsSidebar({
                     minWidth: mini ? 0 : 36,
                     color: "text.secondary",
                     justifyContent: "center",
+                    m: mini ? 0 : undefined,
                   }}
                 >
                   {item.icon}
@@ -128,195 +138,237 @@ export function ChannelsSidebar({
 
         <Divider sx={{ my: 1 }} />
 
-        <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, px: 0.5 }}>
-          <SubscriptionsIcon color="action" fontSize="small" />
-          {!mini ? (
-            <Typography variant="overline" sx={{ lineHeight: 1.2, letterSpacing: 0.08 }}>
+        {!mini ? (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+              mb: 1,
+              px: 0.5,
+            }}
+          >
+            <SubscriptionsIcon color="action" fontSize="small" />
+            <Typography
+              variant="overline"
+              sx={{ lineHeight: 1.2, letterSpacing: 0.08 }}
+            >
               Saved channels
             </Typography>
-          ) : null}
-        </Box>
+          </Box>
+        ) : null}
         {savedChannels.length === 0 ? (
           !mini ? (
-            <Typography variant="body2" color="text.secondary" sx={{ px: 1, py: 1 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ px: 1, py: 1 }}
+            >
               Save channels from a channel page to pin them here.
             </Typography>
           ) : null
         ) : (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+          <List disablePadding sx={{ mb: 1 }}>
             {savedChannels.map((c) => (
-              <Box
-                key={c.id}
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                  borderRadius: 1,
-                  px: mini ? 0 : 1,
-                  py: 0.5,
-                  justifyContent: mini ? "center" : "flex-start",
-                  "&:hover": { bgcolor: "action.hover" },
-                }}
-              >
-                {!mini ? (
-                  <Box
-                    component={Link}
-                    href={savedChannelHref(c)}
-                    onClick={onClose}
-                    sx={{
-                      flex: 1,
-                      minWidth: 0,
-                      textAlign: "left",
-                      cursor: "pointer",
-                      border: 0,
-                      background: "none",
-                      font: "inherit",
-                      color: "inherit",
-                      textDecoration: "none",
-                      p: 0,
-                      m: 0,
-                    }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                      {c.name}
-                    </Typography>
-                    {c.searchQuery !== c.name ? (
-                      <Typography variant="caption" color="text.secondary" noWrap>
-                        Search: {c.searchQuery}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                ) : null}
-                <IconButton
-                  aria-label={`Open ${c.name}`}
+              <Tooltip key={c.id} title={c.name} placement="right" enterDelay={400}>
+                <ListItemButton
                   component={Link}
                   href={savedChannelHref(c)}
-                  size="small"
                   onClick={onClose}
+                  sx={{
+                    borderRadius: 1,
+                    py: mini ? 0.5 : 0.75,
+                    justifyContent: mini ? "center" : "flex-start",
+                  }}
                 >
-                  <Tooltip title={mini ? c.name : ""} placement="right">
-                    <SearchIcon fontSize="small" />
-                  </Tooltip>
-                </IconButton>
-                {!mini ? (
-                  <IconButton
-                    aria-label={`Remove ${c.name}`}
-                    size="small"
-                    onClick={() => removeChannel(c.id)}
-                  >
-                    <DeleteOutlineIcon fontSize="small" />
-                  </IconButton>
-                ) : null}
-              </Box>
+                  {mini ? (
+                    <Avatar
+                      src={c.thumbnailUrl}
+                      alt=""
+                      sx={{ width: 36, height: 36 }}
+                    >
+                      {c.name.slice(0, 1).toUpperCase()}
+                    </Avatar>
+                  ) : (
+                    <>
+                      <ListItemAvatar sx={{ minWidth: 44 }}>
+                        <Avatar
+                          src={c.thumbnailUrl}
+                          alt=""
+                          sx={{ width: 32, height: 32 }}
+                        >
+                          {c.name.slice(0, 1).toUpperCase()}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={c.name}
+                        secondary={
+                          c.searchQuery !== c.name
+                            ? `Search: ${c.searchQuery}`
+                            : null
+                        }
+                        primaryTypographyProps={{ noWrap: true }}
+                        secondaryTypographyProps={{ noWrap: true }}
+                      />
+                    </>
+                  )}
+                </ListItemButton>
+              </Tooltip>
             ))}
-          </Box>
+          </List>
         )}
 
         {savedSearches.length > 0 ? (
           <>
             <Divider sx={{ my: 1 }} />
-
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, mb: 1, px: 0.5 }}>
-              <SearchIcon color="action" fontSize="small" />
-              {!mini ? (
-                <Typography variant="overline" sx={{ lineHeight: 1.2, letterSpacing: 0.08 }}>
+            {!mini ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  mb: 1,
+                  px: 0.5,
+                }}
+              >
+                <Typography
+                  variant="overline"
+                  sx={{ lineHeight: 1.2, letterSpacing: 0.08 }}
+                >
                   Pinned searches
                 </Typography>
-              ) : null}
-            </Box>
-            <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+              </Box>
+            ) : null}
+            <List disablePadding>
               {savedSearches.map((c) => (
-                <Box
-                  key={c.id}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 0.5,
-                    borderRadius: 1,
-                    px: mini ? 0 : 1,
-                    py: 0.5,
-                    justifyContent: mini ? "center" : "flex-start",
-                    "&:hover": { bgcolor: "action.hover" },
-                  }}
-                >
-                  {!mini ? (
-                    <Box
-                      component={Link}
-                      href={searchHref(c.searchQuery)}
-                      onClick={onClose}
-                      sx={{
-                        flex: 1,
-                        minWidth: 0,
-                        textAlign: "left",
-                        cursor: "pointer",
-                        border: 0,
-                        background: "none",
-                        font: "inherit",
-                        color: "inherit",
-                        textDecoration: "none",
-                        p: 0,
-                        m: 0,
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                        {c.name}
-                      </Typography>
-                      {c.searchQuery !== c.name ? (
-                        <Typography variant="caption" color="text.secondary" noWrap>
-                          Search: {c.searchQuery}
-                        </Typography>
-                      ) : null}
-                    </Box>
-                  ) : null}
-                  <IconButton
-                    aria-label={`Search ${c.name}`}
+                <Tooltip key={c.id} title={c.name} placement="right" enterDelay={400}>
+                  <ListItemButton
                     component={Link}
                     href={searchHref(c.searchQuery)}
-                    size="small"
                     onClick={onClose}
+                    sx={{
+                      borderRadius: 1,
+                      py: mini ? 0.5 : 0.75,
+                      justifyContent: mini ? "center" : "flex-start",
+                    }}
                   >
-                    <Tooltip title={mini ? c.name : ""} placement="right">
-                      <SearchIcon fontSize="small" />
-                    </Tooltip>
-                  </IconButton>
-                  {!mini ? (
-                    <IconButton
-                      aria-label={`Remove ${c.name}`}
-                      size="small"
-                      onClick={() => removeChannel(c.id)}
-                    >
-                      <DeleteOutlineIcon fontSize="small" />
-                    </IconButton>
-                  ) : null}
-                </Box>
+                    {mini ? (
+                      <Avatar sx={{ width: 36, height: 36 }}>
+                        {c.name.slice(0, 1).toUpperCase()}
+                      </Avatar>
+                    ) : (
+                      <>
+                        <ListItemAvatar sx={{ minWidth: 44 }}>
+                          <Avatar sx={{ width: 32, height: 32 }}>
+                            {c.name.slice(0, 1).toUpperCase()}
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText
+                          primary={c.name}
+                          secondary={
+                            c.searchQuery !== c.name
+                              ? `Query: ${c.searchQuery}`
+                              : null
+                          }
+                          primaryTypographyProps={{ noWrap: true }}
+                          secondaryTypographyProps={{ noWrap: true }}
+                        />
+                      </>
+                    )}
+                  </ListItemButton>
+                </Tooltip>
               ))}
-            </Box>
+            </List>
           </>
         ) : null}
+
+        <Divider sx={{ my: 2 }} />
+        <Tooltip title={mini ? "Manage library" : ""} placement="right">
+          <ListItemButton
+            component={Link}
+            href="/library"
+            onClick={onClose}
+            sx={{
+              borderRadius: 1,
+              justifyContent: mini ? "center" : "flex-start",
+            }}
+          >
+            {mini ? (
+              <ListItemIcon sx={{ minWidth: 0, justifyContent: "center" }}>
+                <SettingsOutlinedIcon fontSize="small" color="action" />
+              </ListItemIcon>
+            ) : (
+              <ListItemText
+                primary="Manage saved channels & searches"
+                secondary="Remove or review pins"
+                primaryTypographyProps={{ variant: "body2", fontWeight: 600 }}
+                secondaryTypographyProps={{ variant: "caption" }}
+              />
+            )}
+          </ListItemButton>
+        </Tooltip>
       </Box>
     </Box>
   );
 
+  if (surface === "permanent") {
+    return (
+      <Drawer
+        variant="permanent"
+        open
+        sx={[
+          {
+            width: drawerWidth,
+            flexShrink: 0,
+            display: { xs: "none", md: "block" },
+            [`& .MuiDrawer-paper`]: {
+              width: drawerWidth,
+              boxSizing: "border-box",
+              position: "fixed",
+              top: 0,
+              left: 0,
+              height: "100vh",
+              borderRight: (t) => `1px solid ${t.palette.divider}`,
+              overflowX: "hidden",
+              zIndex: (t) => t.zIndex.drawer,
+              transition: (t) =>
+                t.transitions.create("width", {
+                  easing: t.transitions.easing.sharp,
+                  duration: t.transitions.duration.enteringScreen,
+                }),
+            },
+          },
+          ...(sx ? (Array.isArray(sx) ? sx : [sx]) : []),
+        ]}
+      >
+        {drawer}
+      </Drawer>
+    );
+  }
+
   return (
     <Drawer
-      variant={variant}
+      variant="temporary"
       open={open}
       onClose={onClose}
-      ModalProps={{ keepMounted: true }}
+      ModalProps={{
+        keepMounted: true,
+        sx: {
+          zIndex: (t) => t.zIndex.appBar - 1,
+        },
+      }}
       sx={[
         {
-          width: drawerWidth,
-          flexShrink: 0,
+          zIndex: (t) => t.zIndex.appBar - 1,
+          display: { xs: "block", md: "none" },
           [`& .MuiDrawer-paper`]: {
-            width: drawerWidth,
+            width: CHANNELS_DRAWER_WIDTH,
             boxSizing: "border-box",
+            mt: `${toolbarOffset}px`,
+            height: `calc(100% - ${toolbarOffset}px)`,
             borderRight: (t) => `1px solid ${t.palette.divider}`,
             overflowX: "hidden",
-            transition: (t) =>
-              t.transitions.create("width", {
-                easing: t.transitions.easing.sharp,
-                duration: t.transitions.duration.shorter,
-              }),
+            borderRadius: 0,
           },
         },
         ...(sx ? (Array.isArray(sx) ? sx : [sx]) : []),
@@ -326,6 +378,3 @@ export function ChannelsSidebar({
     </Drawer>
   );
 }
-
-export const CHANNELS_DRAWER_WIDTH = DRAWER_WIDTH;
-export const CHANNELS_COLLAPSED_DRAWER_WIDTH = COLLAPSED_DRAWER_WIDTH;
