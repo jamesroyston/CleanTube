@@ -1,8 +1,12 @@
 import { cache } from "react";
 
 import { canonicalYoutubeThumbnailUrl } from "@/lib/serializeVideo";
-import { feedVideoToVideoLike } from "@/lib/youtubeiAdapters";
+import {
+  channelFeedVideoToVideoLike,
+  feedVideoToVideoLike,
+} from "@/lib/youtubeiAdapters";
 import { getInnertube } from "@/lib/youtubeiClient";
+import type { ChannelVideosVariant } from "@/lib/channelVideosPreferenceConstants";
 import type {
   ChannelDetails,
   ChannelSortMode,
@@ -13,6 +17,9 @@ import type {
 /** InnerTube channel: one `getChannel` per normalized lookup per request (`cache`); metadata uses `getChannelDetails` only, page adds `getVideos`. */
 const DEFAULT_PAGE_SIZE = 24;
 const CHANNEL_ID_PATTERN = /^UC[a-zA-Z0-9_-]{22}$/;
+const ROBUST_PAGE1_MAX_CONTINUATIONS = 8;
+const ROBUST_DEEP_PAGE_MAX_CONTINUATIONS = 4;
+const RETRY_ATTEMPTS = 3;
 
 type Thumbnailish = { url?: string };
 
@@ -58,6 +65,30 @@ type ChannelBackend = {
     limit?: number;
   }): Promise<ChannelVideosPage | null>;
 };
+
+function channelVideosDebugEnabled(): boolean {
+  return process.env.CHANNEL_VIDEOS_DEBUG === "1";
+}
+
+async function withRetries<T>(
+  label: string,
+  fn: () => Promise<T>,
+  attempts = RETRY_ATTEMPTS,
+): Promise<T | null> {
+  let last: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      last = err;
+      await new Promise((r) => setTimeout(r, 140 * (i + 1)));
+    }
+  }
+  if (channelVideosDebugEnabled()) {
+    console.warn(`[channel videos] ${label}: exhausted retries`, last);
+  }
+  return null;
+}
 
 function text(value: unknown): string | undefined {
   if (typeof value === "string") return value.trim() || undefined;
@@ -290,28 +321,97 @@ async function sortedVideosFeed(
 async function feedAtPage(
   initialFeed: FeedLike,
   pageNumber: number,
-): Promise<FeedLike> {
+): Promise<{ feed: FeedLike; continuationFailed: boolean }> {
   let feed = initialFeed;
   for (let page = 1; page < pageNumber; page += 1) {
     if (!feed.has_continuation || typeof feed.getContinuation !== "function") {
-      return feed;
+      return { feed, continuationFailed: false };
     }
-    feed = await feed.getContinuation();
+    try {
+      feed = await feed.getContinuation();
+    } catch {
+      return { feed, continuationFailed: true };
+    }
   }
-  return feed;
+  return { feed, continuationFailed: false };
 }
 
-function videosFromFeed(feed: FeedLike, limit: number): VideoLikeForSummary[] {
+function videosFromFeed(
+  feed: FeedLike,
+  limit: number,
+  mapItem: (item: unknown) => VideoLikeForSummary | null,
+): VideoLikeForSummary[] {
   const out: VideoLikeForSummary[] = [];
   const seen = new Set<string>();
   for (const item of feed.videos ?? []) {
-    const video = feedVideoToVideoLike(item);
+    const video = mapItem(item);
     if (!video || seen.has(video.id)) continue;
     seen.add(video.id);
     out.push(video);
     if (out.length >= limit) break;
   }
   return out;
+}
+
+function countUnmappedRaw(
+  feed: FeedLike,
+  mapItem: (item: unknown) => VideoLikeForSummary | null,
+): { raw: number; mapped: number } {
+  const raw = feed.videos?.length ?? 0;
+  let mapped = 0;
+  const seen = new Set<string>();
+  for (const item of feed.videos ?? []) {
+    const v = mapItem(item);
+    if (v && !seen.has(v.id)) {
+      seen.add(v.id);
+      mapped++;
+    }
+  }
+  return { raw, mapped };
+}
+
+async function collectMappedAcrossContinuations(
+  start: FeedLike,
+  limit: number,
+  mapItem: (item: unknown) => VideoLikeForSummary | null,
+  maxContinuationSteps: number,
+): Promise<{
+  videos: VideoLikeForSummary[];
+  endFeed: FeedLike;
+  rawItemCount: number;
+  lostItems: boolean;
+}> {
+  const videos: VideoLikeForSummary[] = [];
+  const seen = new Set<string>();
+  let feed = start;
+  let rawItemCount = 0;
+  let stepsUsed = 0;
+  let lostItems = false;
+
+  while (videos.length < limit && stepsUsed <= maxContinuationSteps) {
+    const { raw, mapped } = countUnmappedRaw(feed, mapItem);
+    rawItemCount += raw;
+    if (raw > 0 && mapped === 0) lostItems = true;
+
+    for (const item of feed.videos ?? []) {
+      const v = mapItem(item);
+      if (v && !seen.has(v.id)) {
+        seen.add(v.id);
+        videos.push(v);
+        if (videos.length >= limit) break;
+      }
+    }
+    if (videos.length >= limit) break;
+    if (!feed.has_continuation || typeof feed.getContinuation !== "function") break;
+    try {
+      feed = await feed.getContinuation();
+      stepsUsed++;
+    } catch {
+      break;
+    }
+  }
+
+  return { videos, endFeed: feed, rawItemCount, lostItems };
 }
 
 function withChannelName(
@@ -328,10 +428,34 @@ function withChannelName(
   };
 }
 
-/** One `getChannel` per normalized `lookup` per request (e.g. metadata + video grid share it). */
-const loadChannel = cache(async function loadChannel(
-  lookup: string,
-): Promise<ChannelLike | null> {
+function emptyGridHintFromSignals(input: {
+  videoCount: number;
+  hasNext: boolean;
+  rawItemCount: number;
+  continuationFailed: boolean;
+  lostItems: boolean;
+}): "none" | "try_again" | "likely_empty" {
+  if (input.videoCount > 0) return "none";
+  if (input.continuationFailed || input.lostItems || input.rawItemCount > 0) {
+    return "try_again";
+  }
+  if (!input.hasNext) return "likely_empty";
+  return "try_again";
+}
+
+function refineEmptyHint(
+  hint: "none" | "try_again" | "likely_empty",
+  videoCountText: string | undefined,
+  hasNext: boolean,
+): "none" | "try_again" | "likely_empty" {
+  if (hint !== "likely_empty" && hint !== "try_again") return hint;
+  const n = parseCountText(videoCountText);
+  if (n != null && n === 0 && !hasNext) return "likely_empty";
+  if (n != null && n > 0) return "try_again";
+  return hint;
+}
+
+async function fetchChannelRaw(lookup: string): Promise<ChannelLike | null> {
   if (!lookup) return null;
   try {
     const yt = (await getInnertube()) as InnertubeLike;
@@ -340,7 +464,10 @@ const loadChannel = cache(async function loadChannel(
   } catch {
     return null;
   }
-});
+}
+
+/** One `getChannel` per normalized `lookup` per request (e.g. metadata + video grid share it). */
+const loadChannel = cache(fetchChannelRaw);
 
 async function loadAbout(channel: ChannelLike): Promise<unknown> {
   if (typeof channel.getAbout !== "function") return null;
@@ -349,6 +476,106 @@ async function loadAbout(channel: ChannelLike): Promise<unknown> {
   } catch {
     return null;
   }
+}
+
+async function getChannelVideosRobustInner({
+  channelId,
+  sort = "latest",
+  pageToken,
+  limit = DEFAULT_PAGE_SIZE,
+}: {
+  channelId: string;
+  sort?: ChannelSortMode;
+  pageToken?: string;
+  limit?: number;
+}): Promise<ChannelVideosPage | null> {
+  const lookup = normalizeChannelLookup(channelId);
+  let channel: ChannelLike | null = await loadChannel(lookup);
+  if (!channel) {
+    channel = await withRetries("getChannel", () => fetchChannelRaw(lookup));
+  }
+  if (!channel || typeof channel.getVideos !== "function") {
+    return null;
+  }
+
+  const about = await loadAbout(channel);
+  const details = detailsFromChannel(channel, about, lookup);
+  if (!details) return null;
+
+  const pageNumber = normalizePageToken(pageToken);
+  const videosFeed =
+    (await withRetries("getVideos", () => channel!.getVideos!() as Promise<FeedLike>)) ??
+    null;
+  if (!videosFeed) return null;
+
+  const sortedFeed = await sortedVideosFeed(videosFeed, sort);
+  const { feed: pageStart, continuationFailed: pageWalkFailed } = await feedAtPage(
+    sortedFeed,
+    pageNumber,
+  );
+
+  const maxHops =
+    pageNumber === 1
+      ? ROBUST_PAGE1_MAX_CONTINUATIONS
+      : ROBUST_DEEP_PAGE_MAX_CONTINUATIONS;
+  const {
+    videos: collected,
+    endFeed,
+    rawItemCount,
+    lostItems,
+  } = await collectMappedAcrossContinuations(
+    pageStart,
+    limit,
+    channelFeedVideoToVideoLike,
+    maxHops,
+  );
+
+  const videos = collected.map((v) => withChannelName(v, details));
+
+  const gridSourceLostItems = lostItems;
+  if (channelVideosDebugEnabled() && rawItemCount > 0 && videos.length === 0) {
+    console.warn("[channel videos] robust: raw feed items but none mapped", {
+      rawItemCount,
+      pageNumber,
+      sort,
+    });
+  }
+
+  const hasNext = Boolean(
+    endFeed.has_continuation && typeof endFeed.getContinuation === "function",
+  );
+  const totalPages = totalPagesFromVideoCount(details.videoCountText, limit);
+
+  let emptyGridHint = emptyGridHintFromSignals({
+    videoCount: videos.length,
+    hasNext,
+    rawItemCount,
+    continuationFailed: pageWalkFailed,
+    lostItems: gridSourceLostItems,
+  });
+  emptyGridHint = refineEmptyHint(
+    emptyGridHint,
+    details.videoCountText,
+    hasNext,
+  );
+
+  const gridPartialLoad = pageWalkFailed || (pageNumber > 1 && videos.length === 0);
+
+  return {
+    channel: details,
+    videos,
+    sort,
+    pageToken: String(pageNumber),
+    nextPageToken: hasNext ? String(pageNumber + 1) : undefined,
+    previousPageToken: pageNumber > 1 ? String(pageNumber - 1) : undefined,
+    totalPages:
+      totalPages == null
+        ? undefined
+        : Math.max(totalPages, hasNext ? pageNumber + 1 : pageNumber),
+    emptyGridHint: videos.length > 0 ? "none" : emptyGridHint,
+    gridPartialLoad,
+    gridSourceLostItems: videos.length === 0 ? gridSourceLostItems : false,
+  };
 }
 
 export const youtubeiChannelBackend: ChannelBackend = {
@@ -379,14 +606,35 @@ export const youtubeiChannelBackend: ChannelBackend = {
     const pageNumber = normalizePageToken(pageToken);
     const videosFeed = await channel.getVideos();
     const sortedFeed = await sortedVideosFeed(videosFeed, sort);
-    const feed = await feedAtPage(sortedFeed, pageNumber);
-    const hasNext =
-      feed.has_continuation && typeof feed.getContinuation === "function";
+    const { feed, continuationFailed: pageWalkFailed } = await feedAtPage(
+      sortedFeed,
+      pageNumber,
+    );
+    const rawLen = feed.videos?.length ?? 0;
+    const hasNext = Boolean(
+      feed.has_continuation && typeof feed.getContinuation === "function",
+    );
     const totalPages = totalPagesFromVideoCount(details.videoCountText, limit);
 
-    const videos = videosFromFeed(feed, limit).map((video) =>
+    const videos = videosFromFeed(feed, limit, feedVideoToVideoLike).map((video) =>
       withChannelName(video, details),
     );
+
+    let emptyGridHint = emptyGridHintFromSignals({
+      videoCount: videos.length,
+      hasNext,
+      rawItemCount: rawLen,
+      continuationFailed: pageWalkFailed,
+      lostItems: rawLen > 0 && videos.length === 0,
+    });
+    emptyGridHint = refineEmptyHint(
+      emptyGridHint,
+      details.videoCountText,
+      hasNext,
+    );
+
+    const gridPartialLoad =
+      pageWalkFailed || (pageNumber > 1 && videos.length === 0);
 
     return {
       channel: details,
@@ -399,16 +647,26 @@ export const youtubeiChannelBackend: ChannelBackend = {
         totalPages == null
           ? undefined
           : Math.max(totalPages, hasNext ? pageNumber + 1 : pageNumber),
+      emptyGridHint: videos.length > 0 ? "none" : emptyGridHint,
+      gridPartialLoad,
+      gridSourceLostItems: rawLen > 0 && videos.length === 0,
     };
   },
 };
 
-export async function getChannelVideosPage(input: {
-  channelId: string;
-  sort?: ChannelSortMode;
-  pageToken?: string;
-  limit?: number;
-}): Promise<ChannelVideosPage | null> {
+export async function getChannelVideosPage(
+  input: {
+    channelId: string;
+    sort?: ChannelSortMode;
+    pageToken?: string;
+    limit?: number;
+  },
+  options?: { variant?: ChannelVideosVariant },
+): Promise<ChannelVideosPage | null> {
+  const variant = options?.variant ?? "legacy";
+  if (variant === "v2") {
+    return getChannelVideosRobustInner(input);
+  }
   return youtubeiChannelBackend.getChannelVideos(input);
 }
 

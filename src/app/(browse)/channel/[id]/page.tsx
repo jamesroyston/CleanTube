@@ -6,11 +6,14 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 
+import { ChannelGridEmptyState } from "@/components/ChannelGridEmptyState";
 import { ChannelPagination } from "@/components/ChannelPagination";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
+import { resolveChannelVideosVariant } from "@/lib/channelVideosVariant";
 import { toVideoSummaries } from "@/lib/serializeVideo";
 import { getChannelDetails, getChannelVideosPage } from "@/lib/youtubeChannel";
 import { isValidYoutubeChannelId } from "@/lib/youtubeUrl";
@@ -18,7 +21,7 @@ import type { ChannelSortMode } from "@/lib/youtubeTypes";
 
 type PageProps = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sort?: string; page?: string }>;
+  searchParams: Promise<{ sort?: string; page?: string; grid?: string }>;
 };
 
 export const runtime = "nodejs";
@@ -29,7 +32,7 @@ function normalizeChannelSort(value: string | undefined): ChannelSortMode {
 
 function channelHref(
   id: string,
-  options?: { sort?: ChannelSortMode; page?: string },
+  options?: { sort?: ChannelSortMode; page?: string; grid?: string },
 ): string {
   const qs = new URLSearchParams();
   if (options?.sort && options.sort !== "latest") {
@@ -37,6 +40,9 @@ function channelHref(
   }
   if (options?.page && options.page !== "1") {
     qs.set("page", options.page);
+  }
+  if (options?.grid) {
+    qs.set("grid", options.grid);
   }
   const query = qs.toString();
   return `/channel/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
@@ -68,22 +74,29 @@ export async function generateMetadata({
 
 export default async function ChannelPage({ params, searchParams }: PageProps) {
   const { id: rawId } = await params;
-  const { sort: sortRaw, page: pageRaw } = await searchParams;
+  const { sort: sortRaw, page: pageRaw, grid: gridRaw } = await searchParams;
   const id = decodeRouteToken(rawId);
   const sort = normalizeChannelSort(sortRaw);
+  const gridQuery = gridRaw?.trim() || undefined;
+
+  const cookieStore = await cookies();
+  const variant = resolveChannelVideosVariant(cookieStore, { grid: gridQuery });
 
   if (!isValidYoutubeChannelId(id)) {
     const channel = await getChannelDetails(id);
     if (channel?.id && channel.id !== id) {
-      redirect(channelHref(channel.id, { sort, page: pageRaw }));
+      redirect(channelHref(channel.id, { sort, page: pageRaw, grid: gridQuery }));
     }
   }
 
-  const page = await getChannelVideosPage({
-    channelId: id,
-    sort,
-    pageToken: pageRaw,
-  });
+  const page = await getChannelVideosPage(
+    {
+      channelId: id,
+      sort,
+      pageToken: pageRaw,
+    },
+    { variant },
+  );
 
   if (!page) {
     notFound();
@@ -96,6 +109,8 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
     page.channel.subscriberText,
     page.channel.videoCountText,
   ].filter(Boolean);
+
+  const emptyHint = page.emptyGridHint ?? "likely_empty";
 
   return (
     <Box component="main" sx={{ pb: 6, minHeight: "100vh" }}>
@@ -163,13 +178,21 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
         >
           <Stack direction="row" spacing={1}>
             <Button
-              href={channelHref(page.channel.id, { sort: "latest" })}
+              href={channelHref(page.channel.id, {
+                sort: "latest",
+                page: pageRaw,
+                grid: gridQuery,
+              })}
               variant={sort === "latest" ? "contained" : "outlined"}
             >
               Latest
             </Button>
             <Button
-              href={channelHref(page.channel.id, { sort: "popular" })}
+              href={channelHref(page.channel.id, {
+                sort: "popular",
+                page: pageRaw,
+                grid: gridQuery,
+              })}
               variant={sort === "popular" ? "contained" : "outlined"}
             >
               Popular
@@ -182,14 +205,16 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
               currentPage={currentPage}
               hasNextPage={Boolean(page.nextPageToken)}
               totalPages={page.totalPages}
+              gridQuery={gridQuery}
             />
           </Box>
         </Stack>
 
         {videos.length === 0 ? (
-          <Typography color="text.secondary" sx={{ py: 4 }}>
-            No videos found for this channel.
-          </Typography>
+          <ChannelGridEmptyState
+            hint={emptyHint === "try_again" ? "try_again" : "likely_empty"}
+            partialLoad={page.gridPartialLoad}
+          />
         ) : (
           <VideoResultsGrid videos={videos} />
         )}
@@ -201,6 +226,7 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
             currentPage={currentPage}
             hasNextPage={Boolean(page.nextPageToken)}
             totalPages={page.totalPages}
+            gridQuery={gridQuery}
           />
         </Stack>
       </Container>

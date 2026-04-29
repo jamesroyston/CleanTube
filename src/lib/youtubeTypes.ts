@@ -26,7 +26,7 @@ export type ChannelDetails = {
   videoCountText?: string;
   viewCountText?: string;
   joinedDateText?: string;
-  source: "youtubei.js";
+    source: "youtubei.js";
 };
 
 export type ChannelVideosPage = {
@@ -37,6 +37,14 @@ export type ChannelVideosPage = {
   nextPageToken?: string;
   previousPageToken?: string;
   totalPages?: number;
+  /**
+   * v2 / heuristics: hint for empty grid UX when the channel resolved but no rows mapped.
+   */
+  emptyGridHint?: "none" | "try_again" | "likely_empty";
+  /** True when pagination stopped early because a continuation threw (deep pages). */
+  gridPartialLoad?: boolean;
+  /** True when some feed items could not be mapped (debug / UX). */
+  gridSourceLostItems?: boolean;
 };
 
 export type ChannelSearchResult = {

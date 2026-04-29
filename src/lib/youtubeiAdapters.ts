@@ -52,6 +52,59 @@ function isLiveFeedEntry(v: object): boolean {
   );
 }
 
+const FEED_VIDEO_ID = /^[a-zA-Z0-9_-]{11}$/;
+
+function extractVideoIdFromChannelFeedNode(
+  node: unknown,
+  depth = 0,
+  seen: WeakSet<object> | null = null,
+): string | null {
+  if (node == null || depth > 8) return null;
+
+  if (typeof node === "string") {
+    return FEED_VIDEO_ID.test(node) ? node : null;
+  }
+  if (typeof node !== "object") return null;
+
+  const obj = node as object;
+  const tracker = seen ?? new WeakSet<object>();
+  if (tracker.has(obj)) return null;
+  tracker.add(obj);
+
+  const o = node as Record<string, unknown>;
+  if (typeof o.id === "string" && FEED_VIDEO_ID.test(o.id)) return o.id;
+  if (typeof o.video_id === "string" && FEED_VIDEO_ID.test(o.video_id)) {
+    return o.video_id;
+  }
+
+  const basic = o.basic_info;
+  if (basic && typeof basic === "object") {
+    const bi = basic as Record<string, unknown>;
+    if (typeof bi.id === "string" && FEED_VIDEO_ID.test(bi.id)) return bi.id;
+  }
+
+  for (const v of Object.values(o)) {
+    if (!v || typeof v !== "object") continue;
+    const rec = v as Record<string, unknown>;
+    if (typeof rec.videoId === "string" && FEED_VIDEO_ID.test(rec.videoId)) {
+      return rec.videoId;
+    }
+    const we = rec.watchEndpoint;
+    if (we && typeof we === "object") {
+      const vid = (we as { videoId?: string }).videoId;
+      if (typeof vid === "string" && FEED_VIDEO_ID.test(vid)) return vid;
+    }
+  }
+
+  for (const v of Object.values(o)) {
+    if (v && typeof v === "object") {
+      const found = extractVideoIdFromChannelFeedNode(v, depth + 1, tracker);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
 /**
  * Maps a search-feed video node (Video, CompactVideo, GridVideo, …) into our summary shape.
  */
@@ -59,7 +112,7 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
   if (!v || typeof v !== "object") return null;
   const o = v as Record<string, unknown>;
   const id = o.id;
-  if (typeof id !== "string" || !/^[a-zA-Z0-9_-]{11}$/.test(id)) return null;
+  if (typeof id !== "string" || !FEED_VIDEO_ID.test(id)) return null;
 
   const title =
     o.title &&
@@ -121,6 +174,19 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
     live,
     thumbnailUrls,
   };
+}
+
+/**
+ * Channel tab feeds sometimes omit a top-level `id`; walk renderer-shaped nodes for a watch id.
+ */
+export function channelFeedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
+  const direct = feedVideoToVideoLike(v);
+  if (direct) return direct;
+  const extracted = extractVideoIdFromChannelFeedNode(v);
+  if (!extracted || typeof v !== "object" || v === null) return null;
+  const o = v as Record<string, unknown>;
+  const merged = { ...o, id: extracted };
+  return feedVideoToVideoLike(merged);
 }
 
 export function formatYoutubeDurationSeconds(total: number | undefined): string {
