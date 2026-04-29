@@ -8,6 +8,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -174,6 +175,17 @@ function sameChannel(a: SavedChannel, b: Partial<SavedChannel>): boolean {
   return false;
 }
 
+function normalizeThumbnailUrlForCompare(url: string | undefined): string {
+  if (!url?.trim()) return "";
+  try {
+    const parsed = new URL(url.trim());
+    parsed.search = "";
+    return parsed.href;
+  } catch {
+    return url.trim();
+  }
+}
+
 function normalizeProgressInput(input: WatchProgressInput): WatchProgressEntry {
   const now = new Date().toISOString();
   return {
@@ -208,6 +220,12 @@ export function CloudLibraryProvider({
   const [savedChannels, setSavedChannels] = useState<SavedChannel[]>([]);
   const [watchProgress, setWatchProgress] = useState<WatchProgressEntry[]>([]);
   const [passkeysSupported, setPasskeysSupported] = useState(false);
+
+  const savedChannelsRef = useRef<SavedChannel[]>([]);
+
+  useEffect(() => {
+    savedChannelsRef.current = savedChannels;
+  }, [savedChannels]);
 
   const persistLocalSnapshot = useCallback(
     (next: {
@@ -333,6 +351,71 @@ export function CloudLibraryProvider({
       data.subscription.unsubscribe();
     };
   }, [hydrateFromLocal, supabase, syncFromCloud]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        const targets = savedChannelsRef.current.filter((c) => c.channelId);
+        if (targets.length === 0) return;
+
+        const patches = new Map<string, string>();
+
+        await Promise.all(
+          targets.map(async (c) => {
+            try {
+              const res = await fetch("/api/channels/resolve", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ value: c.channelId }),
+              });
+              if (!res.ok || cancelled) return;
+              const data = (await res.json()) as {
+                channel?: { thumbnailUrl?: string };
+              };
+              const next = data.channel?.thumbnailUrl?.trim();
+              if (!next) return;
+              const prevNorm = normalizeThumbnailUrlForCompare(c.thumbnailUrl);
+              const nextNorm = normalizeThumbnailUrlForCompare(next);
+              if (prevNorm === nextNorm) return;
+              patches.set(c.id, next);
+            } catch {
+              /* ignore */
+            }
+          }),
+        );
+
+        if (cancelled || patches.size === 0) return;
+
+        setSavedChannels((prev) => {
+          let changed = false;
+          const nextList = prev.map((ch) => {
+            const thumb = patches.get(ch.id);
+            if (!thumb) return ch;
+            if (
+              normalizeThumbnailUrlForCompare(thumb) ===
+              normalizeThumbnailUrlForCompare(ch.thumbnailUrl)
+            ) {
+              return ch;
+            }
+            changed = true;
+            return { ...ch, thumbnailUrl: thumb };
+          });
+          if (!changed) return prev;
+          persistLocalSnapshot({ savedChannels: nextList });
+          if (supabase && user) {
+            void replaceSavedChannels(supabase, user.id, nextList).catch(() => {});
+          }
+          return nextList;
+        });
+      })();
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [persistLocalSnapshot, supabase, user]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {

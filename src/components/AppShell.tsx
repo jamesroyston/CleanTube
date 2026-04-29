@@ -40,12 +40,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     <IconButton
       color="inherit"
       edge="start"
-      aria-label={mdUp ? "Toggle library rail" : "Open library drawer"}
+      aria-label={
+        mdUp ? "Toggle library rail" : mobileOpen ? "Close library drawer" : "Open library drawer"
+      }
       onClick={() => {
         if (mdUp) {
           setDesktopCollapsed((v) => !v);
         } else {
-          setMobileOpen(true);
+          setMobileOpen((open) => !open);
         }
       }}
     >
