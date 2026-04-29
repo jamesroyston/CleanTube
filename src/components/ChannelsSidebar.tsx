@@ -46,7 +46,12 @@ export function ChannelsSidebar({
   sx,
 }: ChannelsSidebarProps) {
   const { channels } = useSavedChannels();
-  const savedChannels = channels.filter((channel) => channel.channelId);
+  const savedChannels = channels
+    .filter((channel) => channel.channelId)
+    .slice()
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
   const savedSearches = channels.filter((channel) => !channel.channelId);
   const mini = surface === "permanent" && collapsed;
   const drawerWidth =

@@ -73,7 +73,12 @@ function SavedChannelRow({
 
 export function LibraryManageClient() {
   const { channels, removeChannel } = useSavedChannels();
-  const savedChannels = channels.filter((c) => c.channelId);
+  const savedChannels = channels
+    .filter((c) => c.channelId)
+    .slice()
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
   const savedSearches = channels.filter((c) => !c.channelId);
 
   return (
