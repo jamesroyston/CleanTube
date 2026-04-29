@@ -10,11 +10,13 @@ type ChannelPaginationProps = {
   currentPage: number;
   hasNextPage: boolean;
   totalPages?: number;
+  /** Preserve `?grid=` when comparing legacy vs improved channel grids. */
+  gridQuery?: string;
 };
 
 function channelHref(
   id: string,
-  options?: { sort?: "latest" | "popular"; page?: number },
+  options?: { sort?: "latest" | "popular"; page?: number; grid?: string },
 ): string {
   const qs = new URLSearchParams();
   if (options?.sort && options.sort !== "latest") {
@@ -22,6 +24,9 @@ function channelHref(
   }
   if (options?.page && options.page > 1) {
     qs.set("page", String(options.page));
+  }
+  if (options?.grid) {
+    qs.set("grid", options.grid);
   }
   const query = qs.toString();
   return `/channel/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
@@ -33,6 +38,7 @@ export function ChannelPagination({
   currentPage,
   hasNextPage,
   totalPages,
+  gridQuery,
 }: ChannelPaginationProps) {
   const count = totalPages ?? (hasNextPage ? currentPage + 1 : currentPage);
   if (count <= 1) return null;
@@ -46,7 +52,11 @@ export function ChannelPagination({
       renderItem={(item) => (
         <PaginationItem
           component={Link}
-          href={channelHref(channelId, { sort, page: item.page ?? 1 })}
+          href={channelHref(channelId, {
+            sort,
+            page: item.page ?? 1,
+            grid: gridQuery,
+          })}
           {...item}
         />
       )}

@@ -27,10 +27,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
 
+import { setChannelVideosVariantAction } from "@/app/actions/channelVideosPreference";
+import { normalizeChannelVideosVariant, type ChannelVideosVariant } from "@/lib/channelVideosPreferenceConstants";
+
 import { useThemeMode, useWatchLayout } from "@/app/providers";
-import type { WatchLayoutMode } from "@/lib/watchLayoutPersistence";
 import { ThemePresetDialog } from "@/components/ThemePresetPanel";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
+
+function readChannelVideosVariantFromDocument(): ChannelVideosVariant {
+  if (typeof document === "undefined") return "legacy";
+  const m = document.cookie.match(/(?:^|; )cleantube_channel_videos=([^;]*)/);
+  return normalizeChannelVideosVariant(m?.[1]);
+}
 
 export function AccountMenu() {
   const { user, isCloudConfigured, signOutUser, authStatus } = useCloudLibrary();
@@ -40,6 +48,7 @@ export function AccountMenu() {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const open = Boolean(anchorEl);
+  const channelVideosVariant = readChannelVideosVariantFromDocument();
 
   return (
     <>
@@ -148,6 +157,54 @@ export function AccountMenu() {
           >
             <ListItemIcon sx={{ minWidth: 36 }}>
               {watchLayout === opt.value ? (
+                <CheckIcon fontSize="small" color="primary" />
+              ) : (
+                <Box sx={{ width: 24 }} />
+              )}
+            </ListItemIcon>
+            <ListItemText primary={opt.label} secondary={opt.secondary} />
+          </MenuItem>
+        ))}
+        <ListSubheader
+          disableSticky
+          sx={{
+            px: 2,
+            py: 0.5,
+            lineHeight: 1.5,
+            typography: "caption",
+            color: "text.secondary",
+          }}
+        >
+          Channel videos
+        </ListSubheader>
+        {(
+          [
+            {
+              value: "legacy" as const,
+              label: "Stable (legacy)",
+              secondary: "Original channel grid behavior",
+            },
+            {
+              value: "v2" as const,
+              label: "Improved (beta)",
+              secondary: "Retries and improved feed mapping",
+            },
+          ] as const
+        ).map((opt) => (
+          <MenuItem
+            key={opt.value}
+            selected={channelVideosVariant === opt.value}
+            onClick={() => {
+              setAnchorEl(null);
+              void setChannelVideosVariantAction(opt.value).then(() => {
+                startTransition(() => {
+                  router.refresh();
+                });
+              });
+            }}
+          >
+            <ListItemIcon sx={{ minWidth: 36 }}>
+              {channelVideosVariant === opt.value ? (
                 <CheckIcon fontSize="small" color="primary" />
               ) : (
                 <Box sx={{ width: 24 }} />
