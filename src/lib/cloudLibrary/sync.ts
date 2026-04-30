@@ -25,7 +25,9 @@ function normalizeUrl(value: string | undefined): string | undefined {
   }
 }
 
-function channelAliases(channel: SavedChannel): string[] {
+export function savedChannelCanonicalAliasKeys(
+  channel: SavedChannel,
+): string[] {
   const aliases = new Set<string>();
   const channelId = normalizeText(channel.channelId);
   const channelUrl = normalizeUrl(channel.channelUrl);
@@ -73,7 +75,7 @@ export function mergeSavedChannels(
   const aliasToIndex = new Map<string, number>();
 
   for (const channel of [...remoteChannels, ...localChannels]) {
-    const aliases = channelAliases(channel);
+    const aliases = savedChannelCanonicalAliasKeys(channel);
     const matchingIndexes = Array.from(
       new Set(
         aliases
@@ -100,7 +102,7 @@ export function mergeSavedChannels(
     merged[targetIndex] = nextChannel;
     aliasToIndex.clear();
     for (const [index, entry] of merged.entries()) {
-      for (const alias of channelAliases(entry)) aliasToIndex.set(alias, index);
+      for (const alias of savedChannelCanonicalAliasKeys(entry)) aliasToIndex.set(alias, index);
     }
   }
 
@@ -187,6 +189,112 @@ export function mergeWatchProgressEntries(
   }
   return Array.from(merged.values()).sort(
     (a, b) => isoToMs(b.updatedAt) - isoToMs(a.updatedAt),
+  );
+}
+
+/** Prefer Supabase when signed in; allow one-time local→cloud uplift only before slice is initialized (see library_sync_metadata). */
+export function reconcileSavedChannelsForSignedInSync(
+  localChannels: SavedChannel[],
+  remoteChannels: SavedChannel[],
+  sliceInitializedOnCloud: boolean,
+): SavedChannel[] {
+  if (remoteChannels.length > 0) {
+    return remoteChannels.map((channel) => ({ ...channel }));
+  }
+  if (!sliceInitializedOnCloud) {
+    return mergeSavedChannels(localChannels, remoteChannels);
+  }
+  return [];
+}
+
+/** @see reconcileSavedChannelsForSignedInSync */
+export function reconcileWatchLaterForSignedInSync(
+  localEntries: WatchLaterEntry[],
+  remoteEntries: WatchLaterEntry[],
+  sliceInitializedOnCloud: boolean,
+): WatchLaterEntry[] {
+  if (remoteEntries.length > 0) {
+    return remoteEntries.map((entry) => ({ ...entry }));
+  }
+  if (!sliceInitializedOnCloud) {
+    return mergeWatchLaterEntries(localEntries, remoteEntries);
+  }
+  return [];
+}
+
+/** @see reconcileSavedChannelsForSignedInSync */
+export function reconcileWatchProgressForSignedInSync(
+  localEntries: WatchProgressEntry[],
+  remoteEntries: WatchProgressEntry[],
+  sliceInitializedOnCloud: boolean,
+): WatchProgressEntry[] {
+  if (remoteEntries.length > 0) {
+    return remoteEntries.map((entry) => ({ ...entry }));
+  }
+  if (!sliceInitializedOnCloud) {
+    return mergeWatchProgressEntries(localEntries, remoteEntries);
+  }
+  return [];
+}
+
+export function filterSavedChannelsWithoutTombstones(
+  channels: SavedChannel[],
+  tombstoneAliases: ReadonlySet<string>,
+  remoteSliceForWhitelist: SavedChannel[],
+): SavedChannel[] {
+  return channels.filter((channel) => {
+    if (savedChannelAliasesOverlapRemote(channel, remoteSliceForWhitelist)) {
+      return true;
+    }
+    return !savedChannelCanonicalAliasKeys(channel).some((alias) =>
+      tombstoneAliases.has(alias),
+    );
+  });
+}
+
+/** True if aliases overlap merge keys with any remote row (fresh DB beats stale tombstones, e.g. revoke failed mid re-pin). */
+function savedChannelAliasesOverlapRemote(
+  channel: SavedChannel,
+  remote: SavedChannel[],
+): boolean {
+  const localAliases = savedChannelCanonicalAliasKeys(channel);
+  if (localAliases.length === 0) return false;
+  const lookup = new Set(localAliases);
+  for (const r of remote) {
+    for (const alias of savedChannelCanonicalAliasKeys(r)) {
+      if (lookup.has(alias)) return true;
+    }
+  }
+  return false;
+}
+
+export function filterWatchLaterWithoutTombstones(
+  entries: WatchLaterEntry[],
+  tombstoneVideoIds: ReadonlySet<string>,
+  remoteSliceForWhitelist: WatchLaterEntry[],
+): WatchLaterEntry[] {
+  const remoteIds = new Set(
+    remoteSliceForWhitelist.map((entry) => entry.videoId.trim()),
+  );
+  return entries.filter(
+    (entry) =>
+      remoteIds.has(entry.videoId.trim()) ||
+      !tombstoneVideoIds.has(entry.videoId.trim()),
+  );
+}
+
+export function filterWatchProgressWithoutTombstones(
+  entries: WatchProgressEntry[],
+  tombstoneVideoIds: ReadonlySet<string>,
+  remoteSliceForWhitelist: WatchProgressEntry[],
+): WatchProgressEntry[] {
+  const remoteIds = new Set(
+    remoteSliceForWhitelist.map((entry) => entry.videoId.trim()),
+  );
+  return entries.filter(
+    (entry) =>
+      remoteIds.has(entry.videoId.trim()) ||
+      !tombstoneVideoIds.has(entry.videoId.trim()),
   );
 }
 
