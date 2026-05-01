@@ -184,7 +184,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
                   channelName={video.channelName}
                   channelId={video.channelId}
                   channelUrl={video.channelUrl}
-                  thumbnailUrl={thumb}
+                  thumbnailUrl={video.channelThumbnailUrl ?? thumb}
                 />
                 <WatchLaterAddButton
                   videoId={id}

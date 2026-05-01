@@ -201,6 +201,29 @@ export function formatYoutubeDurationSeconds(total: number | undefined): string 
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
+function channelThumbnailUrlFromVideoInfo(info: YT.VideoInfo): string | undefined {
+  const author = info.secondary_info?.owner?.author;
+  if (!author) return undefined;
+  const best = author.best_thumbnail;
+  if (best?.url) {
+    try {
+      return canonicalYoutubeThumbnailUrl(best.url);
+    } catch {
+      return undefined;
+    }
+  }
+  const thumbs = author.thumbnails;
+  const last = thumbs?.length ? thumbs[thumbs.length - 1] : undefined;
+  if (last?.url) {
+    try {
+      return canonicalYoutubeThumbnailUrl(last.url);
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 export function videoInfoToWatchDetails(
   info: YT.VideoInfo,
   id: string,
@@ -212,6 +235,7 @@ export function videoInfoToWatchDetails(
   const channelName = channel?.name?.trim() || bi.author?.trim() || "Unknown channel";
   const channelId = channel?.id;
   const channelUrl = channel?.url;
+  const channelThumbnailUrl = channelThumbnailUrlFromVideoInfo(info);
 
   const thumbList = collectThumbnailUrls(
     bi.thumbnail as Thumbnailish[] | undefined,
@@ -241,6 +265,7 @@ export function videoInfoToWatchDetails(
     channelName,
     channelId,
     channelUrl,
+    channelThumbnailUrl,
     uploadedAt,
     views: bi.view_count ?? 0,
     description: description || undefined,

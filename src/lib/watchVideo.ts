@@ -57,6 +57,10 @@ type WatchHtmlPlayerResponse = {
     thumbnail?: {
       thumbnails?: { url?: string }[];
     };
+    /** Present in many `ytInitialPlayerResponse` payloads — channel / author avatar. */
+    authorThumbnail?: {
+      thumbnails?: { url?: string }[];
+    };
   };
   microformat?: {
     playerMicroformatRenderer?: {
@@ -150,12 +154,27 @@ function fromWatchHtml(
     .filter((url): url is string => Boolean(url))
     .at(-1);
 
+  const authorThumbs = details.authorThumbnail?.thumbnails ?? [];
+  const rawChannelThumb = authorThumbs
+    .map((t) => t.url)
+    .filter((url): url is string => Boolean(url))
+    .at(-1);
+  let channelThumbnailUrl: string | undefined;
+  if (rawChannelThumb) {
+    try {
+      channelThumbnailUrl = canonicalYoutubeThumbnailUrl(rawChannelThumb);
+    } catch {
+      channelThumbnailUrl = rawChannelThumb;
+    }
+  }
+
   return {
     id,
     title: details.title.trim(),
     channelName: details.author?.trim() || "Unknown channel",
     channelId: details.channelId,
     channelUrl,
+    channelThumbnailUrl,
     uploadedAt: parseIsoDateLabel(microformat?.publishDate ?? microformat?.uploadDate),
     views: Number.parseInt(
       details.viewCount ?? microformat?.viewCount ?? "0",
@@ -172,18 +191,31 @@ function fromWatchHtml(
   };
 }
 
-/** Backfill description: `getBasicInfo` has no `next` payload, so `short_description` may be empty; watch HTML often still has it in `ytInitialPlayerResponse`. */
+/**
+ * Backfill description and/or channel avatar from watch HTML when InnerTube omits them
+ * (`short_description`, `secondary_info.owner.author.thumbnails`, etc.).
+ */
 async function mergeDescriptionFromWatchHtml(
   id: string,
   video: WatchVideoDetails,
 ): Promise<WatchVideoDetails> {
-  if (video.description?.trim()) return video;
+  const needsDesc = !video.description?.trim();
+  const needsChannelThumb = !video.channelThumbnailUrl?.trim();
+  if (!needsDesc && !needsChannelThumb) return video;
   const html = await fetchWatchHtml(id);
   if (!html) return video;
   const fromHtml = fromWatchHtml(id, html);
-  const desc = fromHtml?.description?.trim();
-  if (!desc) return video;
-  return { ...video, description: desc };
+  if (!fromHtml) return video;
+  let next = video;
+  const desc = fromHtml.description?.trim();
+  if (needsDesc && desc) {
+    next = { ...next, description: desc };
+  }
+  const chThumb = fromHtml.channelThumbnailUrl?.trim();
+  if (needsChannelThumb && chThumb) {
+    next = { ...next, channelThumbnailUrl: chThumb };
+  }
+  return next;
 }
 
 async function fetchWatchHtml(videoId: string): Promise<string | null> {
