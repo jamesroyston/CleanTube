@@ -14,6 +14,7 @@ import PaletteIcon from "@mui/icons-material/Palette";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
@@ -40,6 +41,13 @@ function readChannelVideosVariantFromDocument(): ChannelVideosVariant {
   return normalizeChannelVideosVariant(m?.[1]);
 }
 
+/** Part before @ for compact app bar label; whole string if malformed. */
+function emailLocalPart(email: string | undefined): string {
+  if (!email?.trim()) return "";
+  const at = email.indexOf("@");
+  return at > 0 ? email.slice(0, at) : email.trim();
+}
+
 export function AccountMenu() {
   const { user, isCloudConfigured, signOutUser, authStatus } = useCloudLibrary();
   const { mode, toggleMode } = useThemeMode();
@@ -50,16 +58,46 @@ export function AccountMenu() {
   const open = Boolean(anchorEl);
   const channelVideosVariant = readChannelVideosVariantFromDocument();
 
+  const accountLabel = user ? emailLocalPart(user.email ?? undefined) : "";
+  const accountTooltip = user?.email?.trim() ?? "Account";
+
   return (
     <>
-      <Tooltip title="Account">
-        <IconButton
-          aria-label="Account"
-          color="inherit"
-          onClick={(event) => setAnchorEl(event.currentTarget)}
-        >
-          <AccountCircleOutlinedIcon />
-        </IconButton>
+      <Tooltip title={accountTooltip}>
+        <span>
+          {user ? (
+            <Button
+              aria-label="Account"
+              color="inherit"
+              onClick={(event) => setAnchorEl(event.currentTarget)}
+              startIcon={<AccountCircleOutlinedIcon />}
+              sx={{
+                minWidth: 0,
+                maxWidth: { xs: 160, sm: 220 },
+                textTransform: "none",
+                color: "text.primary",
+                px: { xs: 0.5, sm: 1 },
+              }}
+            >
+              <Typography
+                variant="body2"
+                component="span"
+                noWrap
+                sx={{ minWidth: 0 }}
+              >
+                {accountLabel || "Account"}
+              </Typography>
+            </Button>
+          ) : (
+            <IconButton
+              aria-label="Account"
+              color="inherit"
+              onClick={(event) => setAnchorEl(event.currentTarget)}
+            >
+              <AccountCircleOutlinedIcon />
+            </IconButton>
+          )}
+        </span>
       </Tooltip>
       <Menu
         anchorEl={anchorEl}
@@ -280,7 +318,7 @@ export function AccountMenu() {
         )}
         <Divider />
         <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1, display: "block", maxWidth: 280 }}>
-          Logged-out users keep local-only storage. Signing in merges local library data into the cloud.
+          Signed-out browsing uses local storage on this device. Sign in to load your cloud library; sign out clears that local copy.
         </Typography>
       </Menu>
       <ThemePresetDialog
