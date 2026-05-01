@@ -8,24 +8,20 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
 import {
   fetchCloudSnapshot,
   getInitialSession,
-  markLibrarySlicesInitialized,
   replaceSavedChannels,
   replaceWatchLaterEntries,
   replaceWatchProgressEntries,
   resetPasswordForEmail,
-  revokeLibraryTombstones,
   signInWithPassword,
   signOut,
   signUpWithPassword,
   subscribeToAuthChanges,
-  upsertLibraryTombstones,
   upsertWatchProgressEntries,
 } from "@/lib/cloudLibrary/cloudStore";
 import {
@@ -33,6 +29,7 @@ import {
   SAVED_CHANNELS_STORAGE_KEY,
   WATCH_LATER_STORAGE_KEY,
   WATCH_PROGRESS_STORAGE_KEY,
+  writeLocalLibraryMirror,
   writeLocalSavedChannels,
   writeLocalWatchLater,
   writeLocalWatchProgress,
@@ -55,15 +52,8 @@ import {
 } from "@/lib/cloudLibrary/webauthnClient";
 import {
   deriveResumeSeconds,
-  filterSavedChannelsWithoutTombstones,
-  filterWatchLaterWithoutTombstones,
-  filterWatchProgressWithoutTombstones,
   isInProgress,
   mergeSavedChannels,
-  reconcileSavedChannelsForSignedInSync,
-  reconcileWatchLaterForSignedInSync,
-  reconcileWatchProgressForSignedInSync,
-  savedChannelCanonicalAliasKeys,
 } from "@/lib/cloudLibrary/sync";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
 import type { SavedChannel } from "@/types/savedChannel";
@@ -71,6 +61,14 @@ import type { WatchLaterEntry } from "@/types/watchLater";
 import type { WatchProgressEntry } from "@/types/watchProgress";
 
 type AuthStatus = "loading" | "ready";
+
+/** Signed-in cloud library sync phase; when `synced`, UI reflects the last successful cloud snapshot (mirrored to localStorage). */
+export type LibraryCloudSyncState =
+  | "unavailable"
+  | "local_only"
+  | "syncing"
+  | "synced"
+  | "error";
 
 type WatchProgressInput = {
   videoId: string;
@@ -90,6 +88,7 @@ type WatchProgressUpsertOptions = {
 type CloudLibraryContextValue = {
   authStatus: AuthStatus;
   isCloudConfigured: boolean;
+  libraryCloudSyncState: LibraryCloudSyncState;
   session: Session | null;
   user: User | null;
   watchLaterEntries: WatchLaterEntry[];
@@ -181,17 +180,6 @@ function sameChannel(a: SavedChannel, b: Partial<SavedChannel>): boolean {
   return false;
 }
 
-function normalizeThumbnailUrlForCompare(url: string | undefined): string {
-  if (!url?.trim()) return "";
-  try {
-    const parsed = new URL(url.trim());
-    parsed.search = "";
-    return parsed.href;
-  } catch {
-    return url.trim();
-  }
-}
-
 function normalizeProgressInput(input: WatchProgressInput): WatchProgressEntry {
   const now = new Date().toISOString();
   return {
@@ -226,12 +214,8 @@ export function CloudLibraryProvider({
   const [savedChannels, setSavedChannels] = useState<SavedChannel[]>([]);
   const [watchProgress, setWatchProgress] = useState<WatchProgressEntry[]>([]);
   const [passkeysSupported, setPasskeysSupported] = useState(false);
-
-  const savedChannelsRef = useRef<SavedChannel[]>([]);
-
-  useEffect(() => {
-    savedChannelsRef.current = savedChannels;
-  }, [savedChannels]);
+  const [libraryCloudSyncState, setLibraryCloudSyncState] =
+    useState<LibraryCloudSyncState>("local_only");
 
   const persistLocalSnapshot = useCallback(
     (next: {
@@ -239,7 +223,9 @@ export function CloudLibraryProvider({
       savedChannels?: SavedChannel[];
       watchProgress?: WatchProgressEntry[];
     }) => {
-      if (next.watchLater !== undefined) writeLocalWatchLater(next.watchLater);
+      if (next.watchLater !== undefined) {
+        writeLocalWatchLater(next.watchLater);
+      }
       if (next.savedChannels !== undefined) {
         writeLocalSavedChannels(next.savedChannels);
       }
@@ -260,62 +246,88 @@ export function CloudLibraryProvider({
   const syncFromCloud = useCallback(
     async (nextUser: User) => {
       if (!supabase) return;
-      const localSnapshot = readLocalSnapshot();
-      const remoteSnapshot = await fetchCloudSnapshot(supabase);
-      const meta = remoteSnapshot.syncMetadata;
-      const tomb = remoteSnapshot.tombstones;
+      setLibraryCloudSyncState("syncing");
 
-      let mergedWatchLater = reconcileWatchLaterForSignedInSync(
-        localSnapshot.watchLater,
-        remoteSnapshot.watchLater,
-        meta?.watch_later_initialized ?? false,
-      );
-      mergedWatchLater = filterWatchLaterWithoutTombstones(
-        mergedWatchLater,
-        tomb.watchLaterVideoIds,
-        remoteSnapshot.watchLater,
-      );
+      /* Wait for JWT on the browser client; otherwise RLS returns no rows. */
+      let { data: authData } = await supabase.auth.getSession();
+      let token = authData.session?.access_token;
+      let tokenUserId = authData.session?.user?.id;
+      if (!token || tokenUserId !== nextUser.id) {
+        await supabase.auth.refreshSession();
+        authData = (await supabase.auth.getSession()).data;
+        token = authData.session?.access_token;
+        tokenUserId = authData.session?.user?.id;
+      }
+      if (!token || tokenUserId !== nextUser.id) {
+        await new Promise<void>((resolve) => queueMicrotask(resolve));
+        authData = (await supabase.auth.getSession()).data;
+        token = authData.session?.access_token;
+        tokenUserId = authData.session?.user?.id;
+      }
+      if (!token || tokenUserId !== nextUser.id) {
+        setLibraryCloudSyncState("error");
+        return;
+      }
 
-      let mergedSavedChannels = reconcileSavedChannelsForSignedInSync(
-        localSnapshot.savedChannels,
-        remoteSnapshot.savedChannels,
-        meta?.saved_channels_initialized ?? false,
-      );
-      mergedSavedChannels = filterSavedChannelsWithoutTombstones(
-        mergedSavedChannels,
-        tomb.savedChannelAliases,
-        remoteSnapshot.savedChannels,
-      );
+      try {
+        const localSnapshot = readLocalSnapshot();
+        const remote = await fetchCloudSnapshot(supabase);
 
-      let mergedWatchProgress = reconcileWatchProgressForSignedInSync(
-        localSnapshot.watchProgress,
-        remoteSnapshot.watchProgress,
-        meta?.watch_progress_initialized ?? false,
-      );
-      mergedWatchProgress = filterWatchProgressWithoutTombstones(
-        mergedWatchProgress,
-        tomb.watchProgressVideoIds,
-        remoteSnapshot.watchProgress,
-      );
+        const cloudEmpty =
+          remote.savedChannels.length === 0 &&
+          remote.watchLater.length === 0 &&
+          remote.watchProgress.length === 0;
+        const localHasData =
+          localSnapshot.savedChannels.length > 0 ||
+          localSnapshot.watchLater.length > 0 ||
+          localSnapshot.watchProgress.length > 0;
 
-      await Promise.all([
-        replaceWatchLaterEntries(supabase, nextUser.id, mergedWatchLater),
-        replaceSavedChannels(supabase, nextUser.id, mergedSavedChannels),
-        replaceWatchProgressEntries(supabase, nextUser.id, mergedWatchProgress),
-      ]);
+        let nextWatchLater: WatchLaterEntry[];
+        let nextSaved: SavedChannel[];
+        let nextProgress: WatchProgressEntry[];
 
-      await markLibrarySlicesInitialized(supabase, nextUser.id);
+        if (cloudEmpty && localHasData) {
+          await Promise.all([
+            replaceWatchLaterEntries(
+              supabase,
+              nextUser.id,
+              localSnapshot.watchLater,
+            ),
+            replaceSavedChannels(
+              supabase,
+              nextUser.id,
+              localSnapshot.savedChannels,
+            ),
+            replaceWatchProgressEntries(
+              supabase,
+              nextUser.id,
+              localSnapshot.watchProgress,
+            ),
+          ]);
+          nextWatchLater = localSnapshot.watchLater;
+          nextSaved = localSnapshot.savedChannels;
+          nextProgress = localSnapshot.watchProgress;
+        } else {
+          nextWatchLater = remote.watchLater.map((e) => ({ ...e }));
+          nextSaved = remote.savedChannels.map((c) => ({ ...c }));
+          nextProgress = remote.watchProgress.map((p) => ({ ...p }));
+        }
 
-      setWatchLaterEntries(mergedWatchLater);
-      setSavedChannels(mergedSavedChannels);
-      setWatchProgress(mergedWatchProgress);
-      persistLocalSnapshot({
-        watchLater: mergedWatchLater,
-        savedChannels: mergedSavedChannels,
-        watchProgress: mergedWatchProgress,
-      });
+        setWatchLaterEntries(nextWatchLater);
+        setSavedChannels(nextSaved);
+        setWatchProgress(nextProgress);
+        writeLocalLibraryMirror({
+          watchLater: nextWatchLater,
+          savedChannels: nextSaved,
+          watchProgress: nextProgress,
+        });
+        setLibraryCloudSyncState("synced");
+      } catch (err) {
+        setLibraryCloudSyncState("error");
+        throw err;
+      }
     },
-    [persistLocalSnapshot, supabase],
+    [supabase],
   );
 
   useLayoutEffect(() => {
@@ -358,7 +370,7 @@ export function CloudLibraryProvider({
         try {
           await syncFromCloud(initial.user);
         } catch {
-          hydrateFromLocal();
+          setLibraryCloudSyncState("error");
         }
       }
       if (!cancelled) setAuthStatus("ready");
@@ -369,9 +381,10 @@ export function CloudLibraryProvider({
       setUser(nextSession?.user ?? null);
       if (nextSession?.user) {
         void syncFromCloud(nextSession.user).catch(() => {
-          hydrateFromLocal();
+          setLibraryCloudSyncState("error");
         });
       } else {
+        setLibraryCloudSyncState(supabase ? "local_only" : "unavailable");
         hydrateFromLocal();
       }
       setAuthStatus("ready");
@@ -382,71 +395,6 @@ export function CloudLibraryProvider({
       data.subscription.unsubscribe();
     };
   }, [hydrateFromLocal, supabase, syncFromCloud]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        const targets = savedChannelsRef.current.filter((c) => c.channelId);
-        if (targets.length === 0) return;
-
-        const patches = new Map<string, string>();
-
-        await Promise.all(
-          targets.map(async (c) => {
-            try {
-              const res = await fetch("/api/channels/resolve", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ value: c.channelId }),
-              });
-              if (!res.ok || cancelled) return;
-              const data = (await res.json()) as {
-                channel?: { thumbnailUrl?: string };
-              };
-              const next = data.channel?.thumbnailUrl?.trim();
-              if (!next) return;
-              const prevNorm = normalizeThumbnailUrlForCompare(c.thumbnailUrl);
-              const nextNorm = normalizeThumbnailUrlForCompare(next);
-              if (prevNorm === nextNorm) return;
-              patches.set(c.id, next);
-            } catch {
-              /* ignore */
-            }
-          }),
-        );
-
-        if (cancelled || patches.size === 0) return;
-
-        setSavedChannels((prev) => {
-          let changed = false;
-          const nextList = prev.map((ch) => {
-            const thumb = patches.get(ch.id);
-            if (!thumb) return ch;
-            if (
-              normalizeThumbnailUrlForCompare(thumb) ===
-              normalizeThumbnailUrlForCompare(ch.thumbnailUrl)
-            ) {
-              return ch;
-            }
-            changed = true;
-            return { ...ch, thumbnailUrl: thumb };
-          });
-          if (!changed) return prev;
-          persistLocalSnapshot({ savedChannels: nextList });
-          if (supabase && user) {
-            void replaceSavedChannels(supabase, user.id, nextList).catch(() => {});
-          }
-          return nextList;
-        });
-      })();
-    }, 2000);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
-  }, [persistLocalSnapshot, supabase, user]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -487,6 +435,7 @@ export function CloudLibraryProvider({
   const signOutUser = useCallback(async () => {
     if (!supabase) return;
     await signOut(supabase);
+    setLibraryCloudSyncState("local_only");
     hydrateFromLocal();
   }, [hydrateFromLocal, supabase]);
 
@@ -591,12 +540,6 @@ export function CloudLibraryProvider({
       if (supabase && user && updated !== savedChannels) {
         try {
           await replaceSavedChannels(supabase, user.id, updated);
-          await revokeLibraryTombstones(
-            supabase,
-            user.id,
-            "saved_channels",
-            savedChannelCanonicalAliasKeys(next),
-          );
         } catch {
           /* keep local state if cloud sync fails */
         }
@@ -613,12 +556,6 @@ export function CloudLibraryProvider({
       persistLocalSnapshot({ savedChannels: updated });
       if (supabase && user && removed) {
         try {
-          await upsertLibraryTombstones(
-            supabase,
-            user.id,
-            "saved_channels",
-            savedChannelCanonicalAliasKeys(removed),
-          );
           await replaceSavedChannels(supabase, user.id, updated);
         } catch {
           /* keep local state if cloud sync fails */
@@ -652,12 +589,6 @@ export function CloudLibraryProvider({
       if (supabase && user) {
         try {
           await replaceSavedChannels(supabase, user.id, updated);
-          await revokeLibraryTombstones(
-            supabase,
-            user.id,
-            "saved_channels",
-            savedChannelCanonicalAliasKeys(next),
-          );
         } catch {
           /* keep local state if cloud sync fails */
         }
@@ -694,9 +625,6 @@ export function CloudLibraryProvider({
       if (supabase && user) {
         try {
           await replaceWatchLaterEntries(supabase, user.id, updated);
-          await revokeLibraryTombstones(supabase, user.id, "watch_later", [
-            videoId,
-          ]);
         } catch {
           /* keep local state if cloud sync fails */
         }
@@ -712,12 +640,6 @@ export function CloudLibraryProvider({
       persistLocalSnapshot({ watchLater: updated });
       if (supabase && user) {
         try {
-          await upsertLibraryTombstones(
-            supabase,
-            user.id,
-            "watch_later",
-            [videoId.trim()],
-          );
           await replaceWatchLaterEntries(supabase, user.id, updated);
         } catch {
           /* keep local state if cloud sync fails */
@@ -728,18 +650,6 @@ export function CloudLibraryProvider({
   );
 
   const clearWatchLater = useCallback(async () => {
-    if (supabase && user && watchLaterEntries.length > 0) {
-      try {
-        await upsertLibraryTombstones(
-          supabase,
-          user.id,
-          "watch_later",
-          watchLaterEntries.map((entry) => entry.videoId.trim()),
-        );
-      } catch {
-        /* keep clearing locally even if tombstones fail */
-      }
-    }
     setWatchLaterEntries([]);
     persistLocalSnapshot({ watchLater: [] });
     if (supabase && user) {
@@ -749,7 +659,7 @@ export function CloudLibraryProvider({
         /* keep local state if cloud sync fails */
       }
     }
-  }, [persistLocalSnapshot, supabase, user, watchLaterEntries]);
+  }, [persistLocalSnapshot, supabase, user]);
 
   const isInWatchLaterFn = useCallback(
     (videoId: string) => watchLaterEntries.some((entry) => entry.videoId === videoId),
@@ -799,12 +709,6 @@ export function CloudLibraryProvider({
       if (syncCloud && supabase && user && rowForCloud) {
         try {
           await upsertWatchProgressEntries(supabase, user.id, [rowForCloud]);
-          await revokeLibraryTombstones(
-            supabase,
-            user.id,
-            "watch_progress",
-            [normalized.videoId.trim()],
-          );
         } catch {
           /* keep local state if cloud sync fails */
         }
@@ -820,12 +724,6 @@ export function CloudLibraryProvider({
       persistLocalSnapshot({ watchProgress: updated });
       if (supabase && user) {
         try {
-          await upsertLibraryTombstones(
-            supabase,
-            user.id,
-            "watch_progress",
-            [videoId.trim()],
-          );
           await replaceWatchProgressEntries(supabase, user.id, updated);
         } catch {
           /* keep local state if cloud sync fails */
@@ -836,18 +734,6 @@ export function CloudLibraryProvider({
   );
 
   const clearWatchProgress = useCallback(async () => {
-    if (supabase && user && watchProgress.length > 0) {
-      try {
-        await upsertLibraryTombstones(
-          supabase,
-          user.id,
-          "watch_progress",
-          watchProgress.map((entry) => entry.videoId.trim()),
-        );
-      } catch {
-        /* keep clearing locally even if tombstones fail */
-      }
-    }
     setWatchProgress([]);
     persistLocalSnapshot({ watchProgress: [] });
     if (supabase && user) {
@@ -857,7 +743,7 @@ export function CloudLibraryProvider({
         /* keep local state if cloud sync fails */
       }
     }
-  }, [persistLocalSnapshot, supabase, user, watchProgress]);
+  }, [persistLocalSnapshot, supabase, user]);
 
   const getProgressByVideoId = useCallback(
     (videoId: string) => watchProgress.find((entry) => entry.videoId === videoId),
@@ -870,10 +756,14 @@ export function CloudLibraryProvider({
     [getProgressByVideoId],
   );
 
+  const effectiveLibraryCloudSyncState: LibraryCloudSyncState =
+    supabase == null ? "unavailable" : libraryCloudSyncState;
+
   const value = useMemo<CloudLibraryContextValue>(
     () => ({
       authStatus,
       isCloudConfigured,
+      libraryCloudSyncState: effectiveLibraryCloudSyncState,
       session,
       user,
       watchLaterEntries,
@@ -911,6 +801,7 @@ export function CloudLibraryProvider({
       addSavedChannel,
       authStatus,
       clearWatchLater,
+      effectiveLibraryCloudSyncState,
       clearWatchProgress,
       completePhoneMfaCb,
       completeTotpMfaCb,
