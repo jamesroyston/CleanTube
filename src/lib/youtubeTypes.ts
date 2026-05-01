@@ -69,6 +69,8 @@ export type WatchVideoDetails = {
   channelName: string;
   channelId?: string;
   channelUrl?: string;
+  /** Channel / author avatar when the source exposes it (not the video still). */
+  channelThumbnailUrl?: string;
   uploadedAt?: string;
   views: number;
   description?: string;
