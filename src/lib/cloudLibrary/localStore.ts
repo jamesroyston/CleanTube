@@ -178,3 +178,15 @@ export function writeLocalLibraryMirror(snapshot: Snapshot) {
   writeLocalSavedChannels(snapshot.savedChannels);
   writeLocalWatchProgress(snapshot.watchProgress);
 }
+
+/** Clears mirrored library data (e.g. after sign-out so the next anonymous session does not keep another account's library). */
+export function clearLocalLibraryStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.removeItem(WATCH_LATER_STORAGE_KEY);
+    window.localStorage.removeItem(SAVED_CHANNELS_STORAGE_KEY);
+    window.localStorage.removeItem(WATCH_PROGRESS_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
