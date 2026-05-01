@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import { Roboto } from "next/font/google";
 import { cookies } from "next/headers";
 import { AppProviders } from "@/app/providers";
@@ -72,6 +73,7 @@ export default async function RootLayout({
         >
           <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>
+        <Analytics />
       </body>
     </html>
   );
