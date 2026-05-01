@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
+import { fetchChannelResolveBatch } from "@/lib/channelResolveClient";
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 import type { ChannelDetails } from "@/lib/youtubeTypes";
 import type { SavedChannel } from "@/types/savedChannel";
@@ -33,34 +34,45 @@ export function SavedChannelMigration() {
 
     let cancelled = false;
 
-    async function migrate(channel: SavedChannel) {
+    const withLookup = candidates
+      .map((channel) => ({
+        channel,
+        lookup: candidateLookup(channel),
+      }))
+      .filter(
+        (x): x is { channel: SavedChannel; lookup: string } =>
+          Boolean(x.lookup),
+      );
+
+    for (const { channel } of withLookup) {
       attemptedIdsRef.current.add(channel.id);
-      const lookup = candidateLookup(channel);
-      if (!lookup) return;
-
-      try {
-        const response = await fetch("/api/channels/resolve", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ value: lookup }),
-        });
-        if (!response.ok || cancelled) return;
-        const payload = (await response.json()) as {
-          channel?: ChannelDetails;
-        };
-        if (!payload.channel || cancelled) return;
-
-        updateChannel(channel.id, {
-          name: payload.channel.title,
-          channelId: payload.channel.id,
-          channelUrl: payload.channel.channelUrl,
-        });
-      } catch {
-        /* Leave the saved search untouched if resolution fails. */
-      }
     }
 
-    void Promise.all(candidates.map(migrate));
+    const lookups = [...new Set(withLookup.map((x) => x.lookup))];
+
+    void (async () => {
+      try {
+        const rows = await fetchChannelResolveBatch(lookups);
+        if (cancelled) return;
+        const byLookup = new Map<string, ChannelDetails>(
+          rows
+            .filter((r) => r.channel)
+            .map((r) => [r.lookup, r.channel!]),
+        );
+        for (const { channel, lookup } of withLookup) {
+          if (cancelled) return;
+          const payload = byLookup.get(lookup);
+          if (!payload) continue;
+          updateChannel(channel.id, {
+            name: payload.title,
+            channelId: payload.id,
+            channelUrl: payload.channelUrl,
+          });
+        }
+      } catch {
+        /* Leave saved searches untouched if resolution fails. */
+      }
+    })();
 
     return () => {
       cancelled = true;

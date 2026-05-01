@@ -171,3 +171,10 @@ export function writeLocalSavedChannels(channels: SavedChannel[]) {
 export function writeLocalWatchProgress(entries: WatchProgressEntry[]) {
   writeLocalStorage(WATCH_PROGRESS_STORAGE_KEY, JSON.stringify(entries));
 }
+
+/** Writes all three library keys (e.g. mirror cloud after sign-in). */
+export function writeLocalLibraryMirror(snapshot: Snapshot) {
+  writeLocalWatchLater(snapshot.watchLater);
+  writeLocalSavedChannels(snapshot.savedChannels);
+  writeLocalWatchProgress(snapshot.watchProgress);
+}

@@ -1,7 +1,7 @@
 "use client";
 
 import BookmarkAddOutlinedIcon from "@mui/icons-material/BookmarkAddOutlined";
-import CheckIcon from "@mui/icons-material/Check";
+import BookmarkRemoveOutlinedIcon from "@mui/icons-material/BookmarkRemoveOutlined";
 import Button from "@mui/material/Button";
 import { useMemo } from "react";
 
@@ -20,14 +20,14 @@ export function SaveChannelButton({
   channelUrl,
   thumbnailUrl,
 }: SaveChannelButtonProps) {
-  const { channels, addChannel } = useSavedChannels();
+  const { channels, addChannel, removeChannel } = useSavedChannels();
   const trimmedName = channelName.trim();
   const searchQuery = trimmedName;
 
-  const alreadySaved = useMemo(() => {
-    if (!trimmedName) return true;
+  const savedMatch = useMemo(() => {
+    if (!trimmedName) return undefined;
     const q = searchQuery.toLowerCase();
-    return channels.some(
+    return channels.find(
       (c) =>
         (channelId && c.channelId === channelId) ||
         (channelUrl && c.channelUrl === channelUrl) ||
@@ -35,21 +35,23 @@ export function SaveChannelButton({
     );
   }, [channels, channelId, channelUrl, searchQuery, trimmedName]);
 
+  const alreadySaved = Boolean(savedMatch);
+
   if (!trimmedName || trimmedName === "Unknown channel") {
     return null;
   }
 
-  if (alreadySaved) {
+  if (alreadySaved && savedMatch) {
     return (
       <Button
         size="small"
         variant="outlined"
-        color="success"
-        startIcon={<CheckIcon />}
-        disabled
+        color="inherit"
+        startIcon={<BookmarkRemoveOutlinedIcon />}
+        onClick={() => removeChannel(savedMatch.id)}
         sx={{ alignSelf: "flex-start" }}
       >
-        Channel saved
+        Remove from saved
       </Button>
     );
   }
