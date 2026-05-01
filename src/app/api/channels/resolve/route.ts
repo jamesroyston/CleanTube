@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getChannelDetails } from "@/lib/youtubeChannel";
+import { CHANNEL_RESOLVE_CACHE_CONTROL, getChannelDetailsCached } from "@/lib/youtubeChannelResolveCache";
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 
 export const runtime = "nodejs";
@@ -22,10 +22,17 @@ export async function POST(request: Request) {
     );
   }
 
-  const channel = await getChannelDetails(lookup);
+  const channel = await getChannelDetailsCached(lookup);
   if (!channel) {
     return NextResponse.json({ error: "Channel not found." }, { status: 404 });
   }
 
-  return NextResponse.json({ channel });
+  return NextResponse.json(
+    { channel },
+    {
+      headers: {
+        "Cache-Control": CHANNEL_RESOLVE_CACHE_CONTROL,
+      },
+    },
+  );
 }
