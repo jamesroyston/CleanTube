@@ -1,5 +1,4 @@
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
@@ -7,9 +6,8 @@ import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import Link from "next/link";
-
 import { BackToSearch } from "@/components/BackToSearch";
+import { GoToChannelButton } from "@/components/GoToChannelButton";
 import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { WatchLaterAddButton } from "@/components/WatchLaterAddButton";
@@ -170,15 +168,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                 {channelPageHref ? (
-                  <Button
-                    component={Link}
-                    href={channelPageHref}
-                    size="small"
-                    variant="outlined"
-                    sx={{ alignSelf: "flex-start" }}
-                  >
-                    Go to channel
-                  </Button>
+                  <GoToChannelButton href={channelPageHref} />
                 ) : null}
                 <SaveChannelButton
                   channelName={video.channelName}
