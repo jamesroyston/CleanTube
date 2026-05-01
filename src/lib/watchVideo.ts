@@ -1,3 +1,5 @@
+import { cache } from "react";
+
 import {
   fetchYouTubeOEmbed,
   parseChannelIdFromYoutubeUrl,
@@ -204,7 +206,7 @@ async function fetchWatchHtml(videoId: string): Promise<string | null> {
   }
 }
 
-export async function getWatchVideoDetails(
+async function loadWatchVideoDetails(
   id: string,
 ): Promise<WatchVideoDetails | null> {
   if (!id || !isValidYoutubeVideoId(id)) return null;
@@ -235,3 +237,6 @@ export async function getWatchVideoDetails(
   const oembed = await fetchYouTubeOEmbed(id);
   return fromOEmbed(id, oembed) ?? fallbackVideo;
 }
+
+/** Dedupes InnerTube/HTML work within a single RSC request (e.g. `generateMetadata` + page). */
+export const getWatchVideoDetails = cache(loadWatchVideoDetails);

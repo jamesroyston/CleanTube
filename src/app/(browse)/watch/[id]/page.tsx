@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
@@ -6,6 +7,7 @@ import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 
 import { BackToSearch } from "@/components/BackToSearch";
 import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
@@ -25,7 +27,12 @@ import {
 } from "@/lib/watchLayoutPersistence";
 import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { getWatchVideoDetails } from "@/lib/watchVideo";
-import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
+import {
+  channelPageHrefFromToken,
+  extractChannelRouteTokenFromUrl,
+  isValidYoutubeChannelId,
+  isValidYoutubeVideoId,
+} from "@/lib/youtubeUrl";
 
 type PageProps = {
   params: Promise<{ id: string }>;
@@ -36,6 +43,19 @@ type PageProps = {
 };
 
 export const runtime = "nodejs";
+
+function channelHrefForWatchVideo(video: {
+  channelId?: string;
+  channelUrl?: string;
+}): string | null {
+  if (video.channelId && isValidYoutubeChannelId(video.channelId)) {
+    return channelPageHrefFromToken(video.channelId);
+  }
+  const token = video.channelUrl
+    ? extractChannelRouteTokenFromUrl(video.channelUrl)
+    : null;
+  return token ? channelPageHrefFromToken(token) : null;
+}
 
 export async function generateMetadata({
   params,
@@ -88,6 +108,8 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
   const thumb =
     video.thumbnailUrl ??
     `https://i.ytimg.com/vi/${id}/sddefault.jpg`;
+
+  const channelPageHref = channelHrefForWatchVideo(video);
 
   return (
     <Box
@@ -147,10 +169,22 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
                 {metaParts.join(" · ")}
               </Typography>
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {channelPageHref ? (
+                  <Button
+                    component={Link}
+                    href={channelPageHref}
+                    size="small"
+                    variant="outlined"
+                    sx={{ alignSelf: "flex-start" }}
+                  >
+                    Go to channel
+                  </Button>
+                ) : null}
                 <SaveChannelButton
                   channelName={video.channelName}
                   channelId={video.channelId}
                   channelUrl={video.channelUrl}
+                  thumbnailUrl={thumb}
                 />
                 <WatchLaterAddButton
                   videoId={id}
