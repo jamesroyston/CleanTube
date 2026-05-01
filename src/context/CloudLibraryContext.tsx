@@ -29,6 +29,7 @@ import {
   SAVED_CHANNELS_STORAGE_KEY,
   WATCH_LATER_STORAGE_KEY,
   WATCH_PROGRESS_STORAGE_KEY,
+  clearLocalLibraryStorage,
   writeLocalLibraryMirror,
   writeLocalSavedChannels,
   writeLocalWatchLater,
@@ -435,6 +436,7 @@ export function CloudLibraryProvider({
   const signOutUser = useCallback(async () => {
     if (!supabase) return;
     await signOut(supabase);
+    clearLocalLibraryStorage();
     setLibraryCloudSyncState("local_only");
     hydrateFromLocal();
   }, [hydrateFromLocal, supabase]);
