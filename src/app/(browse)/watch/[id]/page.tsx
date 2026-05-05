@@ -26,6 +26,10 @@ import {
 import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { getWatchVideoDetails } from "@/lib/watchVideo";
 import {
+  parseWatchCommentsVisibleCookie,
+  WATCH_COMMENTS_VISIBLE_COOKIE,
+} from "@/lib/watchCommentsVisibilityPersistence";
+import {
   channelPageHrefFromToken,
   extractChannelRouteTokenFromUrl,
   isValidYoutubeChannelId,
@@ -84,10 +88,13 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
   );
   const showUpNext = watchLayout === "up_next";
   const theatreMaximizePlayer = watchLayout === "theatre";
+  const showComments = parseWatchCommentsVisibleCookie(
+    cookieStore.get(WATCH_COMMENTS_VISIBLE_COOKIE)?.value,
+  );
 
   const [video, comments, watchNext] = await Promise.all([
     getWatchVideoDetails(id),
-    getWatchVideoComments(id),
+    showComments ? getWatchVideoComments(id) : Promise.resolve(null),
     showUpNext ? getWatchNextRelatedVideos(id) : Promise.resolve([]),
   ]);
   const watchNextSummaries = toVideoSummaries(watchNext);
@@ -147,6 +154,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
               <Box
                 sx={{
                   mb: { xs: 2, sm: 3 },
+                  mx: { xs: -2, sm: 0 },
                 }}
               >
                 {/* TODO: Revisit mobile landscape full-bleed playback without fighting browser chrome. */}
@@ -157,6 +165,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
                   channelName={video.channelName}
                   startSeconds={startSeconds}
                   theatreMaximize={theatreMaximizePlayer}
+                  edgeToEdge
                 />
               </Box>
 
@@ -187,7 +196,9 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
               {video.description?.trim() ? (
                 <WatchDescription description={video.description} />
               ) : null}
-              <WatchComments videoId={id} initialComments={comments} />
+              {showComments ? (
+                <WatchComments videoId={id} initialComments={comments} />
+              ) : null}
             </Stack>
           </Grid>
           {showUpNext ? (

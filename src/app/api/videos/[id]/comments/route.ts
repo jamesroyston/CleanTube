@@ -13,24 +13,31 @@ type RouteContext = {
 
 export const runtime = "nodejs";
 
-export async function GET(request: Request, { params }: RouteContext) {
-  const { id } = await params;
-  if (!isValidYoutubeVideoId(id)) {
-    return NextResponse.json({ error: "Invalid video id." }, { status: 400 });
+export async function GET(request: Request, context: RouteContext) {
+  try {
+    const { id } = await context.params;
+    if (!isValidYoutubeVideoId(id)) {
+      return NextResponse.json({ error: "Invalid video id." }, { status: 400 });
+    }
+
+    const url = new URL(request.url);
+    const comments = await getWatchVideoComments(id, {
+      sort: normalizeCommentSort(url.searchParams.get("sort") ?? undefined),
+      page: normalizeCommentPage(url.searchParams.get("page") ?? undefined),
+    });
+
+    if (!comments) {
+      return NextResponse.json(
+        { error: "Comments are unavailable for this video." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ comments });
+  } catch (err) {
+    console.error("[api/comments]", err);
+    const message =
+      err instanceof Error ? err.message : "Failed to load comments.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-
-  const url = new URL(request.url);
-  const comments = await getWatchVideoComments(id, {
-    sort: normalizeCommentSort(url.searchParams.get("sort") ?? undefined),
-    page: normalizeCommentPage(url.searchParams.get("page") ?? undefined),
-  });
-
-  if (!comments) {
-    return NextResponse.json(
-      { error: "Comments are unavailable for this video." },
-      { status: 404 },
-    );
-  }
-
-  return NextResponse.json({ comments });
 }

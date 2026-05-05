@@ -42,6 +42,11 @@ const CommentView = (
     default: new (...args: unknown[]) => unknown;
   }
 ).default;
+const ContinuationItemClass = (
+  require(join(pkgRoot, "dist/src/parser/classes/ContinuationItem.js")) as {
+    default: new (...args: unknown[]) => unknown;
+  }
+).default;
 const { NextEndpoint } = require(join(
   pkgRoot,
   "dist/src/core/endpoints/index.js",
@@ -212,6 +217,111 @@ export type WatchVideoCommentReplies = {
   nextContinuation: string | null;
 };
 
+type CommentThreadish = {
+  comment?: { comment_id?: string } | null;
+  comment_replies_data?: {
+    contents: {
+      firstOfType: (...types: unknown[]) => unknown;
+    };
+  } | null;
+};
+
+type CommentsPageish = {
+  contents: CommentThreadish[];
+  has_continuation: boolean;
+  getContinuation: () => Promise<CommentsPageish>;
+};
+
+async function findCommentThreadForParent(
+  yt: Awaited<ReturnType<typeof getInnertube>>,
+  videoId: string,
+  sort: WatchVideoCommentSort,
+  parentCommentId: string,
+): Promise<CommentThreadish | null> {
+  const sortKey = sort === "newest" ? "NEWEST_FIRST" : "TOP_COMMENTS";
+  let page = (await yt.getComments(videoId, sortKey)) as unknown as CommentsPageish;
+  for (;;) {
+    for (const thread of page.contents) {
+      if (thread.comment?.comment_id === parentCommentId) return thread;
+    }
+    if (!page.has_continuation) break;
+    page = (await page.getContinuation()) as unknown as CommentsPageish;
+  }
+  return null;
+}
+
+function tokenFromContinuationItem(item: unknown): string | null {
+  if (!item || typeof item !== "object") return null;
+  const ep = (item as { endpoint?: { payload?: Record<string, unknown> } }).endpoint;
+  const p = ep?.payload;
+  if (p && typeof p.continuation === "string" && p.continuation.length > 0) {
+    return p.continuation;
+  }
+  return null;
+}
+
+function unwrapInnertubeData(data: unknown): unknown {
+  if (
+    data &&
+    typeof data === "object" &&
+    "on_response_received_endpoints_memo" in (data as object)
+  ) {
+    return data;
+  }
+  if (data && typeof data === "object" && "data" in (data as object)) {
+    return (data as { data: unknown }).data;
+  }
+  return data;
+}
+
+function repliesFromParsedResponse(
+  data: unknown,
+  parentCommentId: string,
+  sort: WatchVideoCommentSort,
+): WatchVideoCommentReplies | null {
+  const normalized = unwrapInnertubeData(data);
+  const rawPage = JSON.stringify(normalized);
+  let memo: ReturnType<typeof Parser.parseResponse>["on_response_received_endpoints_memo"];
+  if (
+    normalized &&
+    typeof normalized === "object" &&
+    "on_response_received_endpoints_memo" in (normalized as object)
+  ) {
+    memo = (normalized as { on_response_received_endpoints_memo: typeof memo })
+      .on_response_received_endpoints_memo;
+  } else {
+    memo = Parser.parseResponse(normalized as never).on_response_received_endpoints_memo;
+  }
+  if (!memo) return null;
+
+  const nodes = memo.getType(
+    Comment as never,
+    CommentView as never,
+  ) as unknown[];
+  const replies: WatchVideoComment[] = [];
+  for (const n of nodes) {
+    const mapped = mapReplyNode(n);
+    if (mapped) replies.push(mapped);
+  }
+
+  const moreItems = memo.getType(ContinuationItemClass as never) as unknown as {
+    first?: () => unknown;
+    0?: unknown;
+  };
+  const moreItem =
+    typeof moreItems.first === "function" ? moreItems.first() : moreItems[0];
+  const moreToken =
+    tokenFromContinuationItem(moreItem) ?? extractShowMoreRepliesToken(rawPage);
+
+  return {
+    parentCommentId,
+    sort,
+    replies,
+    hasMore: Boolean(moreToken),
+    nextContinuation: moreToken,
+  };
+}
+
 /**
  * Fetches one page of replies for a top-level comment. Pass `continuation` from a prior
  * response's `nextContinuation` to load the next page (lazy "Show more replies").
@@ -230,51 +340,63 @@ export async function getWatchVideoCommentReplies(
 
   try {
     const yt = await getInnertube();
-    let token = continuationIn?.trim() || null;
+    const contIn = continuationIn?.trim() || null;
 
-    if (!token) {
-      // Load the full comments section (same request shape as `Innertube.getComments`) so we can
-      // find the per-thread reply continuation token; it is not always available on the parsed
-      // `CommentThread` object alone.
-      const cont = encodeCommentsSectionContinuation(videoId, sort);
-      const section = await yt.actions.execute(
+    if (contIn) {
+      const next = await yt.actions.execute(
         NextEndpoint.PATH,
-        NextEndpoint.build({ continuation: cont }),
+        NextEndpoint.build({ continuation: contIn }),
       );
-      const raw = JSON.stringify(section.data);
-      token = extractInitialReplyContinuationToken(raw, parentCommentId);
-      if (!token) return null;
+      return repliesFromParsedResponse(next.data, parentCommentId, sort);
     }
+
+    const thread = await findCommentThreadForParent(
+      yt,
+      videoId,
+      sort,
+      parentCommentId,
+    );
+    if (thread?.comment_replies_data?.contents) {
+      const continuationNode = thread.comment_replies_data.contents.firstOfType(
+        ContinuationItemClass as never,
+      ) as { endpoint?: { call: (a: unknown, o?: unknown) => Promise<unknown> } } | undefined;
+      if (continuationNode?.endpoint?.call) {
+        try {
+          const response = await continuationNode.endpoint.call(yt.actions, {
+            parse: true,
+          });
+          const direct = repliesFromParsedResponse(response, parentCommentId, sort);
+          if (direct) return direct;
+        } catch {
+          /* fall through to legacy token path */
+        }
+      }
+    }
+
+    const cont = encodeCommentsSectionContinuation(videoId, sort);
+    const section = await yt.actions.execute(
+      NextEndpoint.PATH,
+      NextEndpoint.build({ continuation: cont }),
+    );
+    const raw = JSON.stringify(section.data);
+    let token = extractInitialReplyContinuationToken(raw, parentCommentId);
+    if (!token) {
+      const idx = raw.indexOf(parentCommentId);
+      if (idx >= 0) {
+        const slice = raw.slice(Math.max(0, idx - 400), idx + 3200);
+        const m = slice.match(
+          /"continuationCommand":\s*\{[^}]*"token":\s*"([^"]+)"/,
+        );
+        token = m?.[1] ?? null;
+      }
+    }
+    if (!token) return null;
 
     const next = await yt.actions.execute(
       NextEndpoint.PATH,
       NextEndpoint.build({ continuation: token }),
     );
-    const rawPage = JSON.stringify(next.data);
-    const parsed = Parser.parseResponse(next.data);
-    const memo = parsed.on_response_received_endpoints_memo;
-    if (!memo) return null;
-
-    // `as never` keeps TypeScript happy with dynamically required YTNode constructors.
-    const nodes = memo.getType(
-      Comment as never,
-      CommentView as never,
-    ) as unknown[];
-    const replies: WatchVideoComment[] = [];
-    for (const n of nodes) {
-      const mapped = mapReplyNode(n);
-      if (mapped) replies.push(mapped);
-    }
-
-    const moreToken = extractShowMoreRepliesToken(rawPage);
-
-    return {
-      parentCommentId,
-      sort,
-      replies,
-      hasMore: Boolean(moreToken),
-      nextContinuation: moreToken,
-    };
+    return repliesFromParsedResponse(next.data, parentCommentId, sort);
   } catch {
     return null;
   }

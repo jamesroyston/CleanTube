@@ -15,7 +15,8 @@ import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
 import { resolveChannelVideosVariant } from "@/lib/channelVideosVariant";
 import { toVideoSummaries } from "@/lib/serializeVideo";
-import { getChannelDetails, getChannelVideosPage } from "@/lib/youtubeChannel";
+import { getChannelVideosPageCached } from "@/lib/youtubeChannel";
+import { getChannelDetailsCached } from "@/lib/youtubeChannelResolveCache";
 import { isValidYoutubeChannelId } from "@/lib/youtubeUrl";
 import type { ChannelSortMode } from "@/lib/youtubeTypes";
 
@@ -62,7 +63,7 @@ export async function generateMetadata({
   const { id: rawId } = await params;
   const id = decodeRouteToken(rawId);
   /** Title/description only: `getChannel` + about — no `getVideos` (grid loads in the page). */
-  const channel = await getChannelDetails(id);
+  const channel = await getChannelDetailsCached(id);
 
   return {
     title: channel?.title
@@ -83,13 +84,13 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
   const variant = resolveChannelVideosVariant(cookieStore, { grid: gridQuery });
 
   if (!isValidYoutubeChannelId(id)) {
-    const channel = await getChannelDetails(id);
+    const channel = await getChannelDetailsCached(id);
     if (channel?.id && channel.id !== id) {
       redirect(channelHref(channel.id, { sort, page: pageRaw, grid: gridQuery }));
     }
   }
 
-  const page = await getChannelVideosPage(
+  const page = await getChannelVideosPageCached(
     {
       channelId: id,
       sort,
