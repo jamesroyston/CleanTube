@@ -7,8 +7,12 @@ import type { ChannelDetails } from "@/lib/youtubeTypes";
 export const CHANNEL_RESOLVE_CACHE_CONTROL =
   "public, s-maxage=86400, stale-while-revalidate=604800";
 
-export const getChannelDetailsCached = unstable_cache(
-  async (lookup: string): Promise<ChannelDetails | null> => getChannelDetails(lookup),
-  ["cleantube-channel-resolve"],
-  { revalidate: 86400 },
-);
+export async function getChannelDetailsCached(
+  lookup: string,
+): Promise<ChannelDetails | null> {
+  return unstable_cache(
+    async () => getChannelDetails(lookup),
+    ["cleantube-channel-resolve", lookup],
+    { revalidate: 86400 },
+  )();
+}

@@ -123,6 +123,41 @@ function parseIsoDateLabel(value: string | undefined): string | undefined {
   });
 }
 
+function descriptionFromWatchPlayerDetails(
+  details: WatchHtmlPlayerResponse["videoDetails"],
+): string | undefined {
+  if (!details || typeof details !== "object") return undefined;
+  const d = details as Record<string, unknown>;
+  if (typeof d.shortDescription === "string") {
+    const t = d.shortDescription.trim();
+    if (t) return t;
+  }
+  const raw = d.description;
+  if (typeof raw === "string") {
+    const t = raw.trim();
+    return t || undefined;
+  }
+  if (raw && typeof raw === "object") {
+    const o = raw as Record<string, unknown>;
+    if (typeof o.simpleText === "string" && o.simpleText.trim()) {
+      return o.simpleText.trim();
+    }
+    const runs = o.runs;
+    if (Array.isArray(runs)) {
+      const text = runs
+        .map((r) =>
+          r && typeof r === "object" && typeof (r as { text?: string }).text === "string"
+            ? (r as { text: string }).text
+            : "",
+        )
+        .join("");
+      const t = text.trim();
+      if (t) return t;
+    }
+  }
+  return undefined;
+}
+
 function fromWatchHtml(
   id: string,
   html: string,
@@ -181,7 +216,7 @@ function fromWatchHtml(
       10,
     ) || 0,
     description:
-      details.shortDescription?.trim() ||
+      descriptionFromWatchPlayerDetails(details) ||
       microformat?.description?.simpleText?.trim() ||
       undefined,
     thumbnailUrl: bestThumbnail
@@ -199,20 +234,24 @@ async function mergeDescriptionFromWatchHtml(
   id: string,
   video: WatchVideoDetails,
 ): Promise<WatchVideoDetails> {
-  const needsDesc = !video.description?.trim();
-  const needsChannelThumb = !video.channelThumbnailUrl?.trim();
-  if (!needsDesc && !needsChannelThumb) return video;
+  const hasDesc = Boolean(video.description?.trim());
+  const hasThumb = Boolean(video.channelThumbnailUrl?.trim());
+  if (hasDesc && hasThumb) return video;
+
   const html = await fetchWatchHtml(id);
   if (!html) return video;
   const fromHtml = fromWatchHtml(id, html);
   if (!fromHtml) return video;
+
   let next = video;
   const desc = fromHtml.description?.trim();
-  if (needsDesc && desc) {
-    next = { ...next, description: desc };
+  if (desc) {
+    if (!hasDesc || desc.length > (video.description?.trim().length ?? 0)) {
+      next = { ...next, description: desc };
+    }
   }
   const chThumb = fromHtml.channelThumbnailUrl?.trim();
-  if (needsChannelThumb && chThumb) {
+  if (!hasThumb && chThumb) {
     next = { ...next, channelThumbnailUrl: chThumb };
   }
   return next;
@@ -222,14 +261,18 @@ async function fetchWatchHtml(videoId: string): Promise<string | null> {
   const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`;
   try {
     const res = await fetch(watchUrl, {
+      cache: "no-store",
       headers: {
         Accept:
           "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9",
+        "Sec-CH-UA":
+          '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": '"macOS"',
         "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
       },
-      next: { revalidate: 3600 },
     });
     if (!res.ok) return null;
     return await res.text();
@@ -247,7 +290,7 @@ async function loadWatchVideoDetails(
 
   try {
     const yt = await getInnertube();
-    const info = await yt.getBasicInfo(id);
+    const info = await yt.getInfo(id);
     const video = videoInfoToWatchDetails(info, id);
     if (hasUsableWatchMetadata(video)) {
       return await mergeDescriptionFromWatchHtml(id, video);

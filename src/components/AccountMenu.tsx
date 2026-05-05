@@ -27,9 +27,13 @@ import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { startTransition, useState } from "react";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 
 import { setChannelVideosVariantAction } from "@/app/actions/channelVideosPreference";
+import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibility";
 import { normalizeChannelVideosVariant, type ChannelVideosVariant } from "@/lib/channelVideosPreferenceConstants";
+import { parseWatchCommentsVisibleCookie } from "@/lib/watchCommentsVisibilityPersistence";
 
 import { useThemeMode, useWatchLayout } from "@/app/providers";
 import { ThemePresetDialog } from "@/components/ThemePresetPanel";
@@ -41,6 +45,15 @@ function readChannelVideosVariantFromDocument(): ChannelVideosVariant {
   return normalizeChannelVideosVariant(m?.[1]);
 }
 
+function readWatchCommentsVisibleFromDocument(): boolean {
+  if (typeof document === "undefined") return false;
+  const m = document.cookie.match(
+    /(?:^|; )cleantube-watch-comments-visible=([^;]*)/,
+  );
+  const raw = m?.[1] ? decodeURIComponent(m[1]) : undefined;
+  return parseWatchCommentsVisibleCookie(raw);
+}
+
 /** Part before @ for compact app bar label; whole string if malformed. */
 function emailLocalPart(email: string | undefined): string {
   if (!email?.trim()) return "";
@@ -49,6 +62,8 @@ function emailLocalPart(email: string | undefined): string {
 }
 
 export function AccountMenu() {
+  const theme = useTheme();
+  const compactAccount = useMediaQuery(theme.breakpoints.down("md"));
   const { user, isCloudConfigured, signOutUser, authStatus } = useCloudLibrary();
   const { mode, toggleMode } = useThemeMode();
   const { mode: watchLayout, setWatchLayoutMode } = useWatchLayout();
@@ -57,6 +72,7 @@ export function AccountMenu() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const open = Boolean(anchorEl);
   const channelVideosVariant = readChannelVideosVariantFromDocument();
+  const commentsVisible = readWatchCommentsVisibleFromDocument();
 
   const accountLabel = user ? emailLocalPart(user.email ?? undefined) : "";
   const accountTooltip = user?.email?.trim() ?? "Account";
@@ -66,28 +82,33 @@ export function AccountMenu() {
       <Tooltip title={accountTooltip}>
         <span>
           {user ? (
-            <Button
-              aria-label="Account"
-              color="inherit"
-              onClick={(event) => setAnchorEl(event.currentTarget)}
-              startIcon={<AccountCircleOutlinedIcon />}
-              sx={{
-                minWidth: 0,
-                maxWidth: { xs: 160, sm: 220 },
-                textTransform: "none",
-                color: "text.primary",
-                px: { xs: 0.5, sm: 1 },
-              }}
-            >
-              <Typography
-                variant="body2"
-                component="span"
-                noWrap
-                sx={{ minWidth: 0 }}
+            compactAccount ? (
+              <IconButton
+                aria-label="Account"
+                color="inherit"
+                onClick={(event) => setAnchorEl(event.currentTarget)}
               >
-                {accountLabel || "Account"}
-              </Typography>
-            </Button>
+                <AccountCircleOutlinedIcon />
+              </IconButton>
+            ) : (
+              <Button
+                aria-label="Account"
+                color="inherit"
+                onClick={(event) => setAnchorEl(event.currentTarget)}
+                startIcon={<AccountCircleOutlinedIcon />}
+                sx={{
+                  minWidth: 0,
+                  maxWidth: 220,
+                  textTransform: "none",
+                  color: "text.primary",
+                  px: 1,
+                }}
+              >
+                <Typography variant="body2" component="span" noWrap sx={{ minWidth: 0 }}>
+                  {accountLabel || "Account"}
+                </Typography>
+              </Button>
+            )
           ) : (
             <IconButton
               aria-label="Account"
@@ -203,6 +224,28 @@ export function AccountMenu() {
             <ListItemText primary={opt.label} secondary={opt.secondary} />
           </MenuItem>
         ))}
+        <MenuItem
+          onClick={() => {
+            setAnchorEl(null);
+            void setWatchCommentsVisibleAction(!commentsVisible).then(() => {
+              startTransition(() => {
+                router.refresh();
+              });
+            });
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 36 }}>
+            {commentsVisible ? (
+              <CheckIcon fontSize="small" color="primary" />
+            ) : (
+              <Box sx={{ width: 24 }} />
+            )}
+          </ListItemIcon>
+          <ListItemText
+            primary="Show comments on watch"
+            secondary="Turn off to skip loading comments (faster watch page)"
+          />
+        </MenuItem>
         <ListSubheader
           disableSticky
           sx={{

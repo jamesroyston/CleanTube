@@ -1,6 +1,8 @@
 "use client";
 
 import Box from "@mui/material/Box";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
@@ -41,6 +43,8 @@ type LiteYouTubeEmbedProps = {
    * (16:9 box limited by `100dvh` minus chrome).
    */
   theatreMaximize?: boolean;
+  /** Full viewport width on small screens (no rounded corners). */
+  edgeToEdge?: boolean;
 };
 
 export function LiteYouTubeEmbed({
@@ -51,7 +55,11 @@ export function LiteYouTubeEmbed({
   startSeconds,
   enableGlobalShortcuts = true,
   theatreMaximize = false,
+  edgeToEdge = false,
 }: LiteYouTubeEmbedProps) {
+  const theme = useTheme();
+  const edgeBreakpoint = useMediaQuery(theme.breakpoints.down("md"));
+  const bleed = edgeToEdge && edgeBreakpoint;
   const { upsertWatchProgress, user } = useCloudLibrary();
   const [ready, setReady] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -250,13 +258,21 @@ export function LiteYouTubeEmbed({
       }
     : { width: "100%" };
 
+  const radiusSx = bleed
+    ? {
+        borderRadius: 0,
+        "& lite-youtube": { borderRadius: "0 !important" },
+      }
+    : {};
+
   if (!ready) {
     const skeleton = (
       <Box
         sx={{
           ...shellSx,
+          ...radiusSx,
           aspectRatio: "16 / 9",
-          borderRadius: 1,
+          borderRadius: bleed ? 0 : 1,
           bgcolor: "action.hover",
         }}
       />
@@ -277,7 +293,7 @@ export function LiteYouTubeEmbed({
   }
 
   const player = (
-    <Box ref={shellRef} sx={shellSx}>
+    <Box ref={shellRef} sx={{ ...shellSx, ...radiusSx }}>
       <lite-youtube
         key={`${videoId}-${start ?? 0}`}
         videoid={videoId}
@@ -289,7 +305,7 @@ export function LiteYouTubeEmbed({
           width: "100%",
           maxWidth: "100%",
           display: "block",
-          borderRadius: 8,
+          borderRadius: bleed ? 0 : 8,
           overflow: "hidden",
         }}
       />

@@ -1,3 +1,4 @@
+import { unstable_cache } from "next/cache";
 import { cache } from "react";
 
 import { canonicalYoutubeThumbnailUrl } from "@/lib/serializeVideo";
@@ -668,6 +669,54 @@ export async function getChannelVideosPage(
     return getChannelVideosRobustInner(input);
   }
   return youtubeiChannelBackend.getChannelVideos(input);
+}
+
+const CHANNEL_VIDEOS_CACHE_SECONDS = (() => {
+  const raw = process.env.CHANNEL_VIDEOS_CACHE_SECONDS;
+  const n = raw ? Number.parseInt(raw, 10) : 3600;
+  if (!Number.isFinite(n)) return 3600;
+  return Math.min(Math.max(n, 60), 86400);
+})();
+
+/**
+ * Cached channel grid for Data Cache (helps when the route is dynamic due to cookies).
+ * Failures are not stored: empty InnerTube responses fall through to a live retry.
+ */
+export async function getChannelVideosPageCached(
+  input: {
+    channelId: string;
+    sort?: ChannelSortMode;
+    pageToken?: string;
+    limit?: number;
+  },
+  options?: { variant?: ChannelVideosVariant },
+): Promise<ChannelVideosPage | null> {
+  const sort = input.sort ?? "latest";
+  const variant = options?.variant ?? "legacy";
+  const limit = input.limit ?? DEFAULT_PAGE_SIZE;
+  const pageKey = input.pageToken ?? "";
+  const cacheTags = [
+    "cleantube-channel-videos",
+    input.channelId,
+    sort,
+    pageKey,
+    variant,
+    String(limit),
+  ];
+
+  try {
+    return await unstable_cache(
+      async () => {
+        const page = await getChannelVideosPage(input, options);
+        if (!page) throw new Error("channel_videos_miss");
+        return page;
+      },
+      cacheTags,
+      { revalidate: CHANNEL_VIDEOS_CACHE_SECONDS },
+    )();
+  } catch {
+    return getChannelVideosPage(input, options);
+  }
 }
 
 export async function getChannelDetails(

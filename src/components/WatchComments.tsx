@@ -10,10 +10,10 @@ import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import NextLink from "next/link";
 import { useState, type ReactNode } from "react";
 
 import type { WatchVideoCommentReplies } from "@/lib/youtubeCommentReplies";
+import { readFetchJson } from "@/lib/fetchJson";
 import type {
   WatchVideoComment,
   WatchVideoComments,
@@ -25,12 +25,6 @@ type WatchCommentsProps = {
   initialComments: WatchVideoComments | null;
 };
 
-function authorHref(comment: WatchVideoComment): string | undefined {
-  if (comment.authorChannelId) {
-    return `/channel/${encodeURIComponent(comment.authorChannelId)}`;
-  }
-  return comment.authorUrl;
-}
 
 type CommentsResponse = {
   comments?: WatchVideoComments;
@@ -40,12 +34,6 @@ type CommentsResponse = {
 type RepliesApiResponse = {
   replies?: WatchVideoCommentReplies;
   error?: string;
-};
-
-const authorLinkStyle = {
-  color: "inherit",
-  fontWeight: 700,
-  textDecoration: "none",
 };
 
 function parseReplyCountLabel(text: string | undefined): number {
@@ -88,7 +76,6 @@ function CommentBlock({
   hideReplyMeta = false,
   children,
 }: CommentBlockProps) {
-  const href = authorHref(comment);
   const avatarSize = dense ? 28 : 36;
   return (
     <Stack direction="row" spacing={1.5} alignItems="flex-start">
@@ -108,30 +95,9 @@ function CommentBlock({
           useFlexGap
           sx={{ mb: 0.5 }}
         >
-          {href ? (
-            href.startsWith("/") ? (
-              <NextLink href={href} style={authorLinkStyle}>
-                <Typography component="span" variant="body2">
-                  {comment.authorName}
-                </Typography>
-              </NextLink>
-            ) : (
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={authorLinkStyle}
-              >
-                <Typography component="span" variant="body2">
-                  {comment.authorName}
-                </Typography>
-              </a>
-            )
-          ) : (
-            <Typography variant="body2" sx={{ fontWeight: 700 }}>
-              {comment.authorName}
-            </Typography>
-          )}
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            {comment.authorName}
+          </Typography>
           {comment.publishedTime ? (
             <Typography variant="caption" color="text.secondary">
               {comment.publishedTime}
@@ -216,7 +182,7 @@ export function WatchComments({
         const response = await fetch(
           `/api/videos/${encodeURIComponent(videoId)}/comments?${qs.toString()}`,
         );
-        const payload = (await response.json()) as CommentsResponse;
+        const payload = await readFetchJson<CommentsResponse>(response);
         if (!response.ok || !payload.comments) {
           throw new Error(payload.error || "Comments could not be loaded.");
         }
@@ -243,7 +209,7 @@ export function WatchComments({
     const response = await fetch(
       `/api/videos/${encodeURIComponent(videoId)}/comments/replies?${qs.toString()}`,
     );
-    const payload = (await response.json()) as RepliesApiResponse;
+    const payload = await readFetchJson<RepliesApiResponse>(response);
     if (!response.ok || !payload.replies) {
       throw new Error(payload.error || "Replies could not be loaded.");
     }

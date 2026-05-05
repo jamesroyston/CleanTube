@@ -36,7 +36,8 @@ export function parseWatchLayoutCookie(
   if (legacyFocus === "1" || legacyFocus === "on" || legacyFocus === "true") {
     return "theatre";
   }
-  return "up_next";
+  /** Default: no Up next rail (lower compute; user can enable in Account menu). */
+  return "theatre";
 }
 
 export function isValidWatchLayoutMode(value: unknown): value is WatchLayoutMode {
