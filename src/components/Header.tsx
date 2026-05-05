@@ -225,6 +225,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
               <Box
                 component="form"
                 onSubmit={onSubmit}
+                autoComplete="off"
                 sx={{
                   width: "100%",
                   maxWidth: 560,
@@ -235,6 +236,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
                   name="q"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
+                  autoComplete="off"
                   placeholder="Search or paste a YouTube URL"
                   size="small"
                   fullWidth
@@ -285,6 +287,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
         <Box
           component="form"
           onSubmit={onOverlaySubmit}
+          autoComplete="off"
           sx={{
             display: "flex",
             alignItems: "center",
@@ -299,6 +302,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
             autoFocus
             fullWidth
             size="small"
+            autoComplete="off"
             placeholder="Search or paste a YouTube URL"
             value={overlayQuery}
             onChange={(e) => setOverlayQuery(e.target.value)}
