@@ -154,10 +154,8 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
               <Box
                 sx={{
                   mb: { xs: 2, sm: 3 },
-                  mx: { xs: -2, sm: 0 },
                 }}
               >
-                {/* TODO: Revisit mobile landscape full-bleed playback without fighting browser chrome. */}
                 <LiteYouTubeEmbed
                   videoId={id}
                   title={title}
@@ -165,7 +163,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
                   channelName={video.channelName}
                   startSeconds={startSeconds}
                   theatreMaximize={theatreMaximizePlayer}
-                  edgeToEdge
                 />
               </Box>
 

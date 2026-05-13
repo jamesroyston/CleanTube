@@ -6,6 +6,7 @@ import Button from "@mui/material/Button";
 import { useMemo } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
+import { effectiveSavedChannelKind } from "@/types/savedChannel";
 
 type SaveChannelButtonProps = {
   channelName: string;
@@ -29,9 +30,10 @@ export function SaveChannelButton({
     const q = searchQuery.toLowerCase();
     return channels.find(
       (c) =>
-        (channelId && c.channelId === channelId) ||
-        (channelUrl && c.channelUrl === channelUrl) ||
-        c.searchQuery.trim().toLowerCase() === q,
+        effectiveSavedChannelKind(c) === "saved_channel" &&
+        ((channelId && c.channelId === channelId) ||
+          (channelUrl && c.channelUrl === channelUrl) ||
+          c.searchQuery.trim().toLowerCase() === q),
     );
   }, [channels, channelId, channelUrl, searchQuery, trimmedName]);
 
@@ -68,6 +70,7 @@ export function SaveChannelButton({
           channelUrl,
           thumbnailUrl,
           searchQuery,
+          entryKind: "saved_channel",
         })
       }
       sx={{ alignSelf: "flex-start" }}

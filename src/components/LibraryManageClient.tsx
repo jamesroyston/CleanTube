@@ -15,6 +15,7 @@ import Typography from "@mui/material/Typography";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
+import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { SavedChannel } from "@/types/savedChannel";
 
 function SavedChannelRow({
@@ -24,9 +25,14 @@ function SavedChannelRow({
   channel: SavedChannel;
   onRemove: () => void;
 }) {
-  const href = channel.channelId
-    ? channelPageHrefFromToken(channel.channelId)
-    : `/?q=${encodeURIComponent(channel.searchQuery)}`;
+  const kind = effectiveSavedChannelKind(channel);
+  const href =
+    kind === "pinned_search"
+      ? `/?q=${encodeURIComponent(channel.searchQuery)}`
+      : channel.channelId
+        ? channelPageHrefFromToken(channel.channelId)
+        : channel.channelUrl?.trim() ||
+          `/?q=${encodeURIComponent(channel.searchQuery)}`;
 
   return (
     <ListItem
@@ -59,7 +65,7 @@ function SavedChannelRow({
         <ListItemText
           primary={channel.name}
           secondary={
-            channel.channelId
+            kind === "saved_channel"
               ? "Saved channel"
               : `Pinned search: ${channel.searchQuery}`
           }
@@ -74,12 +80,14 @@ function SavedChannelRow({
 export function LibraryManageClient() {
   const { channels, removeChannel } = useSavedChannels();
   const savedChannels = channels
-    .filter((c) => c.channelId)
+    .filter((c) => effectiveSavedChannelKind(c) === "saved_channel")
     .slice()
     .sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
     );
-  const savedSearches = channels.filter((c) => !c.channelId);
+  const savedSearches = channels.filter(
+    (c) => effectiveSavedChannelKind(c) === "pinned_search",
+  );
 
   return (
     <Stack spacing={3}>

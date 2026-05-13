@@ -9,6 +9,7 @@ import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
+import ClearAllOutlinedIcon from "@mui/icons-material/ClearAllOutlined";
 import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import PaletteIcon from "@mui/icons-material/Palette";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
@@ -30,20 +31,13 @@ import { startTransition, useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 
-import { setChannelVideosVariantAction } from "@/app/actions/channelVideosPreference";
 import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibility";
-import { normalizeChannelVideosVariant, type ChannelVideosVariant } from "@/lib/channelVideosPreferenceConstants";
 import { parseWatchCommentsVisibleCookie } from "@/lib/watchCommentsVisibilityPersistence";
+import { clearChannelPageSessionBackups } from "@/lib/channelPageClientCache";
 
 import { useThemeMode, useWatchLayout } from "@/app/providers";
 import { ThemePresetDialog } from "@/components/ThemePresetPanel";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
-
-function readChannelVideosVariantFromDocument(): ChannelVideosVariant {
-  if (typeof document === "undefined") return "legacy";
-  const m = document.cookie.match(/(?:^|; )cleantube_channel_videos=([^;]*)/);
-  return normalizeChannelVideosVariant(m?.[1]);
-}
 
 function readWatchCommentsVisibleFromDocument(): boolean {
   if (typeof document === "undefined") return false;
@@ -71,7 +65,6 @@ export function AccountMenu() {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const open = Boolean(anchorEl);
-  const channelVideosVariant = readChannelVideosVariantFromDocument();
   const commentsVisible = readWatchCommentsVisibleFromDocument();
 
   const accountLabel = user ? emailLocalPart(user.email ?? undefined) : "";
@@ -246,54 +239,23 @@ export function AccountMenu() {
             secondary="Turn off to skip loading comments (faster watch page)"
           />
         </MenuItem>
-        <ListSubheader
-          disableSticky
-          sx={{
-            px: 2,
-            py: 0.5,
-            lineHeight: 1.5,
-            typography: "caption",
-            color: "text.secondary",
+        <MenuItem
+          onClick={() => {
+            setAnchorEl(null);
+            clearChannelPageSessionBackups();
+            startTransition(() => {
+              router.refresh();
+            });
           }}
         >
-          Channel videos
-        </ListSubheader>
-        {(
-          [
-            {
-              value: "legacy" as const,
-              label: "Stable (legacy)",
-              secondary: "Original channel grid behavior",
-            },
-            {
-              value: "v2" as const,
-              label: "Improved (beta)",
-              secondary: "Retries and improved feed mapping",
-            },
-          ] as const
-        ).map((opt) => (
-          <MenuItem
-            key={opt.value}
-            selected={channelVideosVariant === opt.value}
-            onClick={() => {
-              setAnchorEl(null);
-              void setChannelVideosVariantAction(opt.value).then(() => {
-                startTransition(() => {
-                  router.refresh();
-                });
-              });
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              {channelVideosVariant === opt.value ? (
-                <CheckIcon fontSize="small" color="primary" />
-              ) : (
-                <Box sx={{ width: 24 }} />
-              )}
-            </ListItemIcon>
-            <ListItemText primary={opt.label} secondary={opt.secondary} />
-          </MenuItem>
-        ))}
+          <ListItemIcon sx={{ minWidth: 36 }}>
+            <ClearAllOutlinedIcon fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Clear channel page backups"
+            secondary="Removes session-only cached channel grids in this browser (use if the grid looks stuck)."
+          />
+        </MenuItem>
         <Divider />
         {!isCloudConfigured ? (
           <MenuItem disabled>

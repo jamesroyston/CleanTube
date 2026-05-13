@@ -1,8 +1,6 @@
 "use client";
 
 import Box from "@mui/material/Box";
-import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
@@ -43,8 +41,6 @@ type LiteYouTubeEmbedProps = {
    * (16:9 box limited by `100dvh` minus chrome).
    */
   theatreMaximize?: boolean;
-  /** Full viewport width on small screens (no rounded corners). */
-  edgeToEdge?: boolean;
 };
 
 export function LiteYouTubeEmbed({
@@ -55,20 +51,22 @@ export function LiteYouTubeEmbed({
   startSeconds,
   enableGlobalShortcuts = true,
   theatreMaximize = false,
-  edgeToEdge = false,
 }: LiteYouTubeEmbedProps) {
-  const theme = useTheme();
-  const edgeBreakpoint = useMediaQuery(theme.breakpoints.down("md"));
-  const bleed = edgeToEdge && edgeBreakpoint;
   const { upsertWatchProgress, user } = useCloudLibrary();
   const [ready, setReady] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
+  /** Avoid `await getYTPlayer()` on every progress sample (hot path). */
+  const ytPlayerRef = useRef<YT.Player | null>(null);
   const lastRecordedSecondsRef = useRef(-1);
   const playingRef = useRef(false);
 
   useEffect(() => {
     void loadLiteYt().then(() => setReady(true));
   }, []);
+
+  useEffect(() => {
+    ytPlayerRef.current = null;
+  }, [videoId]);
 
   useGlobalYoutubeShortcuts(
     shellRef,
@@ -97,11 +95,19 @@ export function LiteYouTubeEmbed({
     } = {}) => {
       const root = shellRef.current;
       if (!root) return;
-      const el = root.querySelector("lite-youtube") as LiteYoutubeElement | null;
-      if (!el || typeof el.getYTPlayer !== "function") return;
+      let player = ytPlayerRef.current;
+      if (!player) {
+        const el = root.querySelector("lite-youtube") as LiteYoutubeElement | null;
+        if (!el || typeof el.getYTPlayer !== "function") return;
+        try {
+          player = await el.getYTPlayer();
+          ytPlayerRef.current = player;
+        } catch {
+          return;
+        }
+      }
 
       try {
-        const player = await el.getYTPlayer();
         let currentSeconds = Math.max(
           0,
           Math.floor(player.getCurrentTime?.() ?? 0),
@@ -134,7 +140,7 @@ export function LiteYouTubeEmbed({
         }
 
         lastRecordedSecondsRef.current = currentSeconds;
-        await upsertWatchProgress(
+        void upsertWatchProgress(
           {
             videoId,
             title: title ?? "Video",
@@ -185,6 +191,7 @@ export function LiteYouTubeEmbed({
             const player = await el.getYTPlayer();
             if (cancelled) return;
             attachedPlayer = player;
+            ytPlayerRef.current = player;
             player.addEventListener("onStateChange", onStateChange);
             return;
           } catch {
@@ -197,6 +204,7 @@ export function LiteYouTubeEmbed({
 
     return () => {
       cancelled = true;
+      ytPlayerRef.current = null;
       if (attachedPlayer) {
         try {
           attachedPlayer.removeEventListener("onStateChange", onStateChange);
@@ -239,6 +247,9 @@ export function LiteYouTubeEmbed({
     window.addEventListener("beforeunload", flush);
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", flushIfHidden);
+    if ("onfreeze" in document) {
+      document.addEventListener("freeze", flush);
+    }
 
     return () => {
       window.clearInterval(sampleInterval);
@@ -246,6 +257,9 @@ export function LiteYouTubeEmbed({
       window.removeEventListener("beforeunload", flush);
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", flushIfHidden);
+      if ("onfreeze" in document) {
+        document.removeEventListener("freeze", flush);
+      }
       void recordProgress({ force: true, persistLocal: true, syncCloud: true });
     };
   }, [recordProgress, ready, user]);
@@ -253,26 +267,24 @@ export function LiteYouTubeEmbed({
   const shellSx = theatreMaximize
     ? {
         width: "100%",
+        // Phone landscape: `100dvh` is the short side; don’t derive maxWidth from it.
         maxWidth: `min(100%, calc((100dvh - ${THEATRE_VIEWPORT_RESERVE}) * 16 / 9))`,
         maxHeight: `calc(100dvh - ${THEATRE_VIEWPORT_RESERVE})`,
+        aspectRatio: "16 / 9",
+        "@media (min-aspect-ratio: 1/1)": {
+          maxWidth: "100%",
+          maxHeight: "none",
+        },
       }
     : { width: "100%" };
-
-  const radiusSx = bleed
-    ? {
-        borderRadius: 0,
-        "& lite-youtube": { borderRadius: "0 !important" },
-      }
-    : {};
 
   if (!ready) {
     const skeleton = (
       <Box
         sx={{
           ...shellSx,
-          ...radiusSx,
           aspectRatio: "16 / 9",
-          borderRadius: bleed ? 0 : 1,
+          borderRadius: 1,
           bgcolor: "action.hover",
         }}
       />
@@ -293,7 +305,7 @@ export function LiteYouTubeEmbed({
   }
 
   const player = (
-    <Box ref={shellRef} sx={{ ...shellSx, ...radiusSx }}>
+    <Box ref={shellRef} sx={shellSx}>
       <lite-youtube
         key={`${videoId}-${start ?? 0}`}
         videoid={videoId}
@@ -305,7 +317,7 @@ export function LiteYouTubeEmbed({
           width: "100%",
           maxWidth: "100%",
           display: "block",
-          borderRadius: bleed ? 0 : 8,
+          borderRadius: 8,
           overflow: "hidden",
         }}
       />

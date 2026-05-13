@@ -27,9 +27,8 @@ export function ChannelGridEmptyState({
   return (
     <Stack spacing={2} sx={{ py: 4 }}>
       <Typography color="text.secondary">
-        We couldn&apos;t load videos for this channel right now. Try again, or
-        open the account menu and switch &quot;Channel videos&quot; to Stable
-        (legacy).
+        We couldn&apos;t load videos for this channel right now. Use Retry or
+        refresh the page to fetch again from YouTube.
       </Typography>
       {partialLoad ? (
         <Typography variant="body2" color="text.secondary">

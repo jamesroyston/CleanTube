@@ -7,7 +7,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Select from "@mui/material/Select";
 import { useRouter } from "next/navigation";
 
-import { setLastResultSort } from "@/lib/lastSearchSession";
+import { setLastResultSort, setLastSearchSort } from "@/lib/lastSearchSession";
 import type { ResultSortMode, SearchSortMode } from "@/lib/uploadedAtSort";
 import {
   normalizeResultSortParam,
@@ -40,9 +40,48 @@ export function SearchSortBar({
     router.push(`/?${qs.toString()}`);
   }
 
+  function commitSearchSort(next: SearchSortMode) {
+    const normalized = normalizeSearchSortParam(next);
+    setLastSearchSort(normalized);
+    const qs = new URLSearchParams();
+    qs.set("q", query);
+    if (normalized !== "relevance") qs.set("searchSort", normalized);
+    if (selectedResultSort !== "search") {
+      qs.set("resultSort", selectedResultSort);
+    }
+    router.push(`/?${qs.toString()}`);
+  }
+
   return (
-    <Box sx={{ minWidth: 200 }}>
-      <FormControl size="small" fullWidth>
+    <Box
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 2,
+        minWidth: 200,
+      }}
+    >
+      <FormControl
+        size="small"
+        sx={{ minWidth: 200, flex: "1 1 180px" }}
+      >
+        <InputLabel id="cleantube-search-ranking-label">Search ranking</InputLabel>
+        <Select<SearchSortMode>
+          labelId="cleantube-search-ranking-label"
+          label="Search ranking"
+          value={selectedSearchSort}
+          onChange={(e) =>
+            commitSearchSort(e.target.value as SearchSortMode)
+          }
+        >
+          <MenuItem value="relevance">Relevance</MenuItem>
+          <MenuItem value="newest">Most recent</MenuItem>
+        </Select>
+      </FormControl>
+      <FormControl
+        size="small"
+        sx={{ minWidth: 200, flex: "1 1 180px" }}
+      >
         <InputLabel id="cleantube-results-sort-label">Results sort</InputLabel>
         <Select<ResultSortMode>
           labelId="cleantube-results-sort-label"

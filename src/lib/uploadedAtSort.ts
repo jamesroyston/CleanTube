@@ -80,7 +80,8 @@ export function normalizeSortParam(
 export function normalizeSearchSortParam(
   raw: string | undefined | null,
 ): SearchSortMode {
-  if (raw === "newest") return raw;
+  const key = raw?.trim().toLowerCase();
+  if (key === "newest" || key === "recent") return "newest";
   return "relevance";
 }
 

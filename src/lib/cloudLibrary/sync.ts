@@ -1,4 +1,5 @@
 import type { SavedChannel } from "@/types/savedChannel";
+import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { WatchProgressEntry } from "@/types/watchProgress";
 
 function normalizeText(value: string | undefined): string | undefined {
@@ -19,14 +20,16 @@ function normalizeUrl(value: string | undefined): string | undefined {
 }
 
 function savedChannelCanonicalAliasKeys(channel: SavedChannel): string[] {
+  const kind = effectiveSavedChannelKind(channel);
+  const kindNs = kind === "pinned_search" ? "pin:" : "ch:";
   const aliases = new Set<string>();
   const channelId = normalizeText(channel.channelId);
   const channelUrl = normalizeUrl(channel.channelUrl);
   const searchQuery = normalizeText(channel.searchQuery);
 
-  if (channelId) aliases.add(`id:${channelId}`);
-  if (channelUrl) aliases.add(`url:${channelUrl}`);
-  if (searchQuery) aliases.add(`query:${searchQuery}`);
+  if (channelId) aliases.add(`${kindNs}id:${channelId}`);
+  if (channelUrl) aliases.add(`${kindNs}url:${channelUrl}`);
+  if (searchQuery) aliases.add(`${kindNs}query:${searchQuery}`);
 
   return Array.from(aliases);
 }
@@ -48,14 +51,23 @@ function mergeSavedChannel(
       ? incoming.name
       : existing.name || incoming.name;
 
-  return {
+  const merged: SavedChannel = {
     id: existing.id || incoming.id,
     name: preferredName,
     channelId: existing.channelId ?? incoming.channelId,
     channelUrl: existing.channelUrl ?? incoming.channelUrl,
     thumbnailUrl: existing.thumbnailUrl ?? incoming.thumbnailUrl,
     searchQuery: existing.searchQuery || incoming.searchQuery,
+    entryKind: existing.entryKind ?? incoming.entryKind,
   };
+  merged.entryKind =
+    merged.entryKind ??
+    effectiveSavedChannelKind({
+      channelId: merged.channelId,
+      channelUrl: merged.channelUrl,
+      thumbnailUrl: merged.thumbnailUrl,
+    });
+  return merged;
 }
 
 /** Dedupe saved channels by canonical aliases (client-side list hygiene). */

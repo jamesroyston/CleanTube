@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate-icons": "node scripts/generate-app-icons.mjs"
+    "generate-icons": "node scripts/generate-app-icons.mjs",
+    "verify-channel-videos": "node scripts/verify-channel-videos.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -25,7 +26,7 @@
     "next": "16.2.2",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "youtubei.js": "^10.5.0"
+    "youtubei.js": "17.0.1"
   },
   "devDependencies": {
     "@types/node": "^20",

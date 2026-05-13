@@ -33,7 +33,8 @@ function searchFiltersForSort(sortMode: SearchSortMode): Types.SearchFilters {
   if (sortMode === "newest") {
     return {
       type: "video",
-      sort_by: "upload_date",
+      // youtubei.js v17+ maps filters to InnerTube protobuf; `upload_date` biases toward recency (no separate public sort key).
+      upload_date: "year",
     };
   }
   return { type: "video" };

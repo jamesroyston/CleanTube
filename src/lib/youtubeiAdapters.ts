@@ -54,6 +54,111 @@ function isLiveFeedEntry(v: object): boolean {
 
 const FEED_VIDEO_ID = /^[a-zA-Z0-9_-]{11}$/;
 
+function textish(value: unknown): string | undefined {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (
+    value &&
+    typeof value === "object" &&
+    typeof (value as { toString?: () => string }).toString === "function"
+  ) {
+    const s = String((value as { toString: () => string }).toString()).trim();
+    return s && s !== "[object Object]" ? s : undefined;
+  }
+  return undefined;
+}
+
+function thumbnailUrlsFromLockupContentImage(ci: unknown): string[] {
+  if (!ci || typeof ci !== "object") return [];
+  const o = ci as Record<string, unknown>;
+  if (o.type === "ThumbnailView" && Array.isArray(o.image)) {
+    return collectThumbnailUrls(o.image as Thumbnailish[]);
+  }
+  if (o.type === "CollectionThumbnailView" && o.primary_thumbnail) {
+    return thumbnailUrlsFromLockupContentImage(o.primary_thumbnail);
+  }
+  return [];
+}
+
+function durationFromLockupThumbnail(contentImage: unknown): string {
+  if (!contentImage || typeof contentImage !== "object") return "—";
+  const { overlays } = contentImage as {
+    overlays?: unknown[];
+  };
+  if (!Array.isArray(overlays)) return "—";
+  for (const ov of overlays) {
+    if (!ov || typeof ov !== "object") continue;
+    const kind = (ov as { type?: string }).type;
+    if (kind !== "ThumbnailBottomOverlayView") continue;
+    const badges = (ov as { badges?: unknown[] }).badges;
+    if (!Array.isArray(badges)) continue;
+    for (const b of badges) {
+      if (!b || typeof b !== "object") continue;
+      const t = (b as { text?: string }).text;
+      if (typeof t === "string" && /^\d+:\d{2}(:\d{2})?$/.test(t.trim())) {
+        return t.trim();
+      }
+    }
+  }
+  return "—";
+}
+
+function uploadedAtFromLockupMetadata(metadata: unknown): string | undefined {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const meta = metadata as Record<string, unknown>;
+  const cm = meta.metadata;
+  if (!cm || typeof cm !== "object") return undefined;
+  const rows = (cm as { metadata_rows?: unknown[] }).metadata_rows;
+  for (const row of rows ?? []) {
+    if (!row || typeof row !== "object") continue;
+    const parts = (row as { metadata_parts?: unknown[] }).metadata_parts;
+    for (const part of parts ?? []) {
+      if (!part || typeof part !== "object") continue;
+      const t = textish((part as { text?: unknown }).text);
+      if (
+        t &&
+        (/\bago\b/i.test(t) ||
+          /\b(today|yesterday|just now)\b/i.test(t) ||
+          /^(streamed|premiered|posted|uploaded)\b/i.test(t) ||
+          /\bscheduled\b/i.test(t))
+      ) {
+        return t;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Rich grid channel tabs expose uploads as {@link LockupView} (not `Video` / `GridVideo`).
+ * `Feed#get videos` does not include those nodes; map lockups here.
+ */
+export function lockupViewVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.type !== "LockupView") return null;
+  const ct = typeof o.content_type === "string" ? o.content_type : "";
+  if (ct !== "VIDEO") return null;
+  const id = typeof o.content_id === "string" ? o.content_id.trim() : "";
+  if (!FEED_VIDEO_ID.test(id)) return null;
+
+  const md = o.metadata as Record<string, unknown> | undefined;
+  const title = md ? textish(md.title) : undefined;
+
+  const thumbnailUrls = thumbnailUrlsFromLockupContentImage(o.content_image);
+  const durationFormatted = durationFromLockupThumbnail(o.content_image);
+  const uploadedAt = md ? uploadedAtFromLockupMetadata(md) : undefined;
+
+  return {
+    id,
+    title,
+    channelName: "Unknown channel",
+    durationFormatted,
+    uploadedAt,
+    live: false,
+    thumbnailUrls,
+  };
+}
+
 function extractVideoIdFromChannelFeedNode(
   node: unknown,
   depth = 0,
@@ -182,6 +287,8 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
 export function channelFeedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
   const direct = feedVideoToVideoLike(v);
   if (direct) return direct;
+  const fromLockup = lockupViewVideoToVideoLike(v);
+  if (fromLockup) return fromLockup;
   const extracted = extractVideoIdFromChannelFeedNode(v);
   if (!extracted || typeof v !== "object" || v === null) return null;
   const o = v as Record<string, unknown>;

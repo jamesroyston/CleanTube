@@ -2,7 +2,11 @@
 
 import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
 
-import type { SavedChannel } from "@/types/savedChannel";
+import {
+  type SavedChannel,
+  type SavedChannelEntryKind,
+  effectiveSavedChannelKind,
+} from "@/types/savedChannel";
 import type { WatchLaterEntry } from "@/types/watchLater";
 import type { WatchProgressEntry } from "@/types/watchProgress";
 
@@ -26,6 +30,7 @@ type SavedChannelRow = {
   channel_url: string | null;
   search_query: string;
   thumbnail_url: string | null;
+  entry_kind: string;
   created_at: string;
 };
 
@@ -55,6 +60,14 @@ function randomId(): string {
 }
 
 function toSavedChannel(row: SavedChannelRow): SavedChannel {
+  const entryKind =
+    row.entry_kind === "pinned_search" || row.entry_kind === "saved_channel"
+      ? (row.entry_kind as SavedChannelEntryKind)
+      : effectiveSavedChannelKind({
+          channelId: row.channel_id ?? undefined,
+          channelUrl: row.channel_url ?? undefined,
+          thumbnailUrl: row.thumbnail_url ?? undefined,
+        });
   return {
     id: row.id,
     name: row.name,
@@ -62,6 +75,7 @@ function toSavedChannel(row: SavedChannelRow): SavedChannel {
     channelUrl: row.channel_url ?? undefined,
     thumbnailUrl: row.thumbnail_url ?? undefined,
     searchQuery: row.search_query,
+    entryKind,
   };
 }
 
@@ -194,6 +208,7 @@ export async function upsertSavedChannels(
     channel_url: channel.channelUrl ?? null,
     search_query: channel.searchQuery,
     thumbnail_url: channel.thumbnailUrl ?? null,
+    entry_kind: effectiveSavedChannelKind(channel),
   }));
   const { error } = await supabase.from("saved_channels").upsert(rows);
   if (error) throw error;
