@@ -8,6 +8,7 @@ import {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -57,7 +58,11 @@ import {
   mergeSavedChannels,
 } from "@/lib/cloudLibrary/sync";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
-import type { SavedChannel } from "@/types/savedChannel";
+import {
+  type SavedChannel,
+  type SavedChannelEntryKind,
+  effectiveSavedChannelKind,
+} from "@/types/savedChannel";
 import type { WatchLaterEntry } from "@/types/watchLater";
 import type { WatchProgressEntry } from "@/types/watchProgress";
 
@@ -106,6 +111,8 @@ type CloudLibraryContextValue = {
     channelUrl?: string;
     thumbnailUrl?: string;
     searchQuery?: string;
+    /** Defaults to `"saved_channel"` when omitted so older callers behave as channel saves. */
+    entryKind?: SavedChannelEntryKind;
   }) => Promise<void>;
   updateSavedChannel: (
     id: string,
@@ -169,14 +176,43 @@ function randomId(): string {
     : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function sameChannel(a: SavedChannel, b: Partial<SavedChannel>): boolean {
-  if (a.channelId && b.channelId && a.channelId === b.channelId) return true;
-  if (a.channelUrl && b.channelUrl && a.channelUrl === b.channelUrl) return true;
-  if (
-    b.searchQuery &&
-    a.searchQuery.trim().toLowerCase() === b.searchQuery.trim().toLowerCase()
-  ) {
-    return true;
+function normalizeComparableUrl(raw: string | undefined): string | undefined {
+  const t = raw?.trim();
+  if (!t) return undefined;
+  try {
+    const u = new URL(t);
+    u.hash = "";
+    return u.toString().replace(/\/$/, "").toLowerCase();
+  } catch {
+    return t.replace(/\/$/, "").toLowerCase();
+  }
+}
+
+/** Dedupe identical rows when inserting (explicit kind first). */
+function isDuplicateSavedLibraryEntry(a: SavedChannel, b: SavedChannel): boolean {
+  if (effectiveSavedChannelKind(a) !== effectiveSavedChannelKind(b)) return false;
+
+  const kind = effectiveSavedChannelKind(b);
+  if (kind === "pinned_search") {
+    return (
+      a.searchQuery.trim().toLowerCase() === b.searchQuery.trim().toLowerCase()
+    );
+  }
+
+  const aId = a.channelId?.trim();
+  const bId = b.channelId?.trim();
+  if (aId && bId && aId === bId) return true;
+
+  const aUrl = normalizeComparableUrl(a.channelUrl);
+  const bUrlNorm = normalizeComparableUrl(b.channelUrl);
+  if (aUrl && bUrlNorm && aUrl === bUrlNorm) return true;
+
+  const orphanA = !aId && !aUrl;
+  const orphanB = !bId && !bUrlNorm;
+  if (orphanA && orphanB) {
+    return (
+      a.searchQuery.trim().toLowerCase() === b.searchQuery.trim().toLowerCase()
+    );
   }
   return false;
 }
@@ -199,6 +235,29 @@ function normalizeProgressInput(input: WatchProgressInput): WatchProgressEntry {
   };
 }
 
+/** In-memory-only playback samples merge here so React state does not re-render every tick. */
+type WatchProgressLivePatch = {
+  lastPositionSeconds: number;
+  durationSeconds?: number;
+  completed: boolean;
+};
+
+function mergeWatchProgressLivePatch(
+  base: WatchProgressEntry,
+  patch: WatchProgressLivePatch | undefined,
+): WatchProgressEntry {
+  if (!patch) return base;
+  return {
+    ...base,
+    lastPositionSeconds: Math.max(base.lastPositionSeconds, patch.lastPositionSeconds),
+    durationSeconds:
+      patch.durationSeconds !== undefined
+        ? patch.durationSeconds
+        : base.durationSeconds,
+    completed: base.completed || patch.completed,
+  };
+}
+
 export function CloudLibraryProvider({
   children,
 }: {
@@ -214,16 +273,55 @@ export function CloudLibraryProvider({
   const [watchLaterEntries, setWatchLaterEntries] = useState<WatchLaterEntry[]>([]);
   const [savedChannels, setSavedChannels] = useState<SavedChannel[]>([]);
   const [watchProgress, setWatchProgress] = useState<WatchProgressEntry[]>([]);
+  /** Latest playback fields while sampling; avoids context churn on 1s ticks (esp. mobile Safari). */
+  const watchProgressLiveRef = useRef<Map<string, WatchProgressLivePatch>>(new Map());
   const [passkeysSupported, setPasskeysSupported] = useState(false);
   const [libraryCloudSyncState, setLibraryCloudSyncState] =
     useState<LibraryCloudSyncState>("local_only");
 
+  /** Coalesced payload for deferred `writeLocalWatchProgress` (idle / setTimeout). */
+  const watchProgressDiskQueueRef = useRef<WatchProgressEntry[] | null>(null);
+  const watchProgressDiskIdleIdRef = useRef<number | null>(null);
+
+  const cancelDeferredWatchProgressDiskWrite = useCallback(() => {
+    const id = watchProgressDiskIdleIdRef.current;
+    if (id == null) return;
+    if (typeof cancelIdleCallback === "function") {
+      cancelIdleCallback(id);
+    } else {
+      clearTimeout(id);
+    }
+    watchProgressDiskIdleIdRef.current = null;
+  }, []);
+
+  const scheduleDeferredWatchProgressDiskWrite = useCallback(
+    (entries: WatchProgressEntry[]) => {
+      watchProgressDiskQueueRef.current = entries;
+      if (watchProgressDiskIdleIdRef.current != null) return;
+      const flush = () => {
+        watchProgressDiskIdleIdRef.current = null;
+        const latest = watchProgressDiskQueueRef.current;
+        if (latest) {
+          writeLocalWatchProgress(latest);
+        }
+      };
+      watchProgressDiskIdleIdRef.current =
+        typeof requestIdleCallback !== "undefined"
+          ? requestIdleCallback(flush, { timeout: 2_000 })
+          : window.setTimeout(flush, 0);
+    },
+    [],
+  );
+
   const persistLocalSnapshot = useCallback(
-    (next: {
-      watchLater?: WatchLaterEntry[];
-      savedChannels?: SavedChannel[];
-      watchProgress?: WatchProgressEntry[];
-    }) => {
+    (
+      next: {
+        watchLater?: WatchLaterEntry[];
+        savedChannels?: SavedChannel[];
+        watchProgress?: WatchProgressEntry[];
+      },
+      diskOptions?: { deferWatchProgressDisk?: boolean },
+    ) => {
       if (next.watchLater !== undefined) {
         writeLocalWatchLater(next.watchLater);
       }
@@ -231,14 +329,36 @@ export function CloudLibraryProvider({
         writeLocalSavedChannels(next.savedChannels);
       }
       if (next.watchProgress !== undefined) {
-        writeLocalWatchProgress(next.watchProgress);
+        if (diskOptions?.deferWatchProgressDisk) {
+          scheduleDeferredWatchProgressDiskWrite(next.watchProgress);
+        } else {
+          cancelDeferredWatchProgressDiskWrite();
+          writeLocalWatchProgress(next.watchProgress);
+          watchProgressDiskQueueRef.current = null;
+        }
       }
     },
-    [],
+    [
+      cancelDeferredWatchProgressDiskWrite,
+      scheduleDeferredWatchProgressDiskWrite,
+    ],
+  );
+
+  useLayoutEffect(
+    () => () => {
+      cancelDeferredWatchProgressDiskWrite();
+      const pending = watchProgressDiskQueueRef.current;
+      if (pending) {
+        writeLocalWatchProgress(pending);
+        watchProgressDiskQueueRef.current = null;
+      }
+    },
+    [cancelDeferredWatchProgressDiskWrite],
   );
 
   const hydrateFromLocal = useCallback(() => {
     const snapshot = readLocalSnapshot();
+    watchProgressLiveRef.current.clear();
     setWatchLaterEntries(snapshot.watchLater);
     setSavedChannels(snapshot.savedChannels);
     setWatchProgress(snapshot.watchProgress);
@@ -314,6 +434,7 @@ export function CloudLibraryProvider({
           nextProgress = remote.watchProgress.map((p) => ({ ...p }));
         }
 
+        watchProgressLiveRef.current.clear();
         setWatchLaterEntries(nextWatchLater);
         setSavedChannels(nextSaved);
         setWatchProgress(nextProgress);
@@ -515,9 +636,11 @@ export function CloudLibraryProvider({
       channelUrl?: string;
       thumbnailUrl?: string;
       searchQuery?: string;
+      entryKind?: SavedChannelEntryKind;
     }) => {
       const name = input.name.trim();
       if (!name) return;
+      const entryKind = input.entryKind ?? "saved_channel";
       const next: SavedChannel = {
         id: randomId(),
         name,
@@ -525,14 +648,11 @@ export function CloudLibraryProvider({
         channelUrl: input.channelUrl,
         thumbnailUrl: input.thumbnailUrl?.trim() || undefined,
         searchQuery: (input.searchQuery ?? name).trim(),
+        entryKind,
       };
 
       const updated = savedChannels.some((channel) =>
-        sameChannel(channel, {
-          channelId: next.channelId,
-          channelUrl: next.channelUrl,
-          searchQuery: next.searchQuery,
-        }),
+        isDuplicateSavedLibraryEntry(channel, next),
       )
         ? savedChannels
         : [next, ...savedChannels];
@@ -580,6 +700,17 @@ export function CloudLibraryProvider({
         searchQuery:
           (patch.searchQuery ?? existing.searchQuery).trim() ||
           existing.searchQuery,
+        channelId: patch.channelId ?? existing.channelId,
+        channelUrl: patch.channelUrl ?? existing.channelUrl,
+        thumbnailUrl: patch.thumbnailUrl ?? existing.thumbnailUrl,
+        entryKind:
+          patch.entryKind ??
+          existing.entryKind ??
+          effectiveSavedChannelKind({
+            channelId: patch.channelId ?? existing.channelId,
+            channelUrl: patch.channelUrl ?? existing.channelUrl,
+            thumbnailUrl: patch.thumbnailUrl ?? existing.thumbnailUrl,
+          }),
       };
       const updated = mergeSavedChannels(
         [next, ...savedChannels.filter((channel) => channel.id !== id)],
@@ -673,26 +804,77 @@ export function CloudLibraryProvider({
       if (!input.videoId.trim()) return;
       const persistLocal = options?.persistLocal ?? true;
       const syncCloud = options?.syncCloud ?? true;
+      const memoryOnly = !persistLocal && !syncCloud;
       const normalized = normalizeProgressInput(input);
 
       let snapshotForDisk: WatchProgressEntry[] = [];
       let rowForCloud: WatchProgressEntry | null = null;
 
       setWatchProgress((prev) => {
-        const existing = prev.find(
+        const liveMap = watchProgressLiveRef.current;
+        const existingBase = prev.find(
           (entry) => entry.videoId === normalized.videoId,
         );
-        const nextEntry: WatchProgressEntry = existing
-          ? {
-              ...existing,
-              ...normalized,
-              lastPositionSeconds: Math.max(
-                existing.lastPositionSeconds,
-                normalized.lastPositionSeconds,
-              ),
-              completed: existing.completed || normalized.completed,
-            }
-          : normalized;
+        const existing = existingBase
+          ? mergeWatchProgressLivePatch(
+              existingBase,
+              liveMap.get(normalized.videoId),
+            )
+          : undefined;
+
+        const nextLastPosition = existing
+          ? Math.max(
+              existing.lastPositionSeconds,
+              normalized.lastPositionSeconds,
+            )
+          : normalized.lastPositionSeconds;
+        const nextCompleted =
+          (existing?.completed === true) || normalized.completed === true;
+
+        const nextDuration =
+          normalized.durationSeconds !== undefined
+            ? normalized.durationSeconds
+            : existing?.durationSeconds;
+
+        if (memoryOnly && existing) {
+          if (
+            existing.lastPositionSeconds === nextLastPosition &&
+            existing.completed === nextCompleted &&
+            (existing.durationSeconds ?? undefined) ===
+              (nextDuration ?? undefined)
+          ) {
+            rowForCloud = null;
+            return prev;
+          }
+          liveMap.set(normalized.videoId, {
+            lastPositionSeconds: nextLastPosition,
+            durationSeconds: nextDuration,
+            completed: nextCompleted,
+          });
+          rowForCloud = null;
+          return prev;
+        }
+
+        liveMap.delete(normalized.videoId);
+
+        let nextEntry: WatchProgressEntry;
+
+        if (existing) {
+          nextEntry = {
+            ...existing,
+            ...normalized,
+            lastPositionSeconds: nextLastPosition,
+            completed: nextCompleted,
+            durationSeconds: nextDuration,
+          };
+        } else {
+          nextEntry = {
+            ...normalized,
+            lastPositionSeconds: nextLastPosition,
+            completed: nextCompleted,
+            durationSeconds: nextDuration,
+          };
+        }
 
         rowForCloud = nextEntry;
         const updated = [
@@ -706,14 +888,17 @@ export function CloudLibraryProvider({
       });
 
       if (persistLocal) {
-        persistLocalSnapshot({ watchProgress: snapshotForDisk });
+        persistLocalSnapshot(
+          { watchProgress: snapshotForDisk },
+          { deferWatchProgressDisk: persistLocal && !syncCloud },
+        );
       }
       if (syncCloud && supabase && user && rowForCloud) {
-        try {
-          await upsertWatchProgressEntries(supabase, user.id, [rowForCloud]);
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+        void upsertWatchProgressEntries(supabase, user.id, [rowForCloud]).catch(
+          () => {
+            /* keep local state if cloud sync fails */
+          },
+        );
       }
     },
     [persistLocalSnapshot, supabase, user],
@@ -721,6 +906,7 @@ export function CloudLibraryProvider({
 
   const removeWatchProgressByVideoId = useCallback(
     async (videoId: string) => {
+      watchProgressLiveRef.current.delete(videoId);
       const updated = watchProgress.filter((entry) => entry.videoId !== videoId);
       setWatchProgress(updated);
       persistLocalSnapshot({ watchProgress: updated });
@@ -736,6 +922,7 @@ export function CloudLibraryProvider({
   );
 
   const clearWatchProgress = useCallback(async () => {
+    watchProgressLiveRef.current.clear();
     setWatchProgress([]);
     persistLocalSnapshot({ watchProgress: [] });
     if (supabase && user) {
@@ -748,7 +935,14 @@ export function CloudLibraryProvider({
   }, [persistLocalSnapshot, supabase, user]);
 
   const getProgressByVideoId = useCallback(
-    (videoId: string) => watchProgress.find((entry) => entry.videoId === videoId),
+    (videoId: string) => {
+      const base = watchProgress.find((entry) => entry.videoId === videoId);
+      if (!base) return undefined;
+      return mergeWatchProgressLivePatch(
+        base,
+        watchProgressLiveRef.current.get(videoId),
+      );
+    },
     [watchProgress],
   );
 

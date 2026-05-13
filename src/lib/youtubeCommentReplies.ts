@@ -32,11 +32,6 @@ const pkgRoot = join(process.cwd(), "node_modules/youtubei.js");
  * `createRequire` + absolute paths under `node_modules` loads the same modules the library uses
  * at runtime. No extra install step (unlike patch-package).
  */
-const Comment = (
-  require(join(pkgRoot, "dist/src/parser/classes/comments/Comment.js")) as {
-    default: new (...args: unknown[]) => unknown;
-  }
-).default;
 const CommentView = (
   require(join(pkgRoot, "dist/src/parser/classes/comments/CommentView.js")) as {
     default: new (...args: unknown[]) => unknown;
@@ -47,15 +42,16 @@ const ContinuationItemClass = (
     default: new (...args: unknown[]) => unknown;
   }
 ).default;
-const { NextEndpoint } = require(join(
-  pkgRoot,
-  "dist/src/core/endpoints/index.js",
-)) as {
-  NextEndpoint: {
-    PATH: string;
-    build: (x: { continuation: string }) => Record<string, unknown>;
-  };
-};
+const NavigationEndpoint = (
+  require(join(pkgRoot, "dist/src/parser/classes/NavigationEndpoint.js")) as {
+    default: new (data: unknown) => {
+      call: (
+        actions: unknown,
+        args?: unknown,
+      ) => Promise<{ data?: unknown }>;
+    };
+  }
+).default;
 const { GetCommentsSectionParams } = require(join(
   pkgRoot,
   "dist/protos/generated/misc/params.js",
@@ -66,6 +62,20 @@ const { u8ToBase64 } = require(join(
   pkgRoot,
   "dist/src/utils/Utils.js",
 )) as { u8ToBase64: (u: Uint8Array) => string };
+
+/** v17 removed `NextEndpoint`; continuation requests use `NavigationEndpoint` + `/next`. */
+function watchNextContinuation(
+  actions: unknown,
+  token: string,
+): Promise<{ data?: unknown }> {
+  const ep = new NavigationEndpoint({
+    continuationCommand: {
+      request: "CONTINUATION_REQUEST_TYPE_WATCH_NEXT",
+      token,
+    },
+  });
+  return ep.call(actions) as Promise<{ data?: unknown }>;
+}
 
 function sortToProto(sort: WatchVideoCommentSort): 0 | 1 {
   return sort === "newest" ? 1 : 0;
@@ -195,16 +205,19 @@ function mapTopLevelComment(c: Record<string, unknown>): WatchVideoComment | nul
 }
 
 /**
- * `memo.getType(Comment, CommentView)` needs the real class references from the same youtubei
- * install as the parsed nodes (so `instanceof` matches). The loose `Record` mapping below is to
- * satisfy our types without importing full youtubei TS types for internals.
+ * youtubei.js v17+ removed the standalone `Comment` class; use `CommentView` and a legacy
+ * duck-typed fallback for older parsed shapes.
  */
 function mapReplyNode(node: unknown): WatchVideoComment | null {
   if (node instanceof CommentView) {
     return mapCommentView(node as unknown as Record<string, unknown>);
   }
-  if (node instanceof Comment) {
-    return mapTopLevelComment(node as unknown as Record<string, unknown>);
+  if (
+    node &&
+    typeof node === "object" &&
+    (node as { type?: string }).type === "Comment"
+  ) {
+    return mapTopLevelComment(node as Record<string, unknown>);
   }
   return null;
 }
@@ -294,10 +307,7 @@ function repliesFromParsedResponse(
   }
   if (!memo) return null;
 
-  const nodes = memo.getType(
-    Comment as never,
-    CommentView as never,
-  ) as unknown[];
+  const nodes = memo.getType(CommentView as never) as unknown[];
   const replies: WatchVideoComment[] = [];
   for (const n of nodes) {
     const mapped = mapReplyNode(n);
@@ -343,10 +353,7 @@ export async function getWatchVideoCommentReplies(
     const contIn = continuationIn?.trim() || null;
 
     if (contIn) {
-      const next = await yt.actions.execute(
-        NextEndpoint.PATH,
-        NextEndpoint.build({ continuation: contIn }),
-      );
+      const next = await watchNextContinuation(yt.actions, contIn);
       return repliesFromParsedResponse(next.data, parentCommentId, sort);
     }
 
@@ -374,10 +381,7 @@ export async function getWatchVideoCommentReplies(
     }
 
     const cont = encodeCommentsSectionContinuation(videoId, sort);
-    const section = await yt.actions.execute(
-      NextEndpoint.PATH,
-      NextEndpoint.build({ continuation: cont }),
-    );
+    const section = await watchNextContinuation(yt.actions, cont);
     const raw = JSON.stringify(section.data);
     let token = extractInitialReplyContinuationToken(raw, parentCommentId);
     if (!token) {
@@ -392,10 +396,7 @@ export async function getWatchVideoCommentReplies(
     }
     if (!token) return null;
 
-    const next = await yt.actions.execute(
-      NextEndpoint.PATH,
-      NextEndpoint.build({ continuation: token }),
-    );
+    const next = await watchNextContinuation(yt.actions, token);
     return repliesFromParsedResponse(next.data, parentCommentId, sort);
   } catch {
     return null;

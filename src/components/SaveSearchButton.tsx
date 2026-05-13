@@ -6,6 +6,7 @@ import Button from "@mui/material/Button";
 import { useMemo } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
+import { effectiveSavedChannelKind } from "@/types/savedChannel";
 
 type SaveSearchButtonProps = {
   query: string;
@@ -20,7 +21,7 @@ export function SaveSearchButton({ query }: SaveSearchButtonProps) {
     if (!normalized) return true;
     return channels.some(
       (channel) =>
-        !channel.channelId &&
+        effectiveSavedChannelKind(channel) === "pinned_search" &&
         channel.searchQuery.trim().toLowerCase() === normalized,
     );
   }, [channels, trimmedQuery]);
@@ -50,6 +51,7 @@ export function SaveSearchButton({ query }: SaveSearchButtonProps) {
         addChannel({
           name: trimmedQuery,
           searchQuery: trimmedQuery,
+          entryKind: "pinned_search",
         })
       }
     >

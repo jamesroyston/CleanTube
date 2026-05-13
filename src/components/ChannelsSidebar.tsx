@@ -22,6 +22,7 @@ import Link from "next/link";
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { getLastSearchSort } from "@/lib/lastSearchSession";
 import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
+import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { SavedChannel } from "@/types/savedChannel";
 
 export const CHANNELS_DRAWER_WIDTH = 280;
@@ -47,12 +48,14 @@ export function ChannelsSidebar({
 }: ChannelsSidebarProps) {
   const { channels } = useSavedChannels();
   const savedChannels = channels
-    .filter((channel) => channel.channelId)
+    .filter((channel) => effectiveSavedChannelKind(channel) === "saved_channel")
     .slice()
     .sort((a, b) =>
       a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
     );
-  const savedSearches = channels.filter((channel) => !channel.channelId);
+  const savedSearches = channels.filter(
+    (channel) => effectiveSavedChannelKind(channel) === "pinned_search",
+  );
   const mini = surface === "permanent" && collapsed;
   const drawerWidth =
     surface === "permanent"
@@ -69,8 +72,12 @@ export function ChannelsSidebar({
     return `/?${qs.toString()}`;
   }
 
-  function savedChannelHref(channel: SavedChannel) {
+  function savedLibraryHref(channel: SavedChannel): string {
+    const kind = effectiveSavedChannelKind(channel);
+    if (kind === "pinned_search") return searchHref(channel.searchQuery);
     if (channel.channelId) return channelPageHrefFromToken(channel.channelId);
+    const url = channel.channelUrl?.trim();
+    if (url) return url;
     return searchHref(channel.searchQuery);
   }
 
@@ -178,7 +185,7 @@ export function ChannelsSidebar({
               <Tooltip key={c.id} title={c.name} placement="right" enterDelay={400}>
                 <ListItemButton
                   component={Link}
-                  href={savedChannelHref(c)}
+                  href={savedLibraryHref(c)}
                   onClick={onClose}
                   sx={{
                     borderRadius: 1,

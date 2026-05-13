@@ -14,8 +14,8 @@ import {
   extractChannelRouteTokenFromUrl,
   extractVideoIdFromUrl,
   isLikelyYouTubeUrl,
-  searchMixedResults,
 } from "@/lib/youtube";
+import { searchMixedResultsCached } from "@/lib/youtubeSearchCache";
 import { extractStartSecondsFromYoutubeInput } from "@/lib/youtubeTime";
 import {
   normalizeResultSortParam,
@@ -62,12 +62,14 @@ export default async function Home({ searchParams }: PageProps) {
   }
 
   let errorMessage: string | null = null;
-  let channels: Awaited<ReturnType<typeof searchMixedResults>>["channels"] = [];
+  let channels: Awaited<
+    ReturnType<typeof searchMixedResultsCached>
+  >["channels"] = [];
   let videos = toVideoSummaries([]);
 
   if (query) {
     try {
-      const results = await searchMixedResults(query, 24, searchSortMode);
+      const results = await searchMixedResultsCached(query, 24, searchSortMode);
       channels = results.channels;
       videos = sortVideoSummariesByUploadDate(
         toVideoSummaries(results.videos),

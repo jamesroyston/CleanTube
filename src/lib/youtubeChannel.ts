@@ -1,13 +1,11 @@
 import { unstable_cache } from "next/cache";
 import { cache } from "react";
+import { YTNodes } from "youtubei.js";
 
+import { logChannelFetchFailure } from "@/lib/channelFetchLog";
 import { canonicalYoutubeThumbnailUrl } from "@/lib/serializeVideo";
-import {
-  channelFeedVideoToVideoLike,
-  feedVideoToVideoLike,
-} from "@/lib/youtubeiAdapters";
+import { channelFeedVideoToVideoLike } from "@/lib/youtubeiAdapters";
 import { getInnertube } from "@/lib/youtubeiClient";
-import type { ChannelVideosVariant } from "@/lib/channelVideosPreferenceConstants";
 import type {
   ChannelDetails,
   ChannelSortMode,
@@ -30,6 +28,9 @@ type FeedLike = {
   getContinuation?: () => Promise<FeedLike>;
   applySort?: (sort: string) => Promise<FeedLike>;
   sort_filters?: string[];
+  memo?: {
+    getType?: (...classes: unknown[]) => unknown[];
+  };
 };
 
 type ChannelLike = FeedLike & {
@@ -319,6 +320,24 @@ async function sortedVideosFeed(
   }
 }
 
+function listVideoLockups(feed: FeedLike): unknown[] {
+  const memo = feed.memo;
+  if (!memo || typeof memo.getType !== "function") return [];
+  try {
+    const lockups = memo.getType(YTNodes.LockupView) as { content_type?: string }[];
+    return lockups.filter((lv) => lv.content_type === "VIDEO");
+  } catch {
+    return [];
+  }
+}
+
+/** Prefer `Video`/`GridVideo` items; fall back to RichGrid {@link LockupView} uploads. */
+function channelFeedVideoItems(feed: FeedLike): unknown[] {
+  const classic = feed.videos ?? [];
+  if (classic.length > 0) return [...classic];
+  return listVideoLockups(feed);
+}
+
 async function feedAtPage(
   initialFeed: FeedLike,
   pageNumber: number,
@@ -337,31 +356,15 @@ async function feedAtPage(
   return { feed, continuationFailed: false };
 }
 
-function videosFromFeed(
-  feed: FeedLike,
-  limit: number,
-  mapItem: (item: unknown) => VideoLikeForSummary | null,
-): VideoLikeForSummary[] {
-  const out: VideoLikeForSummary[] = [];
-  const seen = new Set<string>();
-  for (const item of feed.videos ?? []) {
-    const video = mapItem(item);
-    if (!video || seen.has(video.id)) continue;
-    seen.add(video.id);
-    out.push(video);
-    if (out.length >= limit) break;
-  }
-  return out;
-}
-
 function countUnmappedRaw(
   feed: FeedLike,
   mapItem: (item: unknown) => VideoLikeForSummary | null,
 ): { raw: number; mapped: number } {
-  const raw = feed.videos?.length ?? 0;
+  const items = channelFeedVideoItems(feed);
+  const raw = items.length;
   let mapped = 0;
   const seen = new Set<string>();
-  for (const item of feed.videos ?? []) {
+  for (const item of items) {
     const v = mapItem(item);
     if (v && !seen.has(v.id)) {
       seen.add(v.id);
@@ -394,7 +397,7 @@ async function collectMappedAcrossContinuations(
     rawItemCount += raw;
     if (raw > 0 && mapped === 0) lostItems = true;
 
-    for (const item of feed.videos ?? []) {
+    for (const item of channelFeedVideoItems(feed)) {
       const v = mapItem(item);
       if (v && !seen.has(v.id)) {
         seen.add(v.id);
@@ -462,7 +465,8 @@ async function fetchChannelRaw(lookup: string): Promise<ChannelLike | null> {
     const yt = (await getInnertube()) as InnertubeLike;
     const resolvedLookup = await resolveChannelLookup(yt, lookup);
     return (await yt.getChannel(resolvedLookup)) as ChannelLike;
-  } catch {
+  } catch (err) {
+    logChannelFetchFailure("getChannel_throw", { lookup, phase: "fetchChannelRaw" }, err);
     return null;
   }
 }
@@ -496,18 +500,40 @@ async function getChannelVideosRobustInner({
     channel = await withRetries("getChannel", () => fetchChannelRaw(lookup));
   }
   if (!channel || typeof channel.getVideos !== "function") {
+    logChannelFetchFailure("robust_no_channel", {
+      channelId,
+      lookup,
+      variant: "unified",
+      hadChannelShell: Boolean(channel),
+      hasGetVideos: typeof channel?.getVideos === "function",
+    });
     return null;
   }
 
   const about = await loadAbout(channel);
   const details = detailsFromChannel(channel, about, lookup);
-  if (!details) return null;
+  if (!details) {
+    logChannelFetchFailure("robust_no_details", {
+      channelId,
+      lookup,
+      variant: "unified",
+    });
+    return null;
+  }
 
   const pageNumber = normalizePageToken(pageToken);
   const videosFeed =
     (await withRetries("getVideos", () => channel!.getVideos!() as Promise<FeedLike>)) ??
     null;
-  if (!videosFeed) return null;
+  if (!videosFeed) {
+    logChannelFetchFailure("robust_no_videos_feed", {
+      channelId,
+      lookup,
+      variant: "unified",
+      pageNumber,
+    });
+    return null;
+  }
 
   const sortedFeed = await sortedVideosFeed(videosFeed, sort);
   const { feed: pageStart, continuationFailed: pageWalkFailed } = await feedAtPage(
@@ -588,87 +614,27 @@ export const youtubeiChannelBackend: ChannelBackend = {
     return detailsFromChannel(channel, about, lookup);
   },
 
-  async getChannelVideos({
-    channelId,
-    sort = "latest",
-    pageToken,
-    limit = DEFAULT_PAGE_SIZE,
-  }) {
-    const lookup = normalizeChannelLookup(channelId);
-    const channel = await loadChannel(lookup);
-    if (!channel || typeof channel.getVideos !== "function") {
-      return null;
-    }
-
-    const about = await loadAbout(channel);
-    const details = detailsFromChannel(channel, about, lookup);
-    if (!details) return null;
-
-    const pageNumber = normalizePageToken(pageToken);
-    const videosFeed = await channel.getVideos();
-    const sortedFeed = await sortedVideosFeed(videosFeed, sort);
-    const { feed, continuationFailed: pageWalkFailed } = await feedAtPage(
-      sortedFeed,
-      pageNumber,
-    );
-    const rawLen = feed.videos?.length ?? 0;
-    const hasNext = Boolean(
-      feed.has_continuation && typeof feed.getContinuation === "function",
-    );
-    const totalPages = totalPagesFromVideoCount(details.videoCountText, limit);
-
-    const videos = videosFromFeed(feed, limit, feedVideoToVideoLike).map((video) =>
-      withChannelName(video, details),
-    );
-
-    let emptyGridHint = emptyGridHintFromSignals({
-      videoCount: videos.length,
-      hasNext,
-      rawItemCount: rawLen,
-      continuationFailed: pageWalkFailed,
-      lostItems: rawLen > 0 && videos.length === 0,
-    });
-    emptyGridHint = refineEmptyHint(
-      emptyGridHint,
-      details.videoCountText,
-      hasNext,
-    );
-
-    const gridPartialLoad =
-      pageWalkFailed || (pageNumber > 1 && videos.length === 0);
-
-    return {
-      channel: details,
-      videos,
-      sort,
-      pageToken: String(pageNumber),
-      nextPageToken: hasNext ? String(pageNumber + 1) : undefined,
-      previousPageToken: pageNumber > 1 ? String(pageNumber - 1) : undefined,
-      totalPages:
-        totalPages == null
-          ? undefined
-          : Math.max(totalPages, hasNext ? pageNumber + 1 : pageNumber),
-      emptyGridHint: videos.length > 0 ? "none" : emptyGridHint,
-      gridPartialLoad,
-      gridSourceLostItems: rawLen > 0 && videos.length === 0,
-    };
+  async getChannelVideos(input) {
+    return getChannelVideosRobustInner(input);
   },
 };
 
-export async function getChannelVideosPage(
-  input: {
-    channelId: string;
-    sort?: ChannelSortMode;
-    pageToken?: string;
-    limit?: number;
-  },
-  options?: { variant?: ChannelVideosVariant },
-): Promise<ChannelVideosPage | null> {
-  const variant = options?.variant ?? "legacy";
-  if (variant === "v2") {
-    return getChannelVideosRobustInner(input);
+export async function getChannelVideosPage(input: {
+  channelId: string;
+  sort?: ChannelSortMode;
+  pageToken?: string;
+  limit?: number;
+}): Promise<ChannelVideosPage | null> {
+  const page = await getChannelVideosRobustInner(input);
+  if (!page) {
+    logChannelFetchFailure("channel_videos_page_null", {
+      channelId: input.channelId,
+      sort: input.sort ?? "latest",
+      pageToken: input.pageToken ?? "1",
+      variant: "unified",
+    });
   }
-  return youtubeiChannelBackend.getChannelVideos(input);
+  return page;
 }
 
 const CHANNEL_VIDEOS_CACHE_SECONDS = (() => {
@@ -678,44 +644,52 @@ const CHANNEL_VIDEOS_CACHE_SECONDS = (() => {
   return Math.min(Math.max(n, 60), 86400);
 })();
 
+/** Bump when channel grid mapping or fetch semantics change (invalidates Data Cache). */
+const CHANNEL_VIDEOS_CACHE_VERSION = "v4-memo-gettype-this";
+
 /**
- * Cached channel grid for Data Cache (helps when the route is dynamic due to cookies).
+ * Cached channel grid for Data Cache (`unstable_cache`; superseded by `use cache` when
+ * `cacheComponents` is enabled project-wide — see Next.js 16 Cache Components docs).
  * Failures are not stored: empty InnerTube responses fall through to a live retry.
+ * Intentionally omit cache when InnerTube returned items we failed to map, so a bad empty
+ * snapshot is not stuck until revalidate.
  */
-export async function getChannelVideosPageCached(
-  input: {
-    channelId: string;
-    sort?: ChannelSortMode;
-    pageToken?: string;
-    limit?: number;
-  },
-  options?: { variant?: ChannelVideosVariant },
-): Promise<ChannelVideosPage | null> {
+export async function getChannelVideosPageCached(input: {
+  channelId: string;
+  sort?: ChannelSortMode;
+  pageToken?: string;
+  limit?: number;
+}): Promise<ChannelVideosPage | null> {
   const sort = input.sort ?? "latest";
-  const variant = options?.variant ?? "legacy";
   const limit = input.limit ?? DEFAULT_PAGE_SIZE;
   const pageKey = input.pageToken ?? "";
   const cacheTags = [
     "cleantube-channel-videos",
+    CHANNEL_VIDEOS_CACHE_VERSION,
     input.channelId,
     sort,
     pageKey,
-    variant,
     String(limit),
   ];
 
   try {
     return await unstable_cache(
       async () => {
-        const page = await getChannelVideosPage(input, options);
+        const page = await getChannelVideosPage(input);
         if (!page) throw new Error("channel_videos_miss");
+        if (
+          page.videos.length === 0 &&
+          page.gridSourceLostItems
+        ) {
+          throw new Error("channel_videos_skip_cache_mapping_loss");
+        }
         return page;
       },
       cacheTags,
       { revalidate: CHANNEL_VIDEOS_CACHE_SECONDS },
     )();
   } catch {
-    return getChannelVideosPage(input, options);
+    return getChannelVideosPage(input);
   }
 }
 

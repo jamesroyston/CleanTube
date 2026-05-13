@@ -1,7 +1,10 @@
 "use client";
 
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
-import type { SavedChannel } from "@/types/savedChannel";
+import type {
+  SavedChannel,
+  SavedChannelEntryKind,
+} from "@/types/savedChannel";
 
 export type SavedChannelsContextValue = {
   channels: SavedChannel[];
@@ -11,6 +14,7 @@ export type SavedChannelsContextValue = {
     channelUrl?: string;
     thumbnailUrl?: string;
     searchQuery?: string;
+    entryKind?: SavedChannelEntryKind;
   }) => void;
   updateChannel: (
     id: string,
@@ -29,6 +33,7 @@ export function useSavedChannels() {
       channelUrl?: string;
       thumbnailUrl?: string;
       searchQuery?: string;
+      entryKind?: SavedChannelEntryKind;
     }) => {
       void library.addSavedChannel(input);
     },

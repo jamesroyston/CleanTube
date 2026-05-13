@@ -1,6 +1,9 @@
 "use client";
 
-import type { SavedChannel } from "@/types/savedChannel";
+import type {
+  SavedChannel,
+  SavedChannelEntryKind,
+} from "@/types/savedChannel";
 import type { WatchLaterEntry } from "@/types/watchLater";
 import type { WatchProgressEntry } from "@/types/watchProgress";
 
@@ -75,6 +78,11 @@ function parseSavedChannels(raw: string | null): SavedChannel[] {
     ) {
       return [];
     }
+    const parsedKind =
+      entry.entryKind === "pinned_search" || entry.entryKind === "saved_channel"
+        ? (entry.entryKind as SavedChannelEntryKind)
+        : undefined;
+
     return [
       {
         id: entry.id,
@@ -88,6 +96,7 @@ function parseSavedChannels(raw: string | null): SavedChannel[] {
             ? entry.thumbnailUrl
             : undefined,
         searchQuery: entry.searchQuery,
+        entryKind: parsedKind,
       },
     ];
   });

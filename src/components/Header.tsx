@@ -14,6 +14,8 @@ import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
 import ListSubheader from "@mui/material/ListSubheader";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Toolbar from "@mui/material/Toolbar";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
@@ -38,8 +40,16 @@ import {
   getRecentSearches,
   removeRecentSearch,
 } from "@/lib/recentSearches";
-import { setLastSearchQuery, setLastSearchSort } from "@/lib/lastSearchSession";
-import { normalizeResultSortParam, normalizeSearchSortParam } from "@/lib/uploadedAtSort";
+import {
+  getLastSearchSort,
+  setLastSearchQuery,
+  setLastSearchSort,
+} from "@/lib/lastSearchSession";
+import type { SearchSortMode } from "@/lib/uploadedAtSort";
+import {
+  normalizeResultSortParam,
+  normalizeSearchSortParam,
+} from "@/lib/uploadedAtSort";
 
 export function Header({ leading }: { leading?: ReactNode }) {
   const compactSearch = useMediaQuery("(max-width:899.95px)");
@@ -50,16 +60,46 @@ export function Header({ leading }: { leading?: ReactNode }) {
   const [isPending, startTransition] = useTransition();
   const hadPendingRef = useRef(false);
   const qParam = searchParams.get("q") ?? "";
-  const legacySortParam = searchParams.get("sort");
-  const searchSortParam = searchParams.get("searchSort") ?? legacySortParam;
   const [query, setQuery] = useState(qParam);
+  const [searchSortDraft, setSearchSortDraft] =
+    useState<SearchSortMode>("relevance");
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
   const [overlayQuery, setOverlayQuery] = useState("");
   const [recentList, setRecentList] = useState<string[]>([]);
+  const overlayInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setQuery(qParam);
   }, [qParam]);
+
+  useEffect(() => {
+    const explicit = searchParams.get("searchSort");
+    const legacySort = searchParams.get("sort");
+    const qPresent = Boolean(searchParams.get("q")?.trim());
+
+    if (pathname === "/" && qPresent) {
+      if (explicit != null) {
+        setSearchSortDraft(normalizeSearchSortParam(explicit));
+        return;
+      }
+      if (legacySort === "newest") {
+        setSearchSortDraft("newest");
+        return;
+      }
+      setSearchSortDraft("relevance");
+      return;
+    }
+
+    if (explicit != null) {
+      setSearchSortDraft(normalizeSearchSortParam(explicit));
+      return;
+    }
+    if (legacySort === "newest") {
+      setSearchSortDraft("newest");
+      return;
+    }
+    setSearchSortDraft(getLastSearchSort());
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     if (isPending) {
@@ -73,18 +113,28 @@ export function Header({ leading }: { leading?: ReactNode }) {
     }
   }, [done, isPending, start]);
 
+  useEffect(() => {
+    if (!searchOverlayOpen || !compactSearch) return;
+    const id = window.requestAnimationFrame(() => {
+      overlayInputRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [compactSearch, searchOverlayOpen]);
+
   function openSearchOverlay() {
     setRecentList(getRecentSearches());
     setOverlayQuery(query.trim() ? query : "");
     setSearchOverlayOpen(true);
   }
 
-  function searchSortFromUrl(): ReturnType<typeof normalizeSearchSortParam> {
-    return normalizeSearchSortParam(searchSortParam);
+  function commitSearchLatestPreference(prefersLatest: boolean) {
+    const mode: SearchSortMode = prefersLatest ? "newest" : "relevance";
+    setSearchSortDraft(mode);
+    setLastSearchSort(mode);
   }
 
   function runSearch(trimmed: string) {
-    const sort = searchSortFromUrl();
+    const sort = searchSortDraft;
     if (!trimmed) {
       start();
       startTransition(() => {
@@ -228,10 +278,30 @@ export function Header({ leading }: { leading?: ReactNode }) {
                 autoComplete="off"
                 sx={{
                   width: "100%",
-                  maxWidth: 560,
+                  maxWidth: 680,
                   minWidth: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
                 }}
               >
+                <FormControlLabel
+                  sx={{ flexShrink: 0, m: 0, maxWidth: 200 }}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={searchSortDraft === "newest"}
+                      onChange={(e) =>
+                        commitSearchLatestPreference(e.target.checked)
+                      }
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" component="span">
+                      Most recent uploads
+                    </Typography>
+                  }
+                />
                 <TextField
                   name="q"
                   value={query}
@@ -241,7 +311,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
                   size="small"
                   fullWidth
                   variant="outlined"
-                  sx={{ minWidth: 0 }}
+                  sx={{ minWidth: 0, flex: 1 }}
                   slotProps={{
                     input: {
                       startAdornment: (
@@ -278,6 +348,7 @@ export function Header({ leading }: { leading?: ReactNode }) {
         fullScreen
         open={searchOverlayOpen}
         onClose={() => setSearchOverlayOpen(false)}
+        disableAutoFocus
         slotProps={{
           paper: {
             sx: { bgcolor: "background.default" },
@@ -289,41 +360,60 @@ export function Header({ leading }: { leading?: ReactNode }) {
           onSubmit={onOverlaySubmit}
           autoComplete="off"
           sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 1,
             px: 1.5,
             py: 1.5,
             borderBottom: 1,
             borderColor: "divider",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
           }}
         >
-          <TextField
-            autoFocus
-            fullWidth
-            size="small"
-            autoComplete="off"
-            placeholder="Search or paste a YouTube URL"
-            value={overlayQuery}
-            onChange={(e) => setOverlayQuery(e.target.value)}
-            variant="outlined"
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon color="action" fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-            }}
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <TextField
+              fullWidth
+              size="small"
+              autoComplete="off"
+              placeholder="Search or paste a YouTube URL"
+              value={overlayQuery}
+              onChange={(e) => setOverlayQuery(e.target.value)}
+              variant="outlined"
+              inputRef={overlayInputRef}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" fontSize="small" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+            <IconButton
+              aria-label="Close search"
+              onClick={() => setSearchOverlayOpen(false)}
+              edge="end"
+            >
+              <CloseIcon />
+            </IconButton>
+          </Box>
+          <FormControlLabel
+            sx={{ m: 0, mx: -0.5, alignSelf: "flex-start" }}
+            control={
+              <Checkbox
+                size="small"
+                checked={searchSortDraft === "newest"}
+                onChange={(e) =>
+                  commitSearchLatestPreference(e.target.checked)
+                }
+              />
+            }
+            label={
+              <Typography variant="body2" component="span">
+                Most recent uploads
+              </Typography>
+            }
           />
-          <IconButton
-            aria-label="Close search"
-            onClick={() => setSearchOverlayOpen(false)}
-            edge="end"
-          >
-            <CloseIcon />
-          </IconButton>
         </Box>
         <List
           dense

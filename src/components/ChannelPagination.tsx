@@ -10,7 +10,7 @@ type ChannelPaginationProps = {
   currentPage: number;
   hasNextPage: boolean;
   totalPages?: number;
-  /** Preserve `?grid=` when comparing legacy vs improved channel grids. */
+  /** Preserve optional `?grid=` for shared/bookmarked URLs. */
   gridQuery?: string;
 };
 

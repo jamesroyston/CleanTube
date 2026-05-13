@@ -15,7 +15,7 @@ function installParserErrorHandler(): void {
   parserHandlerInstalled = true;
 
   Parser.setParserErrorHandler((ctx: ParserErrorContext) => {
-    // youtubei.js 10.5 currently emits noisy parser warnings for new summary nodes in search payloads.
+    // youtubei.js may emit noisy parser warnings for new summary nodes in search payloads.
     // These are non-fatal for our mapped search results.
     if (
       (ctx.classname === "VideoSummaryContentView" ||

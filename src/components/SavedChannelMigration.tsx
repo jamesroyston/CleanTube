@@ -6,6 +6,7 @@ import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { fetchChannelResolveBatch } from "@/lib/channelResolveClient";
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 import type { ChannelDetails } from "@/lib/youtubeTypes";
+import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { SavedChannel } from "@/types/savedChannel";
 
 /**
@@ -24,6 +25,9 @@ export function SavedChannelMigration() {
 
   useEffect(() => {
     const candidates = channels.filter((channel) => {
+      if (effectiveSavedChannelKind(channel) !== "saved_channel") {
+        return false;
+      }
       if (channel.channelId || attemptedIdsRef.current.has(channel.id)) {
         return false;
       }
