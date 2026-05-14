@@ -101,4 +101,8 @@ export type WatchVideoComments = {
   page: number;
   hasMore: boolean;
   comments: WatchVideoComment[];
+  /**
+   * When set, the server stopped walking InnerTube continuations early (CPU guardrail).
+   */
+  fetchLimitedNote?: string;
 };

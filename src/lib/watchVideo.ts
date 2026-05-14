@@ -8,8 +8,8 @@ import {
   canonicalYoutubeThumbnailUrl,
   preferredYoutubeThumbnailPath,
 } from "@/lib/serializeVideo";
+import { getCachedInnertubeVideoInfo } from "@/lib/innertubeVideoInfoCache";
 import { videoInfoToWatchDetails } from "@/lib/youtubeiAdapters";
-import { getInnertube } from "@/lib/youtubeiClient";
 import type { WatchVideoDetails } from "@/lib/youtubeTypes";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
@@ -288,16 +288,17 @@ async function loadWatchVideoDetails(
 
   let fallbackVideo: WatchVideoDetails | null = null;
 
-  try {
-    const yt = await getInnertube();
-    const info = await yt.getInfo(id);
-    const video = videoInfoToWatchDetails(info, id);
-    if (hasUsableWatchMetadata(video)) {
-      return await mergeDescriptionFromWatchHtml(id, video);
+  const info = await getCachedInnertubeVideoInfo(id);
+  if (info) {
+    try {
+      const video = videoInfoToWatchDetails(info, id);
+      if (hasUsableWatchMetadata(video)) {
+        return await mergeDescriptionFromWatchHtml(id, video);
+      }
+      fallbackVideo = video;
+    } catch {
+      /* fall through to HTML / oEmbed fallbacks */
     }
-    fallbackVideo = video;
-  } catch {
-    /* fall through to HTML / oEmbed fallbacks */
   }
 
   const watchHtml = await fetchWatchHtml(id);

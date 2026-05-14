@@ -12,13 +12,8 @@ import {
   useState,
 } from "react";
 
-import { createAppTheme } from "@/theme/theme";
-import {
-  normalizeDarkPreset,
-  normalizeLightPreset,
-  type DarkPresetId,
-  type LightPresetId,
-} from "@/theme/presets";
+import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibility";
+import { setWatchUpNextVisibleAction } from "@/app/actions/watchUpNextVisibility";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
 import {
   type InitialThemeSettings,
@@ -33,14 +28,12 @@ import {
   normalizeThemeMode,
 } from "@/lib/themePersistence";
 import {
-  LEGACY_FOCUS_MODE_COOKIE,
-  WATCH_LAYOUT_COOKIE,
-  WATCH_LAYOUT_STORAGE_KEY,
-  type WatchLayoutMode,
-  isValidWatchLayoutMode,
-  normalizeStoredWatchLayout,
-  watchLayoutToCookieValue,
-} from "@/lib/watchLayoutPersistence";
+  normalizeDarkPreset,
+  normalizeLightPreset,
+  type DarkPresetId,
+  type LightPresetId,
+} from "@/theme/presets";
+import { createAppTheme } from "@/theme/theme";
 
 type ThemeContextValue = {
   mode: ThemeMode;
@@ -54,12 +47,21 @@ type ThemeContextValue = {
 
 const ThemeModeContext = createContext<ThemeContextValue | null>(null);
 
-type WatchLayoutContextValue = {
-  mode: WatchLayoutMode;
-  setWatchLayoutMode: (mode: WatchLayoutMode) => void;
+type WatchCommentsVisibleContextValue = {
+  visible: boolean;
+  setWatchCommentsVisible: (visible: boolean) => void;
 };
 
-const WatchLayoutContext = createContext<WatchLayoutContextValue | null>(null);
+const WatchCommentsVisibleContext =
+  createContext<WatchCommentsVisibleContextValue | null>(null);
+
+type WatchUpNextVisibleContextValue = {
+  visible: boolean;
+  setWatchUpNextVisible: (visible: boolean) => void;
+};
+
+const WatchUpNextVisibleContext =
+  createContext<WatchUpNextVisibleContextValue | null>(null);
 
 function readStoredThemeSettings(): InitialThemeSettings {
   if (typeof window === "undefined") {
@@ -102,28 +104,26 @@ function writeThemeStorage(key: string, value: string): void {
   }
 }
 
-function writeWatchLayoutCookie(mode: WatchLayoutMode): void {
-  if (typeof document === "undefined") return;
-  try {
-    document.cookie = `${WATCH_LAYOUT_COOKIE}=${watchLayoutToCookieValue(
-      mode,
-    )}; Max-Age=31536000; Path=/; SameSite=Lax`;
-    document.cookie = `${LEGACY_FOCUS_MODE_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
-  } catch {
-    /* ignore */
-  }
-}
-
 export function useThemeMode() {
   const ctx = useContext(ThemeModeContext);
   if (!ctx) throw new Error("useThemeMode must be used within AppProviders");
   return ctx;
 }
 
-export function useWatchLayout() {
-  const ctx = useContext(WatchLayoutContext);
+export function useWatchCommentsVisible() {
+  const ctx = useContext(WatchCommentsVisibleContext);
   if (!ctx) {
-    throw new Error("useWatchLayout must be used within AppProviders");
+    throw new Error(
+      "useWatchCommentsVisible must be used within AppProviders",
+    );
+  }
+  return ctx;
+}
+
+export function useWatchUpNextVisible() {
+  const ctx = useContext(WatchUpNextVisibleContext);
+  if (!ctx) {
+    throw new Error("useWatchUpNextVisible must be used within AppProviders");
   }
   return ctx;
 }
@@ -131,51 +131,25 @@ export function useWatchLayout() {
 export function AppProviders({
   children,
   initialTheme,
-  initialWatchLayoutMode,
-  hasWatchLayoutCookie,
+  initialWatchCommentsVisible,
+  initialWatchUpNextVisible,
 }: {
   children: React.ReactNode;
   initialTheme: InitialThemeSettings;
-  initialWatchLayoutMode: WatchLayoutMode;
-  hasWatchLayoutCookie: boolean;
+  initialWatchCommentsVisible: boolean;
+  initialWatchUpNextVisible: boolean;
 }) {
   const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode);
   const [darkPresetId, setDarkPresetIdState] =
     useState<DarkPresetId>(initialTheme.darkPresetId);
   const [lightPresetId, setLightPresetIdState] =
     useState<LightPresetId>(initialTheme.lightPresetId);
-  const [watchLayoutMode, setWatchLayoutModeState] = useState(
-    initialWatchLayoutMode,
+  const [watchCommentsVisible, setWatchCommentsVisibleState] = useState(
+    initialWatchCommentsVisible,
   );
-
-  useEffect(() => {
-    if (hasWatchLayoutCookie) return;
-    try {
-      let raw = localStorage.getItem(WATCH_LAYOUT_STORAGE_KEY);
-      const normalized = raw ? normalizeStoredWatchLayout(raw) : undefined;
-      if (normalized && normalized !== raw) {
-        try {
-          localStorage.setItem(WATCH_LAYOUT_STORAGE_KEY, normalized);
-        } catch {
-          /* ignore */
-        }
-        raw = normalized;
-      }
-      if (!raw || !isValidWatchLayoutMode(raw)) {
-        const leg = localStorage.getItem(LEGACY_FOCUS_MODE_COOKIE);
-        if (leg === "1" || leg === "true" || leg === "on") {
-          raw = "theatre";
-        }
-      }
-      if (raw && isValidWatchLayoutMode(raw)) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate watch layout from localStorage when no cookie
-        setWatchLayoutModeState(raw);
-        writeWatchLayoutCookie(raw);
-      }
-    } catch {
-      /* ignore */
-    }
-  }, [hasWatchLayoutCookie]);
+  const [watchUpNextVisible, setWatchUpNextVisibleState] = useState(
+    initialWatchUpNextVisible,
+  );
 
   useEffect(() => {
     if (initialTheme.hasStoredCookie) return;
@@ -191,14 +165,6 @@ export function AppProviders({
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
-      if (e.key === WATCH_LAYOUT_STORAGE_KEY && e.newValue) {
-        const next = normalizeStoredWatchLayout(e.newValue);
-        if (next && isValidWatchLayoutMode(next)) {
-          setWatchLayoutModeState(next);
-          writeWatchLayoutCookie(next);
-        }
-        return;
-      }
       if (!e.newValue) return;
       if (e.key === THEME_MODE_STORAGE_KEY) {
         const next = normalizeThemeMode(e.newValue);
@@ -244,14 +210,14 @@ export function AppProviders({
     setMode(mode === "dark" ? "light" : "dark");
   }, [mode, setMode]);
 
-  const setWatchLayoutMode = useCallback((next: WatchLayoutMode) => {
-    setWatchLayoutModeState(next);
-    try {
-      localStorage.setItem(WATCH_LAYOUT_STORAGE_KEY, next);
-    } catch {
-      /* ignore */
-    }
-    writeWatchLayoutCookie(next);
+  const setWatchCommentsVisible = useCallback((next: boolean) => {
+    setWatchCommentsVisibleState(next);
+    void setWatchCommentsVisibleAction(next);
+  }, []);
+
+  const setWatchUpNextVisible = useCallback((next: boolean) => {
+    setWatchUpNextVisibleState(next);
+    void setWatchUpNextVisibleAction(next);
   }, []);
 
   const theme = useMemo(
@@ -280,23 +246,37 @@ export function AppProviders({
     ],
   );
 
-  const watchLayoutValue = useMemo(
+  const watchCommentsVisibleValue = useMemo(
     () => ({
-      mode: watchLayoutMode,
-      setWatchLayoutMode,
+      visible: watchCommentsVisible,
+      setWatchCommentsVisible,
     }),
-    [watchLayoutMode, setWatchLayoutMode],
+    [watchCommentsVisible, setWatchCommentsVisible],
+  );
+
+  const watchUpNextVisibleValue = useMemo(
+    () => ({
+      visible: watchUpNextVisible,
+      setWatchUpNextVisible,
+    }),
+    [watchUpNextVisible, setWatchUpNextVisible],
   );
 
   return (
     <AppRouterCacheProvider options={{ key: "mui" }}>
       <ThemeModeContext.Provider value={value}>
-        <WatchLayoutContext.Provider value={watchLayoutValue}>
-          <ThemeProvider theme={theme}>
-            <CssBaseline enableColorScheme />
-            <NavigationProgressProvider>{children}</NavigationProgressProvider>
-          </ThemeProvider>
-        </WatchLayoutContext.Provider>
+        <WatchUpNextVisibleContext.Provider value={watchUpNextVisibleValue}>
+          <WatchCommentsVisibleContext.Provider
+            value={watchCommentsVisibleValue}
+          >
+            <ThemeProvider theme={theme}>
+              <CssBaseline enableColorScheme />
+              <NavigationProgressProvider>
+                {children}
+              </NavigationProgressProvider>
+            </ThemeProvider>
+          </WatchCommentsVisibleContext.Provider>
+        </WatchUpNextVisibleContext.Provider>
       </ThemeModeContext.Provider>
     </AppRouterCacheProvider>
   );

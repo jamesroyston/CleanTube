@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
 import {
+  cleantubeCommentsDebugLog,
+  isCleantubeCommentsDebugEnabled,
+} from "@/lib/cleantubeCommentsDebug";
+import {
   getWatchVideoComments,
   normalizeCommentPage,
   normalizeCommentSort,
@@ -21,10 +25,21 @@ export async function GET(request: Request, context: RouteContext) {
     }
 
     const url = new URL(request.url);
+    const started = Date.now();
     const comments = await getWatchVideoComments(id, {
       sort: normalizeCommentSort(url.searchParams.get("sort") ?? undefined),
       page: normalizeCommentPage(url.searchParams.get("page") ?? undefined),
     });
+    if (isCleantubeCommentsDebugEnabled()) {
+      cleantubeCommentsDebugLog("GET /api/videos/[id]/comments", {
+        videoId: id,
+        ms: Date.now() - started,
+        ok: Boolean(comments),
+        page: comments?.page,
+        hasMore: comments?.hasMore,
+        capped: Boolean(comments?.fetchLimitedNote),
+      });
+    }
 
     if (!comments) {
       return NextResponse.json(

@@ -3,6 +3,10 @@ import { join } from "node:path";
 
 import { Parser } from "youtubei.js";
 
+import {
+  cleantubeCommentsDebugLog,
+  readCleantubeCommentsPositiveIntEnv,
+} from "@/lib/cleantubeCommentsDebug";
 import { getInnertube } from "@/lib/youtubeiClient";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 import type { WatchVideoComment, WatchVideoCommentSort } from "@/lib/youtubeTypes";
@@ -62,6 +66,17 @@ const { u8ToBase64 } = require(join(
   pkgRoot,
   "dist/src/utils/Utils.js",
 )) as { u8ToBase64: (u: Uint8Array) => string };
+
+/** Max top-level comment pages walked when locating a thread for direct reply fetch. */
+const DEFAULT_MAX_COMMENT_THREAD_WALK_PAGES = 64;
+const ENV_MAX_COMMENT_THREAD_WALK_PAGES = "CLEANTUBE_COMMENTS_MAX_THREAD_WALK_PAGES";
+
+function maxCommentThreadWalkPages(): number {
+  return readCleantubeCommentsPositiveIntEnv(
+    ENV_MAX_COMMENT_THREAD_WALK_PAGES,
+    DEFAULT_MAX_COMMENT_THREAD_WALK_PAGES,
+  );
+}
 
 /** v17 removed `NextEndpoint`; continuation requests use `NavigationEndpoint` + `/next`. */
 function watchNextContinuation(
@@ -228,6 +243,8 @@ export type WatchVideoCommentReplies = {
   replies: WatchVideoComment[];
   hasMore: boolean;
   nextContinuation: string | null;
+  /** When set, reply lookup stopped early (thread walk cap) and may be incomplete. */
+  fetchLimitedNote?: string;
 };
 
 type CommentThreadish = {
@@ -250,17 +267,27 @@ async function findCommentThreadForParent(
   videoId: string,
   sort: WatchVideoCommentSort,
   parentCommentId: string,
-): Promise<CommentThreadish | null> {
+): Promise<{ thread: CommentThreadish | null; hitThreadWalkCap: boolean }> {
   const sortKey = sort === "newest" ? "NEWEST_FIRST" : "TOP_COMMENTS";
+  const maxPages = maxCommentThreadWalkPages();
   let page = (await yt.getComments(videoId, sortKey)) as unknown as CommentsPageish;
+  let pagesLoaded = 1;
+
   for (;;) {
     for (const thread of page.contents) {
-      if (thread.comment?.comment_id === parentCommentId) return thread;
+      if (thread.comment?.comment_id === parentCommentId) {
+        return { thread, hitThreadWalkCap: false };
+      }
     }
-    if (!page.has_continuation) break;
+    if (!page.has_continuation) {
+      return { thread: null, hitThreadWalkCap: false };
+    }
+    if (pagesLoaded >= maxPages) {
+      return { thread: null, hitThreadWalkCap: true };
+    }
     page = (await page.getContinuation()) as unknown as CommentsPageish;
+    pagesLoaded += 1;
   }
-  return null;
 }
 
 function tokenFromContinuationItem(item: unknown): string | null {
@@ -348,21 +375,35 @@ export async function getWatchVideoCommentReplies(
   const { parentCommentId, sort, continuation: continuationIn } = options;
   if (!parentCommentId) return null;
 
+  const started = Date.now();
+  let hitThreadWalkCap = false;
+
   try {
     const yt = await getInnertube();
     const contIn = continuationIn?.trim() || null;
 
     if (contIn) {
       const next = await watchNextContinuation(yt.actions, contIn);
-      return repliesFromParsedResponse(next.data, parentCommentId, sort);
+      const out = repliesFromParsedResponse(next.data, parentCommentId, sort);
+      cleantubeCommentsDebugLog("getWatchVideoCommentReplies:continuation", {
+        videoId,
+        parentCommentId,
+        sort,
+        ms: Date.now() - started,
+        hitThreadWalkCap,
+        ok: Boolean(out),
+      });
+      return out;
     }
 
-    const thread = await findCommentThreadForParent(
+    const { thread, hitThreadWalkCap: cappedWalk } = await findCommentThreadForParent(
       yt,
       videoId,
       sort,
       parentCommentId,
     );
+    hitThreadWalkCap = cappedWalk;
+
     if (thread?.comment_replies_data?.contents) {
       const continuationNode = thread.comment_replies_data.contents.firstOfType(
         ContinuationItemClass as never,
@@ -373,7 +414,17 @@ export async function getWatchVideoCommentReplies(
             parse: true,
           });
           const direct = repliesFromParsedResponse(response, parentCommentId, sort);
-          if (direct) return direct;
+          if (direct) {
+            cleantubeCommentsDebugLog("getWatchVideoCommentReplies:direct", {
+              videoId,
+              parentCommentId,
+              sort,
+              ms: Date.now() - started,
+              hitThreadWalkCap,
+              ok: true,
+            });
+            return direct;
+          }
         } catch {
           /* fall through to legacy token path */
         }
@@ -394,11 +445,66 @@ export async function getWatchVideoCommentReplies(
         token = m?.[1] ?? null;
       }
     }
-    if (!token) return null;
+    if (!token) {
+      if (hitThreadWalkCap) {
+        const limited: WatchVideoCommentReplies = {
+          parentCommentId,
+          sort,
+          replies: [],
+          hasMore: false,
+          nextContinuation: null,
+          fetchLimitedNote:
+            "Replies could not be loaded because the parent comment is beyond the depth we scan in one request. Try the other sort order or open the thread on YouTube.",
+        };
+        cleantubeCommentsDebugLog("getWatchVideoCommentReplies:section-miss-capped", {
+          videoId,
+          parentCommentId,
+          sort,
+          ms: Date.now() - started,
+          hitThreadWalkCap,
+        });
+        return limited;
+      }
+      cleantubeCommentsDebugLog("getWatchVideoCommentReplies:section-miss", {
+        videoId,
+        parentCommentId,
+        sort,
+        ms: Date.now() - started,
+        hitThreadWalkCap,
+      });
+      return null;
+    }
 
     const next = await watchNextContinuation(yt.actions, token);
-    return repliesFromParsedResponse(next.data, parentCommentId, sort);
+    const parsed = repliesFromParsedResponse(next.data, parentCommentId, sort);
+    cleantubeCommentsDebugLog("getWatchVideoCommentReplies:section", {
+      videoId,
+      parentCommentId,
+      sort,
+      ms: Date.now() - started,
+      hitThreadWalkCap,
+      ok: Boolean(parsed),
+    });
+    if (!parsed && hitThreadWalkCap) {
+      return {
+        parentCommentId,
+        sort,
+        replies: [],
+        hasMore: false,
+        nextContinuation: null,
+        fetchLimitedNote:
+          "Replies could not be parsed after loading the comment section. The thread may be too deep for one request—try the other sort or YouTube.",
+      };
+    }
+    return parsed;
   } catch {
+    cleantubeCommentsDebugLog("getWatchVideoCommentReplies:error", {
+      videoId,
+      parentCommentId,
+      sort,
+      ms: Date.now() - started,
+      hitThreadWalkCap,
+    });
     return null;
   }
 }

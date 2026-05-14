@@ -1,28 +1,15 @@
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
-import Grid from "@mui/material/Grid";
-import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { BackToSearch } from "@/components/BackToSearch";
-import { GoToChannelButton } from "@/components/GoToChannelButton";
-import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
-import { SaveChannelButton } from "@/components/SaveChannelButton";
-import { WatchLaterAddButton } from "@/components/WatchLaterAddButton";
+import { WatchExperienceClient } from "@/components/WatchExperienceClient";
 import { WatchLaterBanner } from "@/components/WatchLaterBanner";
-import { WatchComments } from "@/components/WatchComments";
-import { WatchDescription } from "@/components/WatchDescription";
-import { WatchNextSidebar } from "@/components/WatchNextSidebar";
 import { toVideoSummaries } from "@/lib/serializeVideo";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
 import { getWatchVideoComments } from "@/lib/youtubeComments";
-import {
-  LEGACY_FOCUS_MODE_COOKIE,
-  WATCH_LAYOUT_COOKIE,
-  parseWatchLayoutCookie,
-} from "@/lib/watchLayoutPersistence";
+import { readWatchUpNextVisibleFromCookieStore } from "@/lib/watchUpNextVisibilityPersistence";
 import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { getWatchVideoDetails } from "@/lib/watchVideo";
 import {
@@ -82,12 +69,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
   }
 
   const cookieStore = await cookies();
-  const watchLayout = parseWatchLayoutCookie(
-    cookieStore.get(WATCH_LAYOUT_COOKIE)?.value,
-    cookieStore.get(LEGACY_FOCUS_MODE_COOKIE)?.value,
-  );
-  const showUpNext = watchLayout === "up_next";
-  const theatreMaximizePlayer = watchLayout === "theatre";
+  const showUpNext = readWatchUpNextVisibleFromCookieStore(cookieStore);
   const showComments = parseWatchCommentsVisibleCookie(
     cookieStore.get(WATCH_COMMENTS_VISIBLE_COOKIE)?.value,
   );
@@ -104,15 +86,9 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
 
   const startSeconds = startSecondsFromWatchPageQuery(sp);
   const title = video.title ?? "Video";
-  const metaParts = [
-    video.channelName,
-    video.uploadedAt,
-    video.views > 0 ? `${video.views.toLocaleString()} views` : null,
-  ].filter(Boolean);
 
   const thumb =
-    video.thumbnailUrl ??
-    `https://i.ytimg.com/vi/${id}/sddefault.jpg`;
+    video.thumbnailUrl ?? `https://i.ytimg.com/vi/${id}/sddefault.jpg`;
 
   const channelPageHref = channelHrefForWatchVideo(video);
 
@@ -143,68 +119,19 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
 
           <BackToSearch />
         </Box>
-
-        <Grid
-          container
-          spacing={3}
-          sx={{ px: { xs: 2, sm: 0 }, alignItems: "flex-start" }}
-        >
-          <Grid size={{ xs: 12, lg: showUpNext ? 8 : 12 }}>
-            <Stack spacing={1.5}>
-              <Box
-                sx={{
-                  mb: { xs: 2, sm: 3 },
-                }}
-              >
-                <LiteYouTubeEmbed
-                  videoId={id}
-                  title={title}
-                  thumbnailUrl={thumb}
-                  channelName={video.channelName}
-                  startSeconds={startSeconds}
-                  theatreMaximize={theatreMaximizePlayer}
-                />
-              </Box>
-
-              <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
-                {title}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {metaParts.join(" · ")}
-              </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                {channelPageHref ? (
-                  <GoToChannelButton href={channelPageHref} />
-                ) : null}
-                <SaveChannelButton
-                  channelName={video.channelName}
-                  channelId={video.channelId}
-                  channelUrl={video.channelUrl}
-                  thumbnailUrl={video.channelThumbnailUrl ?? thumb}
-                />
-                <WatchLaterAddButton
-                  videoId={id}
-                  title={title}
-                  thumbnailUrl={thumb}
-                  channelName={video.channelName}
-                  startSecondsContext={startSeconds}
-                />
-              </Stack>
-              {video.description?.trim() ? (
-                <WatchDescription description={video.description} />
-              ) : null}
-              {showComments ? (
-                <WatchComments videoId={id} initialComments={comments} />
-              ) : null}
-            </Stack>
-          </Grid>
-          {showUpNext ? (
-            <Grid size={{ xs: 12, lg: 4 }}>
-              <WatchNextSidebar videos={watchNextSummaries} />
-            </Grid>
-          ) : null}
-        </Grid>
       </Container>
+
+      <WatchExperienceClient
+        key={id}
+        videoId={id}
+        title={title}
+        thumb={thumb}
+        startSeconds={startSeconds ?? 0}
+        video={video}
+        channelPageHref={channelPageHref}
+        commentsInitial={showComments ? comments : null}
+        watchNextInitial={showUpNext ? watchNextSummaries : []}
+      />
     </Box>
   );
 }
