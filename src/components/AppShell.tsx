@@ -7,11 +7,8 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { Suspense, useMemo, useState } from "react";
 
-import {
-  CHANNELS_COLLAPSED_DRAWER_WIDTH,
-  CHANNELS_DRAWER_WIDTH,
-  ChannelsSidebar,
-} from "@/components/ChannelsSidebar";
+import { useLibrarySidebarCollapsed } from "@/app/providers";
+import { ChannelsSidebar } from "@/components/ChannelsSidebar";
 import { Header } from "@/components/Header";
 import { SavedChannelMigration } from "@/components/SavedChannelMigration";
 
@@ -24,17 +21,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
   const smUp = useMediaQuery(theme.breakpoints.up("sm"));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const { collapsed: desktopCollapsed, setLibrarySidebarCollapsed } =
+    useLibrarySidebarCollapsed();
 
   const toolbarOffset = useMemo(() => {
     const raw = theme.mixins.toolbar.minHeight;
     if (typeof raw === "number") return raw;
     return smUp ? 64 : 56;
   }, [smUp, theme.mixins.toolbar.minHeight]);
-
-  const desktopDrawerWidth = desktopCollapsed
-    ? CHANNELS_COLLAPSED_DRAWER_WIDTH
-    : CHANNELS_DRAWER_WIDTH;
 
   const headerLeading = (
     <IconButton
@@ -45,7 +39,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       }
       onClick={() => {
         if (mdUp) {
-          setDesktopCollapsed((v) => !v);
+          setLibrarySidebarCollapsed(!desktopCollapsed);
         } else {
           setMobileOpen((open) => !open);
         }
@@ -59,38 +53,48 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     <Box
       sx={{
         display: "flex",
+        flexDirection: "column",
         minHeight: "100vh",
       }}
     >
-      <ChannelsSidebar
-        surface="permanent"
-        collapsed={desktopCollapsed}
-        open
-        onClose={() => {}}
-        toolbarOffset={toolbarOffset}
-      />
-      <ChannelsSidebar
-        surface="temporary"
-        collapsed={false}
-        open={mobileOpen}
-        onClose={() => setMobileOpen(false)}
-        toolbarOffset={toolbarOffset}
-      />
+      <Suspense fallback={<HeaderFallback />}>
+        <Header leading={headerLeading} />
+      </Suspense>
       <Box
-        component="div"
         sx={{
-          flexGrow: 1,
-          width: { xs: "100%", md: `calc(100% - ${desktopDrawerWidth}px)` },
-          minWidth: 0,
           display: "flex",
-          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          width: "100%",
         }}
       >
-        <Suspense fallback={<HeaderFallback />}>
-          <Header leading={headerLeading} />
-        </Suspense>
-        <SavedChannelMigration />
-        {children}
+        <ChannelsSidebar
+          surface="permanent"
+          collapsed={desktopCollapsed}
+          open
+          onClose={() => {}}
+          toolbarOffset={toolbarOffset}
+        />
+        <ChannelsSidebar
+          surface="temporary"
+          collapsed={false}
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          toolbarOffset={toolbarOffset}
+        />
+        <Box
+          component="div"
+          sx={{
+            flexGrow: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <SavedChannelMigration />
+          {children}
+        </Box>
       </Box>
     </Box>
   );
