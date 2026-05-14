@@ -13,7 +13,6 @@ import ListItemAvatar from "@mui/material/ListItemAvatar";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import Toolbar from "@mui/material/Toolbar";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import type { SxProps, Theme } from "@mui/material/styles";
@@ -96,23 +95,6 @@ export function ChannelsSidebar({
 
   const drawer = (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Toolbar
-        sx={{
-          minHeight: { xs: 56, sm: 64 },
-          borderBottom: 1,
-          borderColor: "divider",
-          justifyContent: mini ? "center" : "flex-start",
-          gap: 1,
-          px: mini ? 0.5 : undefined,
-        }}
-      >
-        <SubscriptionsIcon color="primary" />
-        {!mini ? (
-          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-            Library
-          </Typography>
-        ) : null}
-      </Toolbar>
       <Box sx={{ flex: 1, overflow: "auto", px: mini ? 0.5 : 1, py: 1 }}>
         <List disablePadding sx={{ mb: 1 }}>
           {navLinks.map((item) => (
@@ -332,17 +314,16 @@ export function ChannelsSidebar({
           {
             width: drawerWidth,
             flexShrink: 0,
+            height: "100%",
+            alignSelf: "stretch",
             display: { xs: "none", md: "block" },
             [`& .MuiDrawer-paper`]: {
               width: drawerWidth,
               boxSizing: "border-box",
-              position: "fixed",
-              top: 0,
-              left: 0,
-              height: "100vh",
+              position: "relative",
+              height: "100%",
               borderRight: (t) => `1px solid ${t.palette.divider}`,
               overflowX: "hidden",
-              zIndex: (t) => t.zIndex.drawer,
               transition: (t) =>
                 t.transitions.create("width", {
                   easing: t.transitions.easing.sharp,
@@ -367,6 +348,13 @@ export function ChannelsSidebar({
         keepMounted: true,
         sx: {
           zIndex: (t) => t.zIndex.appBar - 1,
+        },
+        slotProps: {
+          backdrop: {
+            sx: {
+              top: `${toolbarOffset}px`,
+            },
+          },
         },
       }}
       sx={[

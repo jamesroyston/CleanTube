@@ -253,8 +253,20 @@ export function AccountMenu() {
             <ClearAllOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText
+            sx={{ minWidth: 0, flex: 1 }}
             primary="Clear channel page backups"
-            secondary="Removes session-only cached channel grids in this browser (use if the grid looks stuck)."
+            secondary="Clears session-only channel grid cache here if the grid looks stuck."
+            secondaryTypographyProps={
+              compactAccount
+                ? {
+                    noWrap: false,
+                    sx: {
+                      whiteSpace: "normal",
+                      wordBreak: "break-word",
+                    },
+                  }
+                : undefined
+            }
           />
         </MenuItem>
         <Divider />

@@ -5,6 +5,10 @@ import { cookies } from "next/headers";
 import { AppProviders } from "@/app/providers";
 import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 import {
+  LIBRARY_SIDEBAR_COLLAPSED_COOKIE,
+  parseLibrarySidebarCollapsedCookie,
+} from "@/lib/librarySidebarPersistence";
+import {
   parseWatchCommentsVisibleCookie,
   WATCH_COMMENTS_VISIBLE_COOKIE,
 } from "@/lib/watchCommentsVisibilityPersistence";
@@ -53,6 +57,11 @@ export default async function RootLayout({
   );
   const initialWatchUpNextVisible =
     readWatchUpNextVisibleFromCookieStore(cookieStore);
+  const librarySidebarCookie = cookieStore.get(LIBRARY_SIDEBAR_COLLAPSED_COOKIE);
+  const librarySidebarHasCookie = librarySidebarCookie != null;
+  const initialLibrarySidebarCollapsed = parseLibrarySidebarCollapsedCookie(
+    librarySidebarCookie?.value,
+  );
 
   const initialTheme = createInitialThemeSettings({
     mode,
@@ -68,6 +77,8 @@ export default async function RootLayout({
           initialTheme={initialTheme}
           initialWatchCommentsVisible={initialWatchCommentsVisible}
           initialWatchUpNextVisible={initialWatchUpNextVisible}
+          initialLibrarySidebarCollapsed={initialLibrarySidebarCollapsed}
+          librarySidebarHasCookie={librarySidebarHasCookie}
         >
           <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>

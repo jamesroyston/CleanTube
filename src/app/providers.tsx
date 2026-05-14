@@ -12,6 +12,7 @@ import {
   useState,
 } from "react";
 
+import { setLibrarySidebarCollapsedAction } from "@/app/actions/librarySidebarCollapsed";
 import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibility";
 import { setWatchUpNextVisibleAction } from "@/app/actions/watchUpNextVisibility";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
@@ -27,6 +28,11 @@ import {
   createInitialThemeSettings,
   normalizeThemeMode,
 } from "@/lib/themePersistence";
+import {
+  LIBRARY_SIDEBAR_COLLAPSED_STORAGE_KEY,
+  librarySidebarCollapsedToStorageValue,
+  parseLibrarySidebarCollapsedCookie,
+} from "@/lib/librarySidebarPersistence";
 import {
   normalizeDarkPreset,
   normalizeLightPreset,
@@ -62,6 +68,14 @@ type WatchUpNextVisibleContextValue = {
 
 const WatchUpNextVisibleContext =
   createContext<WatchUpNextVisibleContextValue | null>(null);
+
+type LibrarySidebarCollapsedContextValue = {
+  collapsed: boolean;
+  setLibrarySidebarCollapsed: (collapsed: boolean) => void;
+};
+
+const LibrarySidebarCollapsedContext =
+  createContext<LibrarySidebarCollapsedContextValue | null>(null);
 
 function readStoredThemeSettings(): InitialThemeSettings {
   if (typeof window === "undefined") {
@@ -104,6 +118,28 @@ function writeThemeStorage(key: string, value: string): void {
   }
 }
 
+function readStoredLibrarySidebarCollapsed(): boolean | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = localStorage.getItem(LIBRARY_SIDEBAR_COLLAPSED_STORAGE_KEY);
+    if (raw == null || raw === "") return undefined;
+    return parseLibrarySidebarCollapsedCookie(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function writeLibrarySidebarStorage(collapsed: boolean): void {
+  try {
+    localStorage.setItem(
+      LIBRARY_SIDEBAR_COLLAPSED_STORAGE_KEY,
+      librarySidebarCollapsedToStorageValue(collapsed),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export function useThemeMode() {
   const ctx = useContext(ThemeModeContext);
   if (!ctx) throw new Error("useThemeMode must be used within AppProviders");
@@ -128,16 +164,30 @@ export function useWatchUpNextVisible() {
   return ctx;
 }
 
+export function useLibrarySidebarCollapsed() {
+  const ctx = useContext(LibrarySidebarCollapsedContext);
+  if (!ctx) {
+    throw new Error(
+      "useLibrarySidebarCollapsed must be used within AppProviders",
+    );
+  }
+  return ctx;
+}
+
 export function AppProviders({
   children,
   initialTheme,
   initialWatchCommentsVisible,
   initialWatchUpNextVisible,
+  initialLibrarySidebarCollapsed,
+  librarySidebarHasCookie,
 }: {
   children: React.ReactNode;
   initialTheme: InitialThemeSettings;
   initialWatchCommentsVisible: boolean;
   initialWatchUpNextVisible: boolean;
+  initialLibrarySidebarCollapsed: boolean;
+  librarySidebarHasCookie: boolean;
 }) {
   const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode);
   const [darkPresetId, setDarkPresetIdState] =
@@ -150,6 +200,18 @@ export function AppProviders({
   const [watchUpNextVisible, setWatchUpNextVisibleState] = useState(
     initialWatchUpNextVisible,
   );
+  const [librarySidebarCollapsed, setLibrarySidebarCollapsedState] = useState(
+    initialLibrarySidebarCollapsed,
+  );
+
+  useEffect(() => {
+    if (librarySidebarHasCookie) return;
+    const stored = readStoredLibrarySidebarCollapsed();
+    if (stored === undefined) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time migration from localStorage-only preference
+    setLibrarySidebarCollapsedState(stored);
+    void setLibrarySidebarCollapsedAction(stored);
+  }, [librarySidebarHasCookie]);
 
   useEffect(() => {
     if (initialTheme.hasStoredCookie) return;
@@ -188,6 +250,19 @@ export function AppProviders({
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key !== LIBRARY_SIDEBAR_COLLAPSED_STORAGE_KEY || e.newValue == null) {
+        return;
+      }
+      const next = parseLibrarySidebarCollapsedCookie(e.newValue);
+      setLibrarySidebarCollapsedState(next);
+      void setLibrarySidebarCollapsedAction(next);
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   const setMode = useCallback((m: ThemeMode) => {
     setModeState(m);
     writeThemeStorage(THEME_MODE_STORAGE_KEY, m);
@@ -218,6 +293,12 @@ export function AppProviders({
   const setWatchUpNextVisible = useCallback((next: boolean) => {
     setWatchUpNextVisibleState(next);
     void setWatchUpNextVisibleAction(next);
+  }, []);
+
+  const setLibrarySidebarCollapsed = useCallback((next: boolean) => {
+    setLibrarySidebarCollapsedState(next);
+    writeLibrarySidebarStorage(next);
+    void setLibrarySidebarCollapsedAction(next);
   }, []);
 
   const theme = useMemo(
@@ -262,21 +343,33 @@ export function AppProviders({
     [watchUpNextVisible, setWatchUpNextVisible],
   );
 
+  const librarySidebarCollapsedValue = useMemo(
+    () => ({
+      collapsed: librarySidebarCollapsed,
+      setLibrarySidebarCollapsed,
+    }),
+    [librarySidebarCollapsed, setLibrarySidebarCollapsed],
+  );
+
   return (
     <AppRouterCacheProvider options={{ key: "mui" }}>
       <ThemeModeContext.Provider value={value}>
-        <WatchUpNextVisibleContext.Provider value={watchUpNextVisibleValue}>
-          <WatchCommentsVisibleContext.Provider
-            value={watchCommentsVisibleValue}
-          >
-            <ThemeProvider theme={theme}>
-              <CssBaseline enableColorScheme />
-              <NavigationProgressProvider>
-                {children}
-              </NavigationProgressProvider>
-            </ThemeProvider>
-          </WatchCommentsVisibleContext.Provider>
-        </WatchUpNextVisibleContext.Provider>
+        <LibrarySidebarCollapsedContext.Provider
+          value={librarySidebarCollapsedValue}
+        >
+          <WatchUpNextVisibleContext.Provider value={watchUpNextVisibleValue}>
+            <WatchCommentsVisibleContext.Provider
+              value={watchCommentsVisibleValue}
+            >
+              <ThemeProvider theme={theme}>
+                <CssBaseline enableColorScheme />
+                <NavigationProgressProvider>
+                  {children}
+                </NavigationProgressProvider>
+              </ThemeProvider>
+            </WatchCommentsVisibleContext.Provider>
+          </WatchUpNextVisibleContext.Provider>
+        </LibrarySidebarCollapsedContext.Provider>
       </ThemeModeContext.Provider>
     </AppRouterCacheProvider>
   );
