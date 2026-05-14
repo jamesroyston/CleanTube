@@ -1,3 +1,7 @@
+import {
+  cleantubeCommentsDebugLog,
+  readCleantubeCommentsPositiveIntEnv,
+} from "@/lib/cleantubeCommentsDebug";
 import { getInnertube } from "@/lib/youtubeiClient";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 import type {
@@ -49,6 +53,17 @@ type CommentsPageLike = {
 
 const PAGE_SIZE = 8;
 
+/** Max InnerTube comment-section continuation fetches per request (includes walking to reach `page`). */
+const DEFAULT_MAX_COMMENT_CONTINUATION_PAGES = 96;
+const ENV_MAX_COMMENT_CONTINUATION_PAGES = "CLEANTUBE_COMMENTS_MAX_CONTINUATION_PAGES";
+
+function maxCommentContinuationPages(): number {
+  return readCleantubeCommentsPositiveIntEnv(
+    ENV_MAX_COMMENT_CONTINUATION_PAGES,
+    DEFAULT_MAX_COMMENT_CONTINUATION_PAGES,
+  );
+}
+
 function text(value: Textish | string | undefined): string | undefined {
   if (typeof value === "string") return value.trim() || undefined;
   const out = value?.toString?.().trim();
@@ -99,6 +114,8 @@ export async function getWatchVideoComments(
   const sort = options?.sort ?? "top";
   const pageNumber = options?.page ?? 1;
   const targetCount = pageNumber * PAGE_SIZE;
+  const maxContinuations = maxCommentContinuationPages();
+  const started = Date.now();
 
   try {
     const yt = await getInnertube();
@@ -108,6 +125,8 @@ export async function getWatchVideoComments(
     )) as CommentsPageLike;
     const countText = text(page.header?.count) || text(page.header?.comments_count);
     const comments: WatchVideoComment[] = [];
+    let continuationFetches = 0;
+    let hitContinuationCap = false;
 
     while (comments.length < targetCount) {
       const nextComments = (page.contents ?? [])
@@ -120,27 +139,51 @@ export async function getWatchVideoComments(
         ),
       );
 
-      if (
-        comments.length >= targetCount ||
-        !page.has_continuation ||
-        typeof page.getContinuation !== "function"
-      ) {
+      if (comments.length >= targetCount) {
         break;
       }
 
+      if (!page.has_continuation || typeof page.getContinuation !== "function") {
+        break;
+      }
+
+      if (continuationFetches >= maxContinuations) {
+        hitContinuationCap = true;
+        break;
+      }
+
+      continuationFetches += 1;
       page = await page.getContinuation();
     }
 
-    const hasMore =
-      comments.length > targetCount ||
-      page.has_continuation === true ||
-      (page.contents?.length ?? 0) > targetCount;
+    const cappedBeforeTarget = hitContinuationCap && comments.length < targetCount;
+    const fetchLimitedNote = cappedBeforeTarget
+      ? "Fewer comments were loaded than requested because pagination was limited for this request. You can try again or open the video on YouTube for the full thread."
+      : undefined;
+
+    const hasMore = cappedBeforeTarget
+      ? false
+      : comments.length > targetCount ||
+        page.has_continuation === true ||
+        (page.contents?.length ?? 0) > targetCount;
+
+    cleantubeCommentsDebugLog("getWatchVideoComments", {
+      videoId,
+      sort,
+      page: pageNumber,
+      targetCount,
+      ms: Date.now() - started,
+      continuationFetches,
+      hitContinuationCap,
+      returned: Math.min(comments.length, targetCount),
+    });
 
     return {
       countText,
       sort,
       page: pageNumber,
       hasMore,
+      fetchLimitedNote,
       comments: comments.slice(0, targetCount),
     };
   } catch {

@@ -1,4 +1,4 @@
-import { getInnertube } from "@/lib/youtubeiClient";
+import { getCachedInnertubeVideoInfo } from "@/lib/innertubeVideoInfoCache";
 import { preferredYoutubeThumbnailPath } from "@/lib/serializeVideo";
 import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
@@ -82,8 +82,8 @@ export async function getWatchNextRelatedVideos(
 ): Promise<VideoLikeForSummary[]> {
   if (!isValidYoutubeVideoId(videoId)) return [];
   try {
-    const yt = await getInnertube();
-    const info = await yt.getInfo(videoId);
+    const info = await getCachedInnertubeVideoInfo(videoId);
+    if (!info) return [];
     const feed = info.watch_next_feed;
     if (!feed) return [];
     const list = Array.isArray(feed) ? feed : Object.values(feed);

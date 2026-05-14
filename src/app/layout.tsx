@@ -5,10 +5,10 @@ import { cookies } from "next/headers";
 import { AppProviders } from "@/app/providers";
 import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 import {
-  LEGACY_FOCUS_MODE_COOKIE,
-  WATCH_LAYOUT_COOKIE,
-  parseWatchLayoutCookie,
-} from "@/lib/watchLayoutPersistence";
+  parseWatchCommentsVisibleCookie,
+  WATCH_COMMENTS_VISIBLE_COOKIE,
+} from "@/lib/watchCommentsVisibilityPersistence";
+import { readWatchUpNextVisibleFromCookieStore } from "@/lib/watchUpNextVisibilityPersistence";
 import {
   createInitialThemeSettings,
   THEME_DARK_PRESET_COOKIE,
@@ -48,13 +48,11 @@ export default async function RootLayout({
   const mode = cookieStore.get(THEME_MODE_COOKIE)?.value;
   const darkPresetId = cookieStore.get(THEME_DARK_PRESET_COOKIE)?.value;
   const lightPresetId = cookieStore.get(THEME_LIGHT_PRESET_COOKIE)?.value;
-  const layoutCookie = cookieStore.get(WATCH_LAYOUT_COOKIE)?.value;
-  const legacyFocusCookie = cookieStore.get(LEGACY_FOCUS_MODE_COOKIE)?.value;
-  const initialWatchLayoutMode = parseWatchLayoutCookie(
-    layoutCookie,
-    legacyFocusCookie,
+  const initialWatchCommentsVisible = parseWatchCommentsVisibleCookie(
+    cookieStore.get(WATCH_COMMENTS_VISIBLE_COOKIE)?.value,
   );
-  const hasWatchLayoutCookie = Boolean(layoutCookie) || Boolean(legacyFocusCookie);
+  const initialWatchUpNextVisible =
+    readWatchUpNextVisibleFromCookieStore(cookieStore);
 
   const initialTheme = createInitialThemeSettings({
     mode,
@@ -68,8 +66,8 @@ export default async function RootLayout({
       <body style={{ margin: 0 }}>
         <AppProviders
           initialTheme={initialTheme}
-          initialWatchLayoutMode={initialWatchLayoutMode}
-          hasWatchLayoutCookie={hasWatchLayoutCookie}
+          initialWatchCommentsVisible={initialWatchCommentsVisible}
+          initialWatchUpNextVisible={initialWatchUpNextVisible}
         >
           <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>

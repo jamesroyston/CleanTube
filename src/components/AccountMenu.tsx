@@ -1,7 +1,6 @@
 "use client";
 
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
-import CheckIcon from "@mui/icons-material/Check";
 import CloudDoneOutlinedIcon from "@mui/icons-material/CloudDoneOutlined";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import FingerprintOutlinedIcon from "@mui/icons-material/FingerprintOutlined";
@@ -17,38 +16,32 @@ import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import ListSubheader from "@mui/material/ListSubheader";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
+import Switch from "@mui/material/Switch";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useState } from "react";
+import { useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 
-import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibility";
-import { parseWatchCommentsVisibleCookie } from "@/lib/watchCommentsVisibilityPersistence";
 import { clearChannelPageSessionBackups } from "@/lib/channelPageClientCache";
 
-import { useThemeMode, useWatchLayout } from "@/app/providers";
+import {
+  useThemeMode,
+  useWatchCommentsVisible,
+  useWatchUpNextVisible,
+} from "@/app/providers";
 import { ThemePresetDialog } from "@/components/ThemePresetPanel";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
-function readWatchCommentsVisibleFromDocument(): boolean {
-  if (typeof document === "undefined") return false;
-  const m = document.cookie.match(
-    /(?:^|; )cleantube-watch-comments-visible=([^;]*)/,
-  );
-  const raw = m?.[1] ? decodeURIComponent(m[1]) : undefined;
-  return parseWatchCommentsVisibleCookie(raw);
-}
-
-/** Part before @ for compact app bar label; whole string if malformed. */
 function emailLocalPart(email: string | undefined): string {
   if (!email?.trim()) return "";
   const at = email.indexOf("@");
@@ -60,13 +53,14 @@ export function AccountMenu() {
   const compactAccount = useMediaQuery(theme.breakpoints.down("md"));
   const { user, isCloudConfigured, signOutUser, authStatus } = useCloudLibrary();
   const { mode, toggleMode } = useThemeMode();
-  const { mode: watchLayout, setWatchLayoutMode } = useWatchLayout();
+  const { visible: commentsVisible, setWatchCommentsVisible } =
+    useWatchCommentsVisible();
+  const { visible: upNextVisible, setWatchUpNextVisible } =
+    useWatchUpNextVisible();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const open = Boolean(anchorEl);
-  const commentsVisible = readWatchCommentsVisibleFromDocument();
-
   const accountLabel = user ? emailLocalPart(user.email ?? undefined) : "";
   const accountTooltip = user?.email?.trim() ?? "Account";
 
@@ -180,72 +174,79 @@ export function AccountMenu() {
             color: "text.secondary",
           }}
         >
-          Watch layout
+          Watch page
         </ListSubheader>
-        {(
-          [
-            {
-              value: "up_next",
-              label: "Standard + Up next",
-              secondary: "Related videos in the right column",
-            },
-            {
-              value: "theatre",
-              label: "Theatre",
-              secondary: "Standard page width; player sized to fit the viewport",
-            },
-          ] as const
-        ).map((opt) => (
-          <MenuItem
-            key={opt.value}
-            selected={watchLayout === opt.value}
-            onClick={() => {
-              setWatchLayoutMode(opt.value);
-              setAnchorEl(null);
-              startTransition(() => {
-                router.refresh();
-              });
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 36 }}>
-              {watchLayout === opt.value ? (
-                <CheckIcon fontSize="small" color="primary" />
-              ) : (
-                <Box sx={{ width: 24 }} />
-              )}
-            </ListItemIcon>
-            <ListItemText primary={opt.label} secondary={opt.secondary} />
-          </MenuItem>
-        ))}
-        <MenuItem
-          onClick={() => {
-            setAnchorEl(null);
-            void setWatchCommentsVisibleAction(!commentsVisible).then(() => {
-              startTransition(() => {
-                router.refresh();
-              });
-            });
-          }}
+        <Box
+          sx={{ px: 2, py: 1, maxWidth: 320 }}
+          onMouseDown={(e) => e.stopPropagation()}
         >
-          <ListItemIcon sx={{ minWidth: 36 }}>
-            {commentsVisible ? (
-              <CheckIcon fontSize="small" color="primary" />
-            ) : (
-              <Box sx={{ width: 24 }} />
-            )}
-          </ListItemIcon>
-          <ListItemText
-            primary="Show comments on watch"
-            secondary="Turn off to skip loading comments (faster watch page)"
+          <FormControlLabel
+            sx={{
+              m: 0,
+              width: "100%",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 1,
+            }}
+            label={
+              <Box sx={{ pr: 1, pt: 0.25 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Related videos column
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Up next rail (loads only when on)
+                </Typography>
+              </Box>
+            }
+            labelPlacement="start"
+            control={
+              <Switch
+                size="small"
+                checked={upNextVisible}
+                onChange={(_, v) => setWatchUpNextVisible(v)}
+                inputProps={{ "aria-label": "Show related videos column" }}
+              />
+            }
           />
-        </MenuItem>
+        </Box>
+        <Box
+          sx={{ px: 2, py: 1, maxWidth: 320 }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <FormControlLabel
+            sx={{
+              m: 0,
+              width: "100%",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 1,
+            }}
+            label={
+              <Box sx={{ pr: 1, pt: 0.25 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Comments
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Loads only when on (faster watch page when off)
+                </Typography>
+              </Box>
+            }
+            labelPlacement="start"
+            control={
+              <Switch
+                size="small"
+                checked={commentsVisible}
+                onChange={(_, v) => setWatchCommentsVisible(v)}
+                inputProps={{ "aria-label": "Show comments on watch" }}
+              />
+            }
+          />
+        </Box>
         <MenuItem
           onClick={() => {
             setAnchorEl(null);
             clearChannelPageSessionBackups();
-            startTransition(() => {
-              router.refresh();
-            });
+            router.refresh();
           }}
         >
           <ListItemIcon sx={{ minWidth: 36 }}>

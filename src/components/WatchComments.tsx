@@ -10,7 +10,7 @@ import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useState, type ReactNode } from "react";
+import { useState, type ReactNode, useEffect, useRef } from "react";
 
 import type { WatchVideoCommentReplies } from "@/lib/youtubeCommentReplies";
 import { readFetchJson } from "@/lib/fetchJson";
@@ -23,6 +23,11 @@ import type {
 type WatchCommentsProps = {
   videoId: string;
   initialComments: WatchVideoComments | null;
+  /**
+   * When true, load page 1 comments on mount if `initialComments` is null
+   * (e.g. user turned comments on without a full page refresh).
+   */
+  fetchInitialIfNeeded?: boolean;
 };
 
 
@@ -51,6 +56,7 @@ type ReplyThreadState = {
   error: string | null;
   hasMore: boolean;
   continuation: string | null;
+  fetchLimitedNote: string | null;
 };
 
 const emptyThread = (): ReplyThreadState => ({
@@ -61,6 +67,7 @@ const emptyThread = (): ReplyThreadState => ({
   error: null,
   hasMore: false,
   continuation: null,
+  fetchLimitedNote: null,
 });
 
 type CommentBlockProps = {
@@ -157,6 +164,7 @@ function CommentBlock({
 export function WatchComments({
   videoId,
   initialComments,
+  fetchInitialIfNeeded = false,
 }: WatchCommentsProps) {
   const [comments, setComments] = useState(initialComments);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +172,45 @@ export function WatchComments({
   const [replyThreads, setReplyThreads] = useState<
     Record<string, ReplyThreadState>
   >({});
+
+  const didAutoFetchRef = useRef(false);
+
+  useEffect(() => {
+    didAutoFetchRef.current = false;
+  }, [videoId]);
+
+  useEffect(() => {
+    setComments(initialComments);
+  }, [initialComments, videoId]);
+
+  useEffect(() => {
+    if (!fetchInitialIfNeeded || initialComments !== null) return;
+    if (didAutoFetchRef.current) return;
+    didAutoFetchRef.current = true;
+    setError(null);
+    setLoading(true);
+    void (async () => {
+      const qs = new URLSearchParams();
+      qs.set("sort", "top");
+      qs.set("page", "1");
+      try {
+        const response = await fetch(
+          `/api/videos/${encodeURIComponent(videoId)}/comments?${qs.toString()}`,
+        );
+        const payload = await readFetchJson<CommentsResponse>(response);
+        if (!response.ok || !payload.comments) {
+          throw new Error(payload.error || "Comments could not be loaded.");
+        }
+        setComments(payload.comments);
+      } catch (err) {
+        setError(
+          err instanceof Error ? err.message : "Comments could not be loaded.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [fetchInitialIfNeeded, initialComments, videoId]);
 
   const entries = comments?.comments ?? [];
   const sort = comments?.sort ?? "top";
@@ -254,6 +301,7 @@ export function WatchComments({
             error: null,
             hasMore: data.hasMore,
             continuation: data.nextContinuation,
+            fetchLimitedNote: data.fetchLimitedNote ?? null,
           },
         }));
       } catch (err) {
@@ -295,6 +343,7 @@ export function WatchComments({
               loadingMore: false,
               hasMore: data.hasMore,
               continuation: data.nextContinuation,
+              fetchLimitedNote: data.fetchLimitedNote ?? cur.fetchLimitedNote,
             },
           };
         });
@@ -355,6 +404,11 @@ export function WatchComments({
             ? `${comments.countText} · showing ${sort === "newest" ? "newest" : "top"} comments`
             : `${sort === "newest" ? "Newest" : "Top"} comments from YouTube`}
         </Typography>
+        {comments?.fetchLimitedNote ? (
+          <Typography variant="body2" color="warning.main">
+            {comments.fetchLimitedNote}
+          </Typography>
+        ) : null}
         {error ? (
           <Typography variant="body2" color="error">
             {error}
@@ -405,6 +459,13 @@ export function WatchComments({
                       {thread.error ? (
                         <Typography variant="body2" color="error">
                           {thread.error}
+                        </Typography>
+                      ) : null}
+                      {thread.fetchLimitedNote &&
+                      thread.items.length === 0 &&
+                      !thread.error ? (
+                        <Typography variant="body2" color="warning.main">
+                          {thread.fetchLimitedNote}
                         </Typography>
                       ) : null}
                       {thread.loading &&

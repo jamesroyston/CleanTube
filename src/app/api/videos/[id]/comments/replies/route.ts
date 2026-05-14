@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 
 import { getWatchVideoCommentReplies } from "@/lib/youtubeCommentReplies";
 import {
-  normalizeCommentSort,
-} from "@/lib/youtubeComments";
+  cleantubeCommentsDebugLog,
+  isCleantubeCommentsDebugEnabled,
+} from "@/lib/cleantubeCommentsDebug";
+import { normalizeCommentSort } from "@/lib/youtubeComments";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
 export const runtime = "nodejs";
@@ -32,11 +34,24 @@ export async function GET(request: Request, context: RouteContext) {
     const continuation =
       url.searchParams.get("continuation")?.trim() || undefined;
 
+    const started = Date.now();
     const payload = await getWatchVideoCommentReplies(id, {
       parentCommentId: parent,
       sort,
       continuation,
     });
+    if (isCleantubeCommentsDebugEnabled()) {
+      cleantubeCommentsDebugLog("GET /api/videos/[id]/comments/replies", {
+        videoId: id,
+        parentCommentId: parent,
+        ms: Date.now() - started,
+        ok: Boolean(payload),
+        replyCount: payload ? payload.replies.length : undefined,
+        hasMore: payload?.hasMore,
+        capped: Boolean(payload?.fetchLimitedNote),
+        continuation: Boolean(continuation),
+      });
+    }
 
     if (!payload) {
       return NextResponse.json(
