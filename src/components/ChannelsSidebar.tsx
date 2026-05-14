@@ -94,8 +94,24 @@ export function ChannelsSidebar({
   ];
 
   const drawer = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ flex: 1, overflow: "auto", px: mini ? 0.5 : 1, py: 1 }}>
+    <Box
+      sx={{
+        height: "100%",
+        minHeight: 0,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          overflow: "auto",
+          px: mini ? 0.5 : 1,
+          py: 1,
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
         <List disablePadding sx={{ mb: 1 }}>
           {navLinks.map((item) => (
             <Tooltip
@@ -352,7 +368,7 @@ export function ChannelsSidebar({
         slotProps: {
           backdrop: {
             sx: {
-              top: `${toolbarOffset}px`,
+              top: `calc(${toolbarOffset}px + env(safe-area-inset-top, 0px))`,
             },
           },
         },
@@ -364,10 +380,19 @@ export function ChannelsSidebar({
           [`& .MuiDrawer-paper`]: {
             width: CHANNELS_DRAWER_WIDTH,
             boxSizing: "border-box",
-            mt: `${toolbarOffset}px`,
-            height: `calc(100% - ${toolbarOffset}px)`,
+            /**
+             * Paper must sit fully below the app bar: it renders under the bar
+             * (z-index appBar - 1), so `margin-top` alone can still leave the first
+             * list items obscured. Pin `top` + `bottom` and use `dvh` for mobile
+             * viewport stability while the drawer is open.
+             */
+            top: `calc(${toolbarOffset}px + env(safe-area-inset-top, 0px))`,
+            bottom: 0,
+            height: "auto",
+            maxHeight: "none",
             borderRight: (t) => `1px solid ${t.palette.divider}`,
             overflowX: "hidden",
+            overflowY: "hidden",
             borderRadius: 0,
           },
         },
