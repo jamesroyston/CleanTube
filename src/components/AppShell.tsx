@@ -2,13 +2,19 @@
 
 import MenuIcon from "@mui/icons-material/Menu";
 import Box from "@mui/material/Box";
+import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useLayoutEffect, useRef, useState } from "react";
 
 import { useLibrarySidebarCollapsed } from "@/app/providers";
-import { ChannelsSidebar } from "@/components/ChannelsSidebar";
+import {
+  CHANNELS_COLLAPSED_DRAWER_WIDTH,
+  CHANNELS_DRAWER_WIDTH,
+  ChannelsRailContent,
+  drawerRailTransition,
+} from "@/components/ChannelsSidebar";
 import { Header } from "@/components/Header";
 import { SavedChannelMigration } from "@/components/SavedChannelMigration";
 
@@ -19,83 +25,206 @@ function HeaderFallback() {
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
-  const smUp = useMediaQuery(theme.breakpoints.up("sm"));
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { collapsed: desktopCollapsed, setLibrarySidebarCollapsed } =
+  const { collapsed: railCollapsed, setLibrarySidebarCollapsed } =
     useLibrarySidebarCollapsed();
+  const desktopRailPx = mdUp
+    ? railCollapsed
+      ? CHANNELS_COLLAPSED_DRAWER_WIDTH
+      : CHANNELS_DRAWER_WIDTH
+    : null;
 
-  const toolbarOffset = useMemo(() => {
-    const raw = theme.mixins.toolbar.minHeight;
-    if (typeof raw === "number") return raw;
-    return smUp ? 64 : 56;
-  }, [smUp, theme.mixins.toolbar.minHeight]);
+  const appBarRef = useRef<HTMLDivElement | null>(null);
+  const [headerInsetPx, setHeaderInsetPx] = useState(72);
+
+  useLayoutEffect(() => {
+    const el = appBarRef.current;
+    if (!el) return;
+    function measure() {
+      const node = appBarRef.current;
+      if (!node) return;
+      const bottom = Math.ceil(node.getBoundingClientRect().bottom);
+      setHeaderInsetPx((prev) => (bottom > 0 ? bottom : prev));
+    }
+    measure();
+    const ro = new ResizeObserver(() => {
+      measure();
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+
+  /** When `mdUp`, treat the rail as desktop-only (`open` gated so we never show the mobile Drawer on `md`). */
+  const temporaryOpen = mdUp ? false : mobileOpen;
 
   const headerLeading = (
     <IconButton
       color="inherit"
       edge="start"
       aria-label={
-        mdUp ? "Toggle library rail" : mobileOpen ? "Close library drawer" : "Open library drawer"
+        mdUp
+          ? railCollapsed
+            ? "Expand library sidebar"
+            : "Collapse library sidebar"
+          : mobileOpen
+            ? "Close library drawer"
+            : "Open library drawer"
       }
       onClick={() => {
-        if (mdUp) {
-          setLibrarySidebarCollapsed(!desktopCollapsed);
-        } else {
-          setMobileOpen((open) => !open);
-        }
+        if (mdUp) setLibrarySidebarCollapsed(!railCollapsed);
+        else setMobileOpen((open) => !open);
       }}
     >
       <MenuIcon />
     </IconButton>
   );
 
-  return (
+  const railTransition = drawerRailTransition(theme);
+
+  const mainScroll = (
     <Box
       sx={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100vh",
+        flex: 1,
+        minHeight: 0,
+        overflow: "auto",
+        overscrollBehavior: "contain",
+        WebkitOverflowScrolling: "touch",
       }}
     >
-      <Suspense fallback={<HeaderFallback />}>
-        <Header leading={headerLeading} />
-      </Suspense>
-      <Box
-        sx={{
-          display: "flex",
-          flex: 1,
-          minHeight: 0,
-          minWidth: 0,
-          width: "100%",
-        }}
-      >
-        <ChannelsSidebar
-          surface="permanent"
-          collapsed={desktopCollapsed}
-          open
-          onClose={() => {}}
-          toolbarOffset={toolbarOffset}
-        />
-        <ChannelsSidebar
-          surface="temporary"
-          collapsed={false}
-          open={mobileOpen}
-          onClose={() => setMobileOpen(false)}
-          toolbarOffset={toolbarOffset}
-        />
+      <SavedChannelMigration />
+      {children}
+    </Box>
+  );
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+      {mdUp ? (
         <Box
-          component="div"
+          aria-hidden
           sx={{
-            flexGrow: 1,
+            flexShrink: 0,
+            height: `${headerInsetPx}px`,
+            /** Reserves viewport space for browse `Header` (`position="fixed"`). */
+          }}
+        />
+      ) : null}
+      <Suspense fallback={<HeaderFallback />}>
+        <Header
+          ref={appBarRef}
+          leading={headerLeading}
+          browseLayout={
+            desktopRailPx != null
+              ? { mode: "desktopRailMini", railWidthPx: desktopRailPx }
+              : { mode: "mobile" }
+          }
+        />
+      </Suspense>
+
+      {desktopRailPx != null ? (
+        <Box
+          sx={{
+            display: "flex",
+            flex: 1,
+            minHeight: 0,
             minWidth: 0,
+            flexDirection: "row",
+          }}
+        >
+          <Drawer
+            variant="permanent"
+            open
+            slotProps={{
+              docked: {
+                sx: {
+                  width: desktopRailPx,
+                  flexShrink: 0,
+                  transition: railTransition,
+                  boxSizing: "border-box",
+                },
+              },
+            }}
+            sx={{
+              [`& .MuiDrawer-paper`]: {
+                boxSizing: "border-box",
+                position: "fixed",
+                overflow: "hidden",
+                whiteSpace: "nowrap",
+                width: desktopRailPx,
+                borderRight: (t) => `1px solid ${t.palette.divider}`,
+                transition: railTransition,
+                top: `${headerInsetPx}px`,
+                height: `calc(100dvh - ${headerInsetPx}px)`,
+              },
+            }}
+          >
+            <ChannelsRailContent
+              miniMode={railCollapsed}
+              onNavigate={() => {}}
+            />
+          </Drawer>
+
+          <Box
+            component="main"
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 0,
+              ml: `${desktopRailPx}px`,
+              transition: railTransition,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            {mainScroll}
+          </Box>
+        </Box>
+      ) : (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
             display: "flex",
             flexDirection: "column",
           }}
         >
-          <SavedChannelMigration />
-          {children}
+          <Drawer
+            variant="temporary"
+            open={temporaryOpen}
+            onClose={() => setMobileOpen(false)}
+            elevation={0}
+            ModalProps={{
+              keepMounted: true,
+              /** Above browse `Header` (`zIndex.drawer + 1`): full viewport overlay incl. app bar */
+              sx: {
+                zIndex: (t) => t.zIndex.modal,
+              },
+            }}
+            sx={{
+              [`& .MuiDrawer-paper`]: {
+                width: CHANNELS_DRAWER_WIDTH,
+                boxSizing: "border-box",
+                top: 0,
+                bottom: 0,
+                height: "100%",
+                pt: "env(safe-area-inset-top, 0px)",
+                borderRadius: 0,
+                overflow: "hidden",
+                borderRight: (t) => `1px solid ${t.palette.divider}`,
+              },
+            }}
+          >
+            <ChannelsRailContent
+              miniMode={false}
+              onNavigate={() => setMobileOpen(false)}
+            />
+          </Drawer>
+
+          <Box component="main" sx={{ flex: 1, minHeight: 0 }}>
+            {mainScroll}
+          </Box>
         </Box>
-      </Box>
+      )}
     </Box>
   );
 }

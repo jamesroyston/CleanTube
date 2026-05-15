@@ -19,11 +19,13 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import Toolbar from "@mui/material/Toolbar";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   FormEvent,
+  forwardRef,
   useEffect,
   useRef,
   useState,
@@ -51,9 +53,26 @@ import {
   normalizeSearchSortParam,
 } from "@/lib/uploadedAtSort";
 
-export function Header({ leading }: { leading?: ReactNode }) {
-  const compactSearch = useMediaQuery("(max-width:899.95px)");
-  const router = useRouter();
+import { drawerRailTransition } from "@/components/ChannelsSidebar";
+
+/** Browse layouts: stacked header (mobile) vs fixed bar inset by library rail (`md+`). */
+export type BrowseHeaderLayout =
+  | { mode: "mobile" }
+  | { mode: "desktopRailMini"; railWidthPx: number };
+
+export type HeaderProps = {
+  leading?: ReactNode;
+  browseLayout?: BrowseHeaderLayout;
+};
+
+export const Header = forwardRef<HTMLDivElement, HeaderProps>(
+  function Header(
+    { leading, browseLayout = { mode: "mobile" } },
+    ref,
+  ) {
+    const theme = useTheme();
+    const compactSearch = useMediaQuery("(max-width:899.95px)");
+    const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { start, done } = useNavigationProgress();
@@ -182,16 +201,36 @@ export function Header({ leading }: { leading?: ReactNode }) {
     runSearch(overlayQuery.trim());
   }
 
+  const desktopRail =
+    browseLayout.mode === "desktopRailMini" ? browseLayout.railWidthPx : null;
+
   return (
     <>
       <AppBar
-        position="sticky"
+        ref={ref}
+        position={desktopRail != null ? "fixed" : "sticky"}
         elevation={0}
         color="transparent"
-        sx={{
-          position: { xs: "static", md: "sticky" },
-          zIndex: (t) => t.zIndex.drawer + 1,
-        }}
+        sx={[
+          {
+            pt: "env(safe-area-inset-top, 0px)",
+            boxSizing: "border-box",
+            zIndex: (t) => t.zIndex.drawer + 1,
+          },
+          desktopRail != null
+            ? {
+                transition: drawerRailTransition(theme),
+                /** `left + right` avoids subpixel overlap vs `marginLeft + calc(width)` beside the rail. */
+                left: `${desktopRail}px`,
+                right: 0,
+                width: "auto",
+                ml: 0,
+                mr: 0,
+              }
+            : {
+                position: { xs: "static", sm: "sticky" },
+              },
+        ]}
       >
         <Toolbar
           sx={{
@@ -493,4 +532,6 @@ export function Header({ leading }: { leading?: ReactNode }) {
       </Dialog>
     </>
   );
-}
+});
+
+Header.displayName = "Header";

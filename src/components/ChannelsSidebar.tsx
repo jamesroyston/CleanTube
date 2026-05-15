@@ -7,7 +7,6 @@ import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
 import Avatar from "@mui/material/Avatar";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
-import Drawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import ListItemAvatar from "@mui/material/ListItemAvatar";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -15,7 +14,7 @@ import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
-import type { SxProps, Theme } from "@mui/material/styles";
+import type { Theme } from "@mui/material/styles";
 import Link from "next/link";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
@@ -24,27 +23,30 @@ import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { SavedChannel } from "@/types/savedChannel";
 
-export const CHANNELS_DRAWER_WIDTH = 280;
-export const CHANNELS_COLLAPSED_DRAWER_WIDTH = 72;
+export const CHANNELS_DRAWER_WIDTH = 276;
+/** Mini rail outer width aligned with fixed AppBar `left` / main `marginLeft`. */
+export const CHANNELS_COLLAPSED_DRAWER_WIDTH = 77;
 
-type ChannelsSidebarProps = {
-  surface: "permanent" | "temporary";
-  /** Narrow rail: icons + channel avatars only (desktop permanent). */
-  collapsed: boolean;
-  open: boolean;
-  onClose: () => void;
-  toolbarOffset: number;
-  sx?: SxProps<Theme>;
+/** Shared transition easing with MUI mini-variant drawer demos. */
+export function drawerRailTransition(theme: Theme) {
+  return theme.transitions.create(
+    ["width", "margin", "margin-left", "left"],
+    {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    },
+  );
+}
+
+type ChannelsRailContentProps = {
+  miniMode: boolean;
+  onNavigate?: () => void;
 };
 
-export function ChannelsSidebar({
-  surface,
-  collapsed,
-  open,
-  onClose,
-  toolbarOffset,
-  sx,
-}: ChannelsSidebarProps) {
+export function ChannelsRailContent({
+  miniMode,
+  onNavigate,
+}: ChannelsRailContentProps) {
   const { channels } = useSavedChannels();
   const savedChannels = channels
     .filter((channel) => effectiveSavedChannelKind(channel) === "saved_channel")
@@ -55,13 +57,6 @@ export function ChannelsSidebar({
   const savedSearches = channels.filter(
     (channel) => effectiveSavedChannelKind(channel) === "pinned_search",
   );
-  const mini = surface === "permanent" && collapsed;
-  const drawerWidth =
-    surface === "permanent"
-      ? mini
-        ? CHANNELS_COLLAPSED_DRAWER_WIDTH
-        : CHANNELS_DRAWER_WIDTH
-      : CHANNELS_DRAWER_WIDTH;
 
   function searchHref(q: string) {
     const searchSort = getLastSearchSort();
@@ -93,7 +88,7 @@ export function ChannelsSidebar({
     },
   ];
 
-  const drawer = (
+  return (
     <Box
       sx={{
         height: "100%",
@@ -107,7 +102,7 @@ export function ChannelsSidebar({
           flex: 1,
           minHeight: 0,
           overflow: "auto",
-          px: mini ? 0.5 : 1,
+          px: miniMode ? 0.5 : 1,
           py: 1,
           WebkitOverflowScrolling: "touch",
         }}
@@ -116,31 +111,31 @@ export function ChannelsSidebar({
           {navLinks.map((item) => (
             <Tooltip
               key={item.href}
-              title={mini ? item.label : ""}
+              title={miniMode ? item.label : ""}
               placement="right"
             >
               <ListItemButton
                 component={Link}
                 href={item.href}
-                onClick={onClose}
+                onClick={onNavigate}
                 sx={{
                   borderRadius: 1,
                   minHeight: 44,
-                  justifyContent: mini ? "center" : "flex-start",
-                  px: mini ? 1 : undefined,
+                  justifyContent: miniMode ? "center" : "flex-start",
+                  px: miniMode ? 1 : undefined,
                 }}
               >
                 <ListItemIcon
                   sx={{
-                    minWidth: mini ? 0 : 36,
+                    minWidth: miniMode ? 0 : 36,
                     color: "text.secondary",
                     justifyContent: "center",
-                    m: mini ? 0 : undefined,
+                    m: miniMode ? 0 : undefined,
                   }}
                 >
                   {item.icon}
                 </ListItemIcon>
-                {!mini ? <ListItemText primary={item.label} /> : null}
+                {!miniMode ? <ListItemText primary={item.label} /> : null}
               </ListItemButton>
             </Tooltip>
           ))}
@@ -148,7 +143,7 @@ export function ChannelsSidebar({
 
         <Divider sx={{ my: 1 }} />
 
-        {!mini ? (
+        {!miniMode ? (
           <Box
             sx={{
               display: "flex",
@@ -168,7 +163,7 @@ export function ChannelsSidebar({
           </Box>
         ) : null}
         {savedChannels.length === 0 ? (
-          !mini ? (
+          !miniMode ? (
             <Typography
               variant="body2"
               color="text.secondary"
@@ -184,14 +179,14 @@ export function ChannelsSidebar({
                 <ListItemButton
                   component={Link}
                   href={savedLibraryHref(c)}
-                  onClick={onClose}
+                  onClick={onNavigate}
                   sx={{
                     borderRadius: 1,
-                    py: mini ? 0.5 : 0.75,
-                    justifyContent: mini ? "center" : "flex-start",
+                    py: miniMode ? 0.5 : 0.75,
+                    justifyContent: miniMode ? "center" : "flex-start",
                   }}
                 >
-                  {mini ? (
+                  {miniMode ? (
                     <Avatar
                       src={c.thumbnailUrl}
                       alt=""
@@ -231,7 +226,7 @@ export function ChannelsSidebar({
         {savedSearches.length > 0 ? (
           <>
             <Divider sx={{ my: 1 }} />
-            {!mini ? (
+            {!miniMode ? (
               <Box
                 sx={{
                   display: "flex",
@@ -255,14 +250,14 @@ export function ChannelsSidebar({
                   <ListItemButton
                     component={Link}
                     href={searchHref(c.searchQuery)}
-                    onClick={onClose}
+                    onClick={onNavigate}
                     sx={{
                       borderRadius: 1,
-                      py: mini ? 0.5 : 0.75,
-                      justifyContent: mini ? "center" : "flex-start",
+                      py: miniMode ? 0.5 : 0.75,
+                      justifyContent: miniMode ? "center" : "flex-start",
                     }}
                   >
-                    {mini ? (
+                    {miniMode ? (
                       <Avatar sx={{ width: 36, height: 36 }}>
                         {c.name.slice(0, 1).toUpperCase()}
                       </Avatar>
@@ -293,17 +288,17 @@ export function ChannelsSidebar({
         ) : null}
 
         <Divider sx={{ my: 2 }} />
-        <Tooltip title={mini ? "Manage library" : ""} placement="right">
+        <Tooltip title={miniMode ? "Manage library" : ""} placement="right">
           <ListItemButton
             component={Link}
             href="/library"
-            onClick={onClose}
+            onClick={onNavigate}
             sx={{
               borderRadius: 1,
-              justifyContent: mini ? "center" : "flex-start",
+              justifyContent: miniMode ? "center" : "flex-start",
             }}
           >
-            {mini ? (
+            {miniMode ? (
               <ListItemIcon sx={{ minWidth: 0, justifyContent: "center" }}>
                 <SettingsOutlinedIcon fontSize="small" color="action" />
               </ListItemIcon>
@@ -319,87 +314,5 @@ export function ChannelsSidebar({
         </Tooltip>
       </Box>
     </Box>
-  );
-
-  if (surface === "permanent") {
-    return (
-      <Drawer
-        variant="permanent"
-        open
-        sx={[
-          {
-            width: drawerWidth,
-            flexShrink: 0,
-            height: "100%",
-            alignSelf: "stretch",
-            display: { xs: "none", md: "block" },
-            [`& .MuiDrawer-paper`]: {
-              width: drawerWidth,
-              boxSizing: "border-box",
-              position: "relative",
-              height: "100%",
-              borderRight: (t) => `1px solid ${t.palette.divider}`,
-              overflowX: "hidden",
-              transition: (t) =>
-                t.transitions.create("width", {
-                  easing: t.transitions.easing.sharp,
-                  duration: t.transitions.duration.enteringScreen,
-                }),
-            },
-          },
-          ...(sx ? (Array.isArray(sx) ? sx : [sx]) : []),
-        ]}
-      >
-        {drawer}
-      </Drawer>
-    );
-  }
-
-  return (
-    <Drawer
-      variant="temporary"
-      open={open}
-      onClose={onClose}
-      ModalProps={{
-        keepMounted: true,
-        sx: {
-          zIndex: (t) => t.zIndex.appBar - 1,
-        },
-        slotProps: {
-          backdrop: {
-            sx: {
-              top: `calc(${toolbarOffset}px + env(safe-area-inset-top, 0px))`,
-            },
-          },
-        },
-      }}
-      sx={[
-        {
-          zIndex: (t) => t.zIndex.appBar - 1,
-          display: { xs: "block", md: "none" },
-          [`& .MuiDrawer-paper`]: {
-            width: CHANNELS_DRAWER_WIDTH,
-            boxSizing: "border-box",
-            /**
-             * Paper must sit fully below the app bar: it renders under the bar
-             * (z-index appBar - 1), so `margin-top` alone can still leave the first
-             * list items obscured. Pin `top` + `bottom` and use `dvh` for mobile
-             * viewport stability while the drawer is open.
-             */
-            top: `calc(${toolbarOffset}px + env(safe-area-inset-top, 0px))`,
-            bottom: 0,
-            height: "auto",
-            maxHeight: "none",
-            borderRight: (t) => `1px solid ${t.palette.divider}`,
-            overflowX: "hidden",
-            overflowY: "hidden",
-            borderRadius: 0,
-          },
-        },
-        ...(sx ? (Array.isArray(sx) ? sx : [sx]) : []),
-      ]}
-    >
-      {drawer}
-    </Drawer>
   );
 }
