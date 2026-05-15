@@ -137,24 +137,31 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             slotProps={{
               docked: {
                 sx: {
+                  flex: `0 0 ${desktopRailPx}px`,
                   width: desktopRailPx,
+                  minWidth: desktopRailPx,
+                  maxWidth: desktopRailPx,
                   flexShrink: 0,
                   transition: railTransition,
                   boxSizing: "border-box",
                 },
               },
-            }}
-            sx={{
-              [`& .MuiDrawer-paper`]: {
-                boxSizing: "border-box",
-                position: "fixed",
-                overflow: "hidden",
-                whiteSpace: "nowrap",
-                width: desktopRailPx,
-                borderRight: (t) => `1px solid ${t.palette.divider}`,
-                transition: railTransition,
-                top: `${headerInsetPx}px`,
-                height: `calc(100dvh - ${headerInsetPx}px)`,
+              paper: {
+                sx: {
+                  boxSizing: "border-box",
+                  position: "fixed",
+                  overflow: "hidden",
+                  whiteSpace: railCollapsed ? "nowrap" : "normal",
+                  width: desktopRailPx,
+                  minWidth: desktopRailPx,
+                  maxWidth: desktopRailPx,
+                  flex: "none",
+                  borderRight: (t) => `1px solid ${t.palette.divider}`,
+                  transition: railTransition,
+                  top: 0,
+                  height: "100dvh",
+                  paddingTop: "env(safe-area-inset-top, 0px)",
+                },
               },
             }}
           >
@@ -170,7 +177,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               flex: 1,
               minWidth: 0,
               minHeight: 0,
-              ml: `${desktopRailPx}px`,
               transition: railTransition,
               display: "flex",
               flexDirection: "column",

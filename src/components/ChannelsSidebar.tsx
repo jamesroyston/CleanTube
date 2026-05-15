@@ -93,6 +93,8 @@ export function ChannelsRailContent({
       sx={{
         height: "100%",
         minHeight: 0,
+        width: "100%",
+        minWidth: 0,
         display: "flex",
         flexDirection: "column",
       }}
@@ -101,6 +103,8 @@ export function ChannelsRailContent({
         sx={{
           flex: 1,
           minHeight: 0,
+          width: "100%",
+          minWidth: 0,
           overflow: "auto",
           px: miniMode ? 0.5 : 1,
           py: 1,
