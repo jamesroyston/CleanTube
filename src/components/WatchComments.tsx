@@ -28,6 +28,12 @@ type WatchCommentsProps = {
    * (e.g. user turned comments on without a full page refresh).
    */
   fetchInitialIfNeeded?: boolean;
+  /**
+   * When false, skip the auto-fetch until the section is shown (keeps component
+   * mounted but hidden so toggling off/on does not refetch or lose sort/replies state).
+   * @default true
+   */
+  isVisible?: boolean;
 };
 
 
@@ -165,6 +171,7 @@ export function WatchComments({
   videoId,
   initialComments,
   fetchInitialIfNeeded = false,
+  isVisible = true,
 }: WatchCommentsProps) {
   const [comments, setComments] = useState(initialComments);
   const [error, setError] = useState<string | null>(null);
@@ -184,6 +191,7 @@ export function WatchComments({
   }, [initialComments, videoId]);
 
   useEffect(() => {
+    if (!isVisible) return;
     if (!fetchInitialIfNeeded || initialComments !== null) return;
     if (didAutoFetchRef.current) return;
     didAutoFetchRef.current = true;
@@ -210,7 +218,7 @@ export function WatchComments({
         setLoading(false);
       }
     })();
-  }, [fetchInitialIfNeeded, initialComments, videoId]);
+  }, [isVisible, fetchInitialIfNeeded, initialComments, videoId]);
 
   const entries = comments?.comments ?? [];
   const sort = comments?.sort ?? "top";
