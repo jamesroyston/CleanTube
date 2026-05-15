@@ -149,13 +149,17 @@ export function WatchExperienceClient({
             {video.description?.trim() ? (
               <WatchDescription description={video.description} />
             ) : null}
-            {commentsVisible ? (
+            <Box
+              sx={{ display: commentsVisible ? "block" : "none" }}
+              aria-hidden={!commentsVisible}
+            >
               <WatchComments
                 videoId={videoId}
                 initialComments={commentsInitial}
                 fetchInitialIfNeeded={commentsInitial === null}
+                isVisible={commentsVisible}
               />
-            ) : null}
+            </Box>
           </Stack>
         </Grid>
         {upNextVisible ? (

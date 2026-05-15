@@ -98,7 +98,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   );
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100dvh",
+        minHeight: 0,
+        overflow: "hidden",
+      }}
+    >
       {mdUp ? (
         <Box
           aria-hidden
