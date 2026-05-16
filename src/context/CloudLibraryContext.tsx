@@ -15,6 +15,7 @@ import {
 import {
   fetchCloudSnapshot,
   getInitialSession,
+  mergeWatchProgressEntries,
   replaceSavedChannels,
   replaceWatchLaterEntries,
   replaceWatchProgressEntries,
@@ -431,7 +432,29 @@ export function CloudLibraryProvider({
         } else {
           nextWatchLater = remote.watchLater.map((e) => ({ ...e }));
           nextSaved = remote.savedChannels.map((c) => ({ ...c }));
-          nextProgress = remote.watchProgress.map((p) => ({ ...p }));
+          nextProgress = mergeWatchProgressEntries(
+            remote.watchProgress.map((p) => ({ ...p })),
+            localSnapshot.watchProgress.map((p) => ({ ...p })),
+          );
+          const remoteProgressByVideo = new Map(
+            remote.watchProgress.map((p) => [p.videoId, p]),
+          );
+          const localAhead = localSnapshot.watchProgress.filter((entry) => {
+            const remoteEntry = remoteProgressByVideo.get(entry.videoId);
+            return (
+              remoteEntry === undefined ||
+              entry.updatedAt > remoteEntry.updatedAt
+            );
+          });
+          if (localAhead.length > 0) {
+            void upsertWatchProgressEntries(
+              supabase,
+              nextUser.id,
+              localAhead,
+            ).catch(() => {
+              /* keep merged state if cloud sync fails */
+            });
+          }
         }
 
         watchProgressLiveRef.current.clear();
