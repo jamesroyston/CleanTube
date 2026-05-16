@@ -82,7 +82,12 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   const railTransition = drawerRailTransition(theme);
 
-  const mainScroll = (
+  /**
+   * Desktop: single inner scroll region (sidebar + split layout).
+   * Mobile (esp. iOS Safari): nested `overflow: auto` under `overflow: hidden` + `100dvh`
+   * often breaks momentum/touch scrolling — use native document scrolling instead.
+   */
+  const mainScroll = mdUp ? (
     <Box
       sx={{
         flex: 1,
@@ -95,6 +100,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <SavedChannelMigration />
       {children}
     </Box>
+  ) : (
+    <Box sx={{ flex: 1, minHeight: 0 }}>
+      <SavedChannelMigration />
+      {children}
+    </Box>
   );
 
   return (
@@ -102,9 +112,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       sx={{
         display: "flex",
         flexDirection: "column",
-        height: "100dvh",
-        minHeight: 0,
-        overflow: "hidden",
+        ...(mdUp
+          ? {
+              height: "100dvh",
+              minHeight: 0,
+              overflow: "hidden",
+            }
+          : {
+              minHeight: "100dvh",
+            }),
       }}
     >
       {mdUp ? (

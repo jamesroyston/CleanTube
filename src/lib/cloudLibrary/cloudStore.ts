@@ -105,6 +105,27 @@ function toWatchProgressEntry(row: WatchProgressRow): WatchProgressEntry {
   };
 }
 
+/** Merge two watch-progress lists by video id, keeping the newer `updatedAt`. */
+export function mergeWatchProgressEntries(
+  a: WatchProgressEntry[],
+  b: WatchProgressEntry[],
+): WatchProgressEntry[] {
+  const byId = new Map<string, WatchProgressEntry>();
+  const put = (e: WatchProgressEntry) => {
+    const cur = byId.get(e.videoId);
+    if (!cur || e.updatedAt > cur.updatedAt) {
+      byId.set(e.videoId, e);
+    } else if (e.updatedAt === cur.updatedAt && e.lastWatchedAt > cur.lastWatchedAt) {
+      byId.set(e.videoId, e);
+    }
+  };
+  for (const e of a) put(e);
+  for (const e of b) put(e);
+  return Array.from(byId.values()).sort((x, y) =>
+    x.lastWatchedAt < y.lastWatchedAt ? 1 : x.lastWatchedAt > y.lastWatchedAt ? -1 : 0,
+  );
+}
+
 export async function fetchCloudSnapshot(
   supabase: SupabaseClient,
 ): Promise<CloudSnapshot> {
