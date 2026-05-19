@@ -5,7 +5,8 @@ import Container from "@mui/material/Container";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useWatchCommentsVisible, useWatchUpNextVisible } from "@/app/providers";
 import { GoToChannelButton } from "@/components/GoToChannelButton";
@@ -16,13 +17,33 @@ import { WatchComments } from "@/components/WatchComments";
 import { WatchDescription } from "@/components/WatchDescription";
 import { WatchNextSidebar } from "@/components/WatchNextSidebar";
 import type { VideoSummary } from "@/components/VideoSummary";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { readFetchJson } from "@/lib/fetchJson";
+import {
+  parseYouTubeTimeParam,
+} from "@/lib/youtubeTime";
 import type { WatchVideoComments, WatchVideoDetails } from "@/lib/youtubeTypes";
 
 type WatchNextApiResponse = {
   videos?: VideoSummary[];
   error?: string;
 };
+
+/** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
+const MOBILE_PORTRAIT =
+  "@media (max-width: 599.95px) and (orientation: portrait)";
+
+const watchPlayerShellSx = {
+  mb: { xs: 2, sm: 3 },
+} as const;
+
+const watchBelowPlayerPadSx = {
+  [MOBILE_PORTRAIT]: { px: 2 },
+} as const;
+
+const watchSidebarPadSx = {
+  [MOBILE_PORTRAIT]: { px: 2 },
+} as const;
 
 export type WatchExperienceClientProps = {
   videoId: string;
@@ -52,8 +73,72 @@ export function WatchExperienceClient({
   commentsInitial,
   watchNextInitial,
 }: WatchExperienceClientProps) {
+  const searchParams = useSearchParams();
+  const {
+    getResumeSeconds,
+    authStatus,
+    isCloudConfigured,
+    localLibraryHydrated,
+    libraryCloudSyncState,
+    user,
+  } = useCloudLibrary();
   const { visible: upNextVisible } = useWatchUpNextVisible();
   const { visible: commentsVisible } = useWatchCommentsVisible();
+
+  const urlStartSeconds =
+    parseYouTubeTimeParam(searchParams.get("t")) ??
+    parseYouTubeTimeParam(searchParams.get("start"));
+  const hasUrlStart = urlStartSeconds != null && urlStartSeconds > 0;
+
+  /** URL `?t=` / `?start=` wins; else wait for local + auth + cloud sync before mounting. */
+  const cloudSnapshotReady =
+    !isCloudConfigured ||
+    user == null ||
+    libraryCloudSyncState !== "syncing";
+  const progressResolvable =
+    hasUrlStart ||
+    (localLibraryHydrated &&
+      (!isCloudConfigured || authStatus === "ready") &&
+      cloudSnapshotReady);
+
+  const effectiveStartSeconds = useMemo(() => {
+    if (hasUrlStart) return urlStartSeconds!;
+    if (!progressResolvable) return startSeconds;
+    const resume = getResumeSeconds(videoId);
+    if (resume != null && resume > 0) return resume;
+    return startSeconds;
+  }, [
+    hasUrlStart,
+    urlStartSeconds,
+    progressResolvable,
+    videoId,
+    getResumeSeconds,
+    startSeconds,
+  ]);
+
+  /** Freeze start at first mount so saving progress on pause does not remount the player. */
+  const playerMountRef = useRef<{
+    videoId: string;
+    startSeconds: number;
+  } | null>(null);
+  if (
+    playerMountRef.current &&
+    playerMountRef.current.videoId !== videoId
+  ) {
+    playerMountRef.current = null;
+  }
+  if (progressResolvable) {
+    const prev = playerMountRef.current;
+    if (!prev || prev.videoId !== videoId) {
+      playerMountRef.current = {
+        videoId,
+        startSeconds: effectiveStartSeconds,
+      };
+    }
+  }
+  const showPlayer = playerMountRef.current?.videoId === videoId;
+  const playerStartSeconds =
+    playerMountRef.current?.startSeconds ?? effectiveStartSeconds;
 
   const [watchNextVideos, setWatchNextVideos] =
     useState<VideoSummary[]>(watchNextInitial);
@@ -103,68 +188,86 @@ export function WatchExperienceClient({
     >
       <Grid
         container
-        spacing={3}
-        sx={{ px: { xs: 2, sm: 0 }, alignItems: "flex-start" }}
+        spacing={{ xs: 0, sm: 3 }}
+        sx={{
+          px: { xs: 2, sm: 0 },
+          alignItems: "flex-start",
+          [MOBILE_PORTRAIT]: { px: 0 },
+        }}
       >
         <Grid size={{ xs: 12, lg: upNextVisible ? 8 : 12 }}>
           <Stack spacing={1.5}>
-            <Box
-              sx={{
-                mb: { xs: 2, sm: 3 },
-              }}
-            >
-              <LiteYouTubeEmbed
-                videoId={videoId}
-                title={title}
-                thumbnailUrl={thumb}
-                channelName={video.channelName}
-                startSeconds={startSeconds}
-              />
+            <Box sx={watchPlayerShellSx}>
+              {showPlayer ? (
+                <LiteYouTubeEmbed
+                  key={videoId}
+                  videoId={videoId}
+                  title={title}
+                  thumbnailUrl={thumb}
+                  channelName={video.channelName}
+                  startSeconds={playerStartSeconds}
+                />
+              ) : (
+                <Box
+                  sx={{
+                    width: "100%",
+                    aspectRatio: "16 / 9",
+                    borderRadius: 1,
+                    bgcolor: "action.hover",
+                    [MOBILE_PORTRAIT]: { borderRadius: 0 },
+                  }}
+                  aria-hidden
+                />
+              )}
             </Box>
 
-            <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
-              {title}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {metaParts.join(" · ")}
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              {channelPageHref ? (
-                <GoToChannelButton href={channelPageHref} />
+            <Stack spacing={1.5} sx={watchBelowPlayerPadSx}>
+              <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
+                {title}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {metaParts.join(" · ")}
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                {channelPageHref ? (
+                  <GoToChannelButton href={channelPageHref} />
+                ) : null}
+                <SaveChannelButton
+                  channelName={video.channelName}
+                  channelId={video.channelId}
+                  channelUrl={video.channelUrl}
+                  thumbnailUrl={video.channelThumbnailUrl ?? thumb}
+                />
+                <WatchLaterAddButton
+                  videoId={videoId}
+                  title={title}
+                  thumbnailUrl={thumb}
+                  channelName={video.channelName}
+                  startSecondsContext={effectiveStartSeconds}
+                />
+              </Stack>
+              {video.description?.trim() ? (
+                <WatchDescription description={video.description} />
               ) : null}
-              <SaveChannelButton
-                channelName={video.channelName}
-                channelId={video.channelId}
-                channelUrl={video.channelUrl}
-                thumbnailUrl={video.channelThumbnailUrl ?? thumb}
-              />
-              <WatchLaterAddButton
-                videoId={videoId}
-                title={title}
-                thumbnailUrl={thumb}
-                channelName={video.channelName}
-                startSecondsContext={startSeconds}
-              />
+              <Box
+                sx={{ display: commentsVisible ? "block" : "none" }}
+                aria-hidden={!commentsVisible}
+              >
+                <WatchComments
+                  videoId={videoId}
+                  initialComments={commentsInitial}
+                  fetchInitialIfNeeded={commentsInitial === null}
+                  isVisible={commentsVisible}
+                />
+              </Box>
             </Stack>
-            {video.description?.trim() ? (
-              <WatchDescription description={video.description} />
-            ) : null}
-            <Box
-              sx={{ display: commentsVisible ? "block" : "none" }}
-              aria-hidden={!commentsVisible}
-            >
-              <WatchComments
-                videoId={videoId}
-                initialComments={commentsInitial}
-                fetchInitialIfNeeded={commentsInitial === null}
-                isVisible={commentsVisible}
-              />
-            </Box>
           </Stack>
         </Grid>
         {upNextVisible ? (
           <Grid size={{ xs: 12, lg: 4 }}>
-            <WatchNextSidebar videos={watchNextVideos} />
+            <Box sx={watchSidebarPadSx}>
+              <WatchNextSidebar videos={watchNextVideos} />
+            </Box>
           </Grid>
         ) : null}
       </Grid>

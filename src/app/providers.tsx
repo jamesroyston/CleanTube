@@ -19,13 +19,12 @@ import { NavigationProgressProvider } from "@/context/NavigationProgressContext"
 import {
   type InitialThemeSettings,
   type ThemeMode,
-  THEME_DARK_PRESET_COOKIE,
-  THEME_DARK_PRESET_STORAGE_KEY,
-  THEME_LIGHT_PRESET_COOKIE,
-  THEME_LIGHT_PRESET_STORAGE_KEY,
+  LEGACY_THEME_DARK_PRESET_COOKIE,
+  LEGACY_THEME_DARK_PRESET_STORAGE_KEY,
+  LEGACY_THEME_LIGHT_PRESET_COOKIE,
+  LEGACY_THEME_LIGHT_PRESET_STORAGE_KEY,
   THEME_MODE_COOKIE,
   THEME_MODE_STORAGE_KEY,
-  createInitialThemeSettings,
   normalizeThemeMode,
 } from "@/lib/themePersistence";
 import {
@@ -33,22 +32,13 @@ import {
   librarySidebarCollapsedToStorageValue,
   parseLibrarySidebarCollapsedCookie,
 } from "@/lib/librarySidebarPersistence";
-import {
-  normalizeDarkPreset,
-  normalizeLightPreset,
-  type DarkPresetId,
-  type LightPresetId,
-} from "@/theme/presets";
+import { applySemanticCssVariables, semanticTokensForMode } from "@/theme/semanticTokens";
 import { createAppTheme } from "@/theme/theme";
 
 type ThemeContextValue = {
   mode: ThemeMode;
   toggleMode: () => void;
   setMode: (m: ThemeMode) => void;
-  darkPresetId: DarkPresetId;
-  lightPresetId: LightPresetId;
-  setDarkPresetId: (id: DarkPresetId) => void;
-  setLightPresetId: (id: LightPresetId) => void;
 };
 
 const ThemeModeContext = createContext<ThemeContextValue | null>(null);
@@ -77,26 +67,20 @@ type LibrarySidebarCollapsedContextValue = {
 const LibrarySidebarCollapsedContext =
   createContext<LibrarySidebarCollapsedContextValue | null>(null);
 
-function readStoredThemeSettings(): InitialThemeSettings {
-  if (typeof window === "undefined") {
-    return createInitialThemeSettings({});
-  }
+function readStoredThemeMode(): ThemeMode | undefined {
+  if (typeof window === "undefined") return undefined;
   try {
-    const storedMode = normalizeThemeMode(
-      localStorage.getItem(THEME_MODE_STORAGE_KEY),
-    );
-    return createInitialThemeSettings({
-      mode:
-        storedMode ??
-        (window.matchMedia("(prefers-color-scheme: light)").matches
-          ? "light"
-          : "dark"),
-      darkPresetId: localStorage.getItem(THEME_DARK_PRESET_STORAGE_KEY),
-      lightPresetId: localStorage.getItem(THEME_LIGHT_PRESET_STORAGE_KEY),
-    });
+    return normalizeThemeMode(localStorage.getItem(THEME_MODE_STORAGE_KEY));
   } catch {
-    return createInitialThemeSettings({});
+    return undefined;
   }
+}
+
+function systemThemeMode(): ThemeMode {
+  if (typeof window === "undefined") return "dark";
+  return window.matchMedia("(prefers-color-scheme: light)").matches
+    ? "light"
+    : "dark";
 }
 
 function writeThemeCookie(name: string, value: string): void {
@@ -110,12 +94,36 @@ function writeThemeCookie(name: string, value: string): void {
   }
 }
 
+function clearLegacyThemeCookie(name: string): void {
+  if (typeof document === "undefined") return;
+  try {
+    document.cookie = `${name}=; Max-Age=0; Path=/; SameSite=Lax`;
+  } catch {
+    /* ignore */
+  }
+}
+
 function writeThemeStorage(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch {
     /* ignore */
   }
+}
+
+function removeThemeStorage(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearLegacyThemeStorage(): void {
+  removeThemeStorage(LEGACY_THEME_DARK_PRESET_STORAGE_KEY);
+  removeThemeStorage(LEGACY_THEME_LIGHT_PRESET_STORAGE_KEY);
+  clearLegacyThemeCookie(LEGACY_THEME_DARK_PRESET_COOKIE);
+  clearLegacyThemeCookie(LEGACY_THEME_LIGHT_PRESET_COOKIE);
 }
 
 function readStoredLibrarySidebarCollapsed(): boolean | undefined {
@@ -190,10 +198,6 @@ export function AppProviders({
   librarySidebarHasCookie: boolean;
 }) {
   const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode);
-  const [darkPresetId, setDarkPresetIdState] =
-    useState<DarkPresetId>(initialTheme.darkPresetId);
-  const [lightPresetId, setLightPresetIdState] =
-    useState<LightPresetId>(initialTheme.lightPresetId);
   const [watchCommentsVisible, setWatchCommentsVisibleState] = useState(
     initialWatchCommentsVisible,
   );
@@ -203,6 +207,17 @@ export function AppProviders({
   const [librarySidebarCollapsed, setLibrarySidebarCollapsedState] = useState(
     initialLibrarySidebarCollapsed,
   );
+
+  useEffect(() => {
+    applySemanticCssVariables(
+      document.documentElement,
+      semanticTokensForMode(mode),
+    );
+  }, [mode]);
+
+  useEffect(() => {
+    clearLegacyThemeStorage();
+  }, []);
 
   useEffect(() => {
     if (librarySidebarHasCookie) return;
@@ -215,35 +230,21 @@ export function AppProviders({
 
   useEffect(() => {
     if (initialTheme.hasStoredCookie) return;
-    const stored = readStoredThemeSettings();
+    const stored = readStoredThemeMode() ?? systemThemeMode();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time migration from legacy localStorage-only theme settings
-    setModeState(stored.mode);
-    setDarkPresetIdState(stored.darkPresetId);
-    setLightPresetIdState(stored.lightPresetId);
-    writeThemeCookie(THEME_MODE_COOKIE, stored.mode);
-    writeThemeCookie(THEME_DARK_PRESET_COOKIE, stored.darkPresetId);
-    writeThemeCookie(THEME_LIGHT_PRESET_COOKIE, stored.lightPresetId);
+    setModeState(stored);
+    writeThemeCookie(THEME_MODE_COOKIE, stored);
+    writeThemeStorage(THEME_MODE_STORAGE_KEY, stored);
   }, [initialTheme.hasStoredCookie]);
 
   useEffect(() => {
     function onStorage(e: StorageEvent) {
-      if (!e.newValue) return;
-      if (e.key === THEME_MODE_STORAGE_KEY) {
+      if (e.key === THEME_MODE_STORAGE_KEY && e.newValue) {
         const next = normalizeThemeMode(e.newValue);
         if (next) {
           setModeState(next);
           writeThemeCookie(THEME_MODE_COOKIE, next);
         }
-      }
-      if (e.key === THEME_DARK_PRESET_STORAGE_KEY) {
-        const next = normalizeDarkPreset(e.newValue);
-        setDarkPresetIdState(next);
-        writeThemeCookie(THEME_DARK_PRESET_COOKIE, next);
-      }
-      if (e.key === THEME_LIGHT_PRESET_STORAGE_KEY) {
-        const next = normalizeLightPreset(e.newValue);
-        setLightPresetIdState(next);
-        writeThemeCookie(THEME_LIGHT_PRESET_COOKIE, next);
       }
     }
     window.addEventListener("storage", onStorage);
@@ -269,18 +270,6 @@ export function AppProviders({
     writeThemeCookie(THEME_MODE_COOKIE, m);
   }, []);
 
-  const setDarkPresetId = useCallback((id: DarkPresetId) => {
-    setDarkPresetIdState(id);
-    writeThemeStorage(THEME_DARK_PRESET_STORAGE_KEY, id);
-    writeThemeCookie(THEME_DARK_PRESET_COOKIE, id);
-  }, []);
-
-  const setLightPresetId = useCallback((id: LightPresetId) => {
-    setLightPresetIdState(id);
-    writeThemeStorage(THEME_LIGHT_PRESET_STORAGE_KEY, id);
-    writeThemeCookie(THEME_LIGHT_PRESET_COOKIE, id);
-  }, []);
-
   const toggleMode = useCallback(() => {
     setMode(mode === "dark" ? "light" : "dark");
   }, [mode, setMode]);
@@ -301,30 +290,15 @@ export function AppProviders({
     void setLibrarySidebarCollapsedAction(next);
   }, []);
 
-  const theme = useMemo(
-    () => createAppTheme(mode, darkPresetId, lightPresetId),
-    [mode, darkPresetId, lightPresetId],
-  );
+  const theme = useMemo(() => createAppTheme(mode), [mode]);
 
   const value = useMemo(
     () => ({
       mode,
       toggleMode,
       setMode,
-      darkPresetId,
-      lightPresetId,
-      setDarkPresetId,
-      setLightPresetId,
     }),
-    [
-      mode,
-      toggleMode,
-      setMode,
-      darkPresetId,
-      lightPresetId,
-      setDarkPresetId,
-      setLightPresetId,
-    ],
+    [mode, toggleMode, setMode],
   );
 
   const watchCommentsVisibleValue = useMemo(
