@@ -94,6 +94,8 @@ type WatchProgressUpsertOptions = {
 
 type CloudLibraryContextValue = {
   authStatus: AuthStatus;
+  /** True after the first client read of localStorage (useLayoutEffect). */
+  localLibraryHydrated: boolean;
   isCloudConfigured: boolean;
   libraryCloudSyncState: LibraryCloudSyncState;
   session: Session | null;
@@ -274,6 +276,7 @@ export function CloudLibraryProvider({
   const [watchLaterEntries, setWatchLaterEntries] = useState<WatchLaterEntry[]>([]);
   const [savedChannels, setSavedChannels] = useState<SavedChannel[]>([]);
   const [watchProgress, setWatchProgress] = useState<WatchProgressEntry[]>([]);
+  const [localLibraryHydrated, setLocalLibraryHydrated] = useState(false);
   /** Latest playback fields while sampling; avoids context churn on 1s ticks (esp. mobile Safari). */
   const watchProgressLiveRef = useRef<Map<string, WatchProgressLivePatch>>(new Map());
   const [passkeysSupported, setPasskeysSupported] = useState(false);
@@ -478,6 +481,7 @@ export function CloudLibraryProvider({
   useLayoutEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage once on client
     hydrateFromLocal();
+    setLocalLibraryHydrated(true);
   }, [hydrateFromLocal]);
 
   useLayoutEffect(() => {
@@ -981,6 +985,7 @@ export function CloudLibraryProvider({
   const value = useMemo<CloudLibraryContextValue>(
     () => ({
       authStatus,
+      localLibraryHydrated,
       isCloudConfigured,
       libraryCloudSyncState: effectiveLibraryCloudSyncState,
       session,
@@ -1019,6 +1024,7 @@ export function CloudLibraryProvider({
       addOrUpdateWatchLater,
       addSavedChannel,
       authStatus,
+      localLibraryHydrated,
       clearWatchLater,
       effectiveLibraryCloudSyncState,
       clearWatchProgress,

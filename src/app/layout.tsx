@@ -15,8 +15,6 @@ import {
 import { readWatchUpNextVisibleFromCookieStore } from "@/lib/watchUpNextVisibilityPersistence";
 import {
   createInitialThemeSettings,
-  THEME_DARK_PRESET_COOKIE,
-  THEME_LIGHT_PRESET_COOKIE,
   THEME_MODE_COOKIE,
 } from "@/lib/themePersistence";
 import "./globals.css";
@@ -50,8 +48,6 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const mode = cookieStore.get(THEME_MODE_COOKIE)?.value;
-  const darkPresetId = cookieStore.get(THEME_DARK_PRESET_COOKIE)?.value;
-  const lightPresetId = cookieStore.get(THEME_LIGHT_PRESET_COOKIE)?.value;
   const initialWatchCommentsVisible = parseWatchCommentsVisibleCookie(
     cookieStore.get(WATCH_COMMENTS_VISIBLE_COOKIE)?.value,
   );
@@ -65,13 +61,16 @@ export default async function RootLayout({
 
   const initialTheme = createInitialThemeSettings({
     mode,
-    darkPresetId,
-    lightPresetId,
-    hasStoredCookie: Boolean(mode || darkPresetId || lightPresetId),
+    hasStoredCookie: Boolean(mode),
   });
 
   return (
-    <html lang="en" className={roboto.variable} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={roboto.variable}
+      data-theme={initialTheme.mode}
+      suppressHydrationWarning
+    >
       <body style={{ margin: 0 }}>
         <AppProviders
           initialTheme={initialTheme}

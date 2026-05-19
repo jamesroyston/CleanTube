@@ -1,9 +1,14 @@
 "use client";
 
-import type { RefObject } from "react";
+import type { MutableRefObject, RefObject } from "react";
 import { useEffect } from "react";
 
-import type { LiteYoutubeElement } from "@/types/lite-youtube-element";
+import {
+  getAttachedLiteYoutubePlayer,
+  isYoutubePlayerAttached,
+  readPlayerCurrentTime,
+  readPlayerDuration,
+} from "@/lib/youtubePlayer";
 
 const SEEK_STEP_SEC = 10;
 const VOLUME_STEP = 5;
@@ -23,15 +28,8 @@ function isTypingTarget(target: EventTarget | null): boolean {
   return target.isContentEditable;
 }
 
-function findLitePlayerRoot(ref: RefObject<HTMLElement | null>): LiteYoutubeElement | null {
-  const root = ref.current;
-  if (!root) return null;
-  const el = root.querySelector("lite-youtube");
-  if (!el) return null;
-  return el as LiteYoutubeElement;
-}
-
 async function toggleFullscreen(player: YT.Player) {
+  if (!isYoutubePlayerAttached(player)) return;
   const iframe = player.getIframe?.();
   if (!iframe) return;
   try {
@@ -41,24 +39,34 @@ async function toggleFullscreen(player: YT.Player) {
       await iframe.requestFullscreen();
     }
   } catch {
-    /* ignore — policy or unsupported */
+    /* ignore */
   }
 }
 
 async function seekToTimelineFraction(player: YT.Player, digit0to9: number) {
-  const d = player.getDuration?.();
-  if (!d || !Number.isFinite(d) || d <= 0) return;
+  if (!isYoutubePlayerAttached(player)) return;
+  const d = readPlayerDuration(player);
+  if (!d || d <= 0) return;
   const frac = digit0to9 === 0 ? 0 : digit0to9 / 10;
-  player.seekTo(Math.floor(frac * d), true);
+  try {
+    player.seekTo(Math.floor(frac * d), true);
+  } catch {
+    /* not ready */
+  }
 }
 
 function adjustVolume(player: YT.Player, delta: number) {
-  if (delta > 0 && player.isMuted()) player.unMute();
-  const current = player.getVolume?.();
-  const v = current == null || !Number.isFinite(current) ? 100 : current;
-  const next = Math.min(100, Math.max(0, Math.round(v + delta)));
-  player.setVolume(next);
-  if (next === 0) player.mute();
+  if (!isYoutubePlayerAttached(player)) return;
+  try {
+    if (delta > 0 && player.isMuted()) player.unMute();
+    const current = player.getVolume?.();
+    const v = current == null || !Number.isFinite(current) ? 100 : current;
+    const next = Math.min(100, Math.max(0, Math.round(v + delta)));
+    player.setVolume(next);
+    if (next === 0) player.mute();
+  } catch {
+    /* not ready */
+  }
 }
 
 /**
@@ -68,6 +76,7 @@ export function useGlobalYoutubeShortcuts(
   containerRef: RefObject<HTMLElement | null>,
   videoId: string,
   enabled = true,
+  playerApiReadyRef?: MutableRefObject<boolean>,
 ): void {
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
@@ -76,44 +85,57 @@ export function useGlobalYoutubeShortcuts(
     let playerCache: YT.Player | null = null;
 
     async function getPlayer(): Promise<YT.Player | null> {
-      if (playerCache) return playerCache;
-      const el = findLitePlayerRoot(containerRef);
-      if (!el || typeof el.getYTPlayer !== "function") return null;
-      try {
-        const p = await el.getYTPlayer();
-        if (cancelled || !p) return null;
-        playerCache = p;
-        return p;
-      } catch {
-        return null;
+      if (playerApiReadyRef && !playerApiReadyRef.current) return null;
+      if (playerCache && isYoutubePlayerAttached(playerCache)) {
+        return playerCache;
       }
+      playerCache = null;
+      const p = await getAttachedLiteYoutubePlayer(containerRef.current);
+      if (cancelled || !p) return null;
+      playerCache = p;
+      return p;
     }
 
     async function togglePlayPause(player: YT.Player) {
-      const s = player.getPlayerState();
-      if (s === YT_PLAYING) player.pauseVideo();
-      else player.playVideo();
-    }
-
-    async function seekRelative(player: YT.Player, deltaSec: number) {
-      const t = player.getCurrentTime?.() ?? 0;
-      const d = player.getDuration?.();
-      const max = d && Number.isFinite(d) ? d : t + Math.abs(deltaSec);
-      const next = Math.min(Math.max(0, t + deltaSec), max);
-      player.seekTo(next, true);
-    }
-
-    async function toggleMute(player: YT.Player) {
-      if (player.isMuted()) {
-        player.unMute();
-        if ((player.getVolume?.() ?? 0) === 0) player.setVolume(100);
-      } else {
-        player.mute();
+      if (!isYoutubePlayerAttached(player)) return;
+      try {
+        const s = player.getPlayerState();
+        if (s === YT_PLAYING) player.pauseVideo();
+        else player.playVideo();
+      } catch {
+        /* not ready */
       }
     }
 
-    /** Captions: best-effort; embed / video may not expose tracks. */
+    async function seekRelative(player: YT.Player, deltaSec: number) {
+      if (!isYoutubePlayerAttached(player)) return;
+      const t = readPlayerCurrentTime(player) ?? 0;
+      const d = readPlayerDuration(player);
+      const max = d && d > 0 ? d : t + Math.abs(deltaSec);
+      const next = Math.min(Math.max(0, t + deltaSec), max);
+      try {
+        player.seekTo(next, true);
+      } catch {
+        /* not ready */
+      }
+    }
+
+    async function toggleMute(player: YT.Player) {
+      if (!isYoutubePlayerAttached(player)) return;
+      try {
+        if (player.isMuted()) {
+          player.unMute();
+          if ((player.getVolume?.() ?? 0) === 0) player.setVolume(100);
+        } else {
+          player.mute();
+        }
+      } catch {
+        /* not ready */
+      }
+    }
+
     async function toggleCaptions(player: YT.Player) {
+      if (!isYoutubePlayerAttached(player)) return;
       const p = player as PlayerExtended;
       try {
         const cur = p.getOption?.("captions", "track") as
@@ -231,5 +253,6 @@ export function useGlobalYoutubeShortcuts(
       playerCache = null;
       window.removeEventListener("keydown", onKeyDown);
     };
+    // playerApiReadyRef is a ref — read .current inside the effect; do not list it here
   }, [containerRef, videoId, enabled]);
 }

@@ -10,7 +10,6 @@ import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import ClearAllOutlinedIcon from "@mui/icons-material/ClearAllOutlined";
 import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
-import PaletteIcon from "@mui/icons-material/Palette";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
 import Box from "@mui/material/Box";
@@ -39,7 +38,6 @@ import {
   useWatchCommentsVisible,
   useWatchUpNextVisible,
 } from "@/app/providers";
-import { ThemePresetDialog } from "@/components/ThemePresetPanel";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 function emailLocalPart(email: string | undefined): string {
@@ -59,8 +57,8 @@ export function AccountMenu() {
     useWatchUpNextVisible();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const [paletteOpen, setPaletteOpen] = useState(false);
   const open = Boolean(anchorEl);
+  const signedInColor = user ? "success" : "inherit";
   const accountLabel = user ? emailLocalPart(user.email ?? undefined) : "";
   const accountTooltip = user?.email?.trim() ?? "Account";
 
@@ -72,7 +70,7 @@ export function AccountMenu() {
             compactAccount ? (
               <IconButton
                 aria-label="Account"
-                color="inherit"
+                color={signedInColor}
                 onClick={(event) => setAnchorEl(event.currentTarget)}
               >
                 <AccountCircleOutlinedIcon />
@@ -82,7 +80,9 @@ export function AccountMenu() {
                 aria-label="Account"
                 color="inherit"
                 onClick={(event) => setAnchorEl(event.currentTarget)}
-                startIcon={<AccountCircleOutlinedIcon />}
+                startIcon={
+                  <AccountCircleOutlinedIcon sx={{ color: "success.main" }} />
+                }
                 sx={{
                   minWidth: 0,
                   maxWidth: 220,
@@ -99,7 +99,7 @@ export function AccountMenu() {
           ) : (
             <IconButton
               aria-label="Account"
-              color="inherit"
+              color={signedInColor}
               onClick={(event) => setAnchorEl(event.currentTarget)}
             >
               <AccountCircleOutlinedIcon />
@@ -152,17 +152,6 @@ export function AccountMenu() {
           <ListItemText>
             {mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
           </ListItemText>
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setAnchorEl(null);
-            setPaletteOpen(true);
-          }}
-        >
-          <ListItemIcon>
-            <PaletteIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText>Theme palette</ListItemText>
         </MenuItem>
         <ListSubheader
           disableSticky
@@ -339,10 +328,6 @@ export function AccountMenu() {
           Signed-out browsing uses local storage on this device. Sign in to load your cloud library; sign out clears that local copy.
         </Typography>
       </Menu>
-      <ThemePresetDialog
-        open={paletteOpen}
-        onClose={() => setPaletteOpen(false)}
-      />
     </>
   );
 }

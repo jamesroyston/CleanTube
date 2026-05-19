@@ -1,66 +1,91 @@
-import { createTheme } from "@mui/material/styles";
+import { alpha, createTheme } from "@mui/material/styles";
 
-import {
-  DARK_PRESETS,
-  DEFAULT_DARK_PRESET,
-  DEFAULT_LIGHT_PRESET,
-  LIGHT_PRESETS,
-  type DarkPresetId,
-  type LightPresetId,
-} from "@/theme/presets";
+import { muiHexPaletteForMode } from "@/theme/semanticTokens";
 
-export function createAppTheme(
-  mode: "light" | "dark",
-  darkPresetId: DarkPresetId = DEFAULT_DARK_PRESET,
-  lightPresetId: LightPresetId = DEFAULT_LIGHT_PRESET,
-) {
-  const tokens =
-    mode === "dark"
-      ? DARK_PRESETS[darkPresetId]
-      : LIGHT_PRESETS[lightPresetId];
+/**
+ * MUI theme from DaisyUI-style semantic tokens.
+ * CSS uses oklch via globals.css; MUI palette uses hex (MUI cannot parse oklch/var).
+ */
+export function createAppTheme(mode: "light" | "dark") {
+  const c = muiHexPaletteForMode(mode);
 
   return createTheme({
     palette: {
       mode,
-      primary: { main: tokens.primary },
-      secondary: { main: tokens.secondary },
-      background: {
-        default: tokens.background,
-        paper: tokens.paper,
-      },
-      divider: tokens.divider,
+      primary: { main: c.primary, contrastText: c.primaryContent },
+      secondary: { main: c.secondary, contrastText: c.secondaryContent },
+      error: { main: c.error, contrastText: c.errorContent },
+      warning: { main: c.warning, contrastText: c.warningContent },
+      info: { main: c.info, contrastText: c.infoContent },
+      success: { main: c.success, contrastText: c.successContent },
+      background: { default: c.base100, paper: c.base200 },
       text: {
-        primary: tokens.textPrimary,
-        secondary: tokens.textSecondary,
+        primary: c.baseContent,
+        secondary: alpha(c.baseContent, 0.72),
       },
+      divider: alpha(c.baseContent, 0.12),
       action: {
-        hover: tokens.hover,
-        selected: tokens.selected,
+        hover: alpha(c.primary, 0.08),
+        selected: alpha(c.primary, 0.16),
       },
     },
     shape: {
-      borderRadius: 10,
+      borderRadius: 8,
     },
     typography: {
       fontFamily:
         'var(--font-roboto), "Roboto", "Helvetica Neue", Arial, sans-serif',
     },
     components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: {
+            backgroundColor: "var(--color-base-100)",
+            color: "var(--color-base-content)",
+          },
+        },
+      },
       MuiAppBar: {
         styleOverrides: {
+          root: ({ theme }) => ({
+            backgroundColor: "var(--color-base-200)",
+            borderBottom: `1px solid ${theme.palette.divider}`,
+            color: "var(--color-base-content)",
+          }),
+        },
+      },
+      MuiDrawer: {
+        styleOverrides: {
+          paper: {
+            backgroundColor: "var(--color-base-100)",
+            color: "var(--color-base-content)",
+          },
+        },
+      },
+      MuiPaper: {
+        styleOverrides: {
           root: {
-            backgroundColor: tokens.appBar,
-            borderBottom: `1px solid ${tokens.divider}`,
-            color: tokens.textPrimary,
+            backgroundImage: "none",
           },
         },
       },
       MuiCard: {
         styleOverrides: {
-          root: {
-            border: `1px solid ${tokens.divider}`,
+          root: ({ theme }) => ({
+            backgroundColor: "var(--color-base-200)",
+            border: `1px solid ${theme.palette.divider}`,
             backgroundImage: "none",
+          }),
+        },
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: {
+            borderRadius: "var(--radius-field)",
           },
+          notchedOutline: ({ theme }) => ({
+            borderColor: alpha(theme.palette.text.primary, 0.2),
+          }),
         },
       },
     },
