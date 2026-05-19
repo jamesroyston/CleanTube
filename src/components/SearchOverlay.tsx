@@ -162,23 +162,15 @@ export function SearchOverlay({
                     <SearchIcon color="action" fontSize="small" />
                   </InputAdornment>
                 ),
-                endAdornment: (
-                  <InputAdornment position="end" sx={{ gap: 0.25 }}>
+                endAdornment: query.length > 0 ? (
+                  <InputAdornment position="end">
                     <SearchFieldClearButton
-                      visible={query.length > 0}
+                      visible
                       onClear={() => onQueryChange("")}
                       inputRef={inputRef}
                     />
-                    <IconButton
-                      aria-label="Search"
-                      edge="end"
-                      size="small"
-                      type="submit"
-                    >
-                      <SearchIcon color="action" fontSize="small" />
-                    </IconButton>
                   </InputAdornment>
-                ),
+                ) : null,
               },
             }}
           />
