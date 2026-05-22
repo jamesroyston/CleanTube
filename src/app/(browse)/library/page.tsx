@@ -10,7 +10,7 @@ export const metadata = {
 
 export default function LibraryPage() {
   return (
-    <Box component="main" sx={{ pb: 6, minHeight: "100vh" }}>
+    <Box component="main" sx={{ pb: 6 }}>
       <Container maxWidth="sm" sx={{ pt: 3 }}>
         <Typography variant="h5" component="h1" sx={{ fontWeight: 800, mb: 2 }}>
           Manage library

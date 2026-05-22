@@ -12,6 +12,10 @@ import {
   parseWatchCommentsVisibleCookie,
   WATCH_COMMENTS_VISIBLE_COOKIE,
 } from "@/lib/watchCommentsVisibilityPersistence";
+import {
+  WATCH_NARROW_PLAYER_LAYOUT_COOKIE,
+  parseWatchNarrowPlayerLayoutCookie,
+} from "@/lib/watchNarrowPlayerLayoutPersistence";
 import { readWatchUpNextVisibleFromCookieStore } from "@/lib/watchUpNextVisibilityPersistence";
 import {
   createInitialThemeSettings,
@@ -53,6 +57,14 @@ export default async function RootLayout({
   );
   const initialWatchUpNextVisible =
     readWatchUpNextVisibleFromCookieStore(cookieStore);
+  const watchNarrowPlayerLayoutCookie = cookieStore.get(
+    WATCH_NARROW_PLAYER_LAYOUT_COOKIE,
+  );
+  const watchNarrowPlayerLayoutHasCookie =
+    watchNarrowPlayerLayoutCookie != null;
+  const initialWatchNarrowPlayerLayout = parseWatchNarrowPlayerLayoutCookie(
+    watchNarrowPlayerLayoutCookie?.value,
+  );
   const librarySidebarCookie = cookieStore.get(LIBRARY_SIDEBAR_COLLAPSED_COOKIE);
   const librarySidebarHasCookie = librarySidebarCookie != null;
   const initialLibrarySidebarCollapsed = parseLibrarySidebarCollapsedCookie(
@@ -76,8 +88,10 @@ export default async function RootLayout({
           initialTheme={initialTheme}
           initialWatchCommentsVisible={initialWatchCommentsVisible}
           initialWatchUpNextVisible={initialWatchUpNextVisible}
+          initialWatchNarrowPlayerLayout={initialWatchNarrowPlayerLayout}
           initialLibrarySidebarCollapsed={initialLibrarySidebarCollapsed}
           librarySidebarHasCookie={librarySidebarHasCookie}
+          watchNarrowPlayerLayoutHasCookie={watchNarrowPlayerLayoutHasCookie}
         >
           <CloudLibraryProvider>{children}</CloudLibraryProvider>
         </AppProviders>

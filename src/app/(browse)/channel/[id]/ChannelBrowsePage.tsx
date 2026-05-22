@@ -11,6 +11,7 @@ import Typography from "@mui/material/Typography";
 import { useEffect, useMemo } from "react";
 
 import { ChannelGridEmptyState } from "@/components/ChannelGridEmptyState";
+import { CondensedDescription } from "@/components/CondensedDescription";
 import { ChannelPagination } from "@/components/ChannelPagination";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
@@ -79,7 +80,7 @@ export function ChannelBrowsePage({
   const emptyHint = page.emptyGridHint ?? "likely_empty";
 
   return (
-    <Box component="main" sx={{ pb: 6, minHeight: "100vh" }}>
+    <Box component="main" sx={{ pb: 6 }}>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
         {stale ? (
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -124,13 +125,10 @@ export function ChannelBrowsePage({
                 </Typography>
               ) : null}
               {page.channel.description ? (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mt: 1, maxWidth: 820 }}
-                >
-                  {page.channel.description}
-                </Typography>
+                <CondensedDescription
+                  text={page.channel.description}
+                  dialogTitle={page.channel.title}
+                />
               ) : null}
             </Box>
             <SaveChannelButton

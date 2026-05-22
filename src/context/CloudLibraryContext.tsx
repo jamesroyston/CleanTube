@@ -13,6 +13,23 @@ import {
 } from "react";
 
 import {
+  fetchCloudRecentSearches,
+  replaceRecentSearches,
+} from "@/lib/cloudRecentSearches/cloudStore";
+import {
+  addLocalRecentSearch,
+  clearLocalRecentSearches,
+  readLocalRecentSearches,
+  RECENT_SEARCHES_STORAGE_KEY,
+  removeLocalRecentSearch,
+  writeLocalRecentSearches,
+} from "@/lib/cloudRecentSearches/localStore";
+import {
+  entriesToQueryList,
+  localQueriesToEntries,
+  mergeRecentSearches,
+} from "@/lib/cloudRecentSearches/sync";
+import {
   fetchCloudSnapshot,
   getInitialSession,
   mergeWatchProgressEntries,
@@ -143,6 +160,10 @@ type CloudLibraryContextValue = {
     videoId: string,
     watchLaterStartSeconds?: number,
   ) => number | undefined;
+  getRecentSearches: () => string[];
+  addRecentSearch: (query: string) => Promise<void>;
+  clearRecentSearches: () => Promise<void>;
+  removeRecentSearch: (query: string) => Promise<void>;
   passkeysSupported: boolean;
   registerPasskey: (
     friendlyName: string,
@@ -233,6 +254,7 @@ function normalizeProgressInput(input: WatchProgressInput): WatchProgressEntry {
         ? Math.floor(input.durationSeconds)
         : undefined,
     completed: input.completed === true,
+    everCompleted: input.completed === true ? true : undefined,
     lastWatchedAt: now,
     updatedAt: now,
   };
@@ -257,7 +279,16 @@ function mergeWatchProgressLivePatch(
       patch.durationSeconds !== undefined
         ? patch.durationSeconds
         : base.durationSeconds,
-    completed: base.completed || patch.completed,
+    completed:
+      patch.completed === true
+        ? true
+        : base.completed && patch.completed === false
+          ? false
+          : base.completed,
+    everCompleted:
+      patch.completed === true || base.everCompleted === true || base.completed
+        ? true
+        : base.everCompleted,
   };
 }
 
@@ -469,6 +500,14 @@ export function CloudLibraryProvider({
           savedChannels: nextSaved,
           watchProgress: nextProgress,
         });
+
+        const localRecent = readLocalRecentSearches();
+        const remoteRecent = await fetchCloudRecentSearches(supabase);
+        const mergedRecent = mergeRecentSearches(localRecent, remoteRecent);
+        const mergedRecentQueries = entriesToQueryList(mergedRecent);
+        writeLocalRecentSearches(mergedRecentQueries);
+        await replaceRecentSearches(supabase, nextUser.id, mergedRecent);
+
         setLibraryCloudSyncState("synced");
       } catch (err) {
         setLibraryCloudSyncState("error");
@@ -495,7 +534,8 @@ export function CloudLibraryProvider({
       if (
         e.key !== WATCH_PROGRESS_STORAGE_KEY &&
         e.key !== WATCH_LATER_STORAGE_KEY &&
-        e.key !== SAVED_CHANNELS_STORAGE_KEY
+        e.key !== SAVED_CHANNELS_STORAGE_KEY &&
+        e.key !== RECENT_SEARCHES_STORAGE_KEY
       ) {
         return;
       }
@@ -585,6 +625,7 @@ export function CloudLibraryProvider({
     if (!supabase) return;
     await signOut(supabase);
     clearLocalLibraryStorage();
+    clearLocalRecentSearches();
     setLibraryCloudSyncState("local_only");
     hydrateFromLocal();
   }, [hydrateFromLocal, supabase]);
@@ -856,7 +897,15 @@ export function CloudLibraryProvider({
             )
           : normalized.lastPositionSeconds;
         const nextCompleted =
-          (existing?.completed === true) || normalized.completed === true;
+          normalized.completed === true
+            ? true
+            : existing?.completed === true && normalized.completed === false
+              ? false
+              : existing?.completed === true;
+        const nextEverCompleted =
+          nextCompleted === true
+            ? true
+            : existing?.everCompleted === true || existing?.completed === true;
 
         const nextDuration =
           normalized.durationSeconds !== undefined
@@ -892,6 +941,7 @@ export function CloudLibraryProvider({
             ...normalized,
             lastPositionSeconds: nextLastPosition,
             completed: nextCompleted,
+            everCompleted: nextEverCompleted ? true : undefined,
             durationSeconds: nextDuration,
           };
         } else {
@@ -899,6 +949,7 @@ export function CloudLibraryProvider({
             ...normalized,
             lastPositionSeconds: nextLastPosition,
             completed: nextCompleted,
+            everCompleted: nextEverCompleted ? true : undefined,
             durationSeconds: nextDuration,
           };
         }
@@ -979,6 +1030,58 @@ export function CloudLibraryProvider({
     [getProgressByVideoId],
   );
 
+  const getRecentSearches = useCallback(
+    () => readLocalRecentSearches(),
+    [],
+  );
+
+  const addRecentSearch = useCallback(
+    async (query: string) => {
+      const next = addLocalRecentSearch(query);
+      if (supabase && user) {
+        try {
+          await replaceRecentSearches(
+            supabase,
+            user.id,
+            localQueriesToEntries(next),
+          );
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [supabase, user],
+  );
+
+  const clearRecentSearches = useCallback(async () => {
+    clearLocalRecentSearches();
+    if (supabase && user) {
+      try {
+        await replaceRecentSearches(supabase, user.id, []);
+      } catch {
+        /* keep local state if cloud sync fails */
+      }
+    }
+  }, [supabase, user]);
+
+  const removeRecentSearch = useCallback(
+    async (query: string) => {
+      const next = removeLocalRecentSearch(query);
+      if (supabase && user) {
+        try {
+          await replaceRecentSearches(
+            supabase,
+            user.id,
+            localQueriesToEntries(next),
+          );
+        } catch {
+          /* keep local state if cloud sync fails */
+        }
+      }
+    },
+    [supabase, user],
+  );
+
   const effectiveLibraryCloudSyncState: LibraryCloudSyncState =
     supabase == null ? "unavailable" : libraryCloudSyncState;
 
@@ -1010,6 +1113,10 @@ export function CloudLibraryProvider({
       clearWatchProgress,
       getProgressByVideoId,
       getResumeSeconds,
+      getRecentSearches,
+      addRecentSearch,
+      clearRecentSearches,
+      removeRecentSearch,
       passkeysSupported,
       registerPasskey,
       signInWithPasskey,
@@ -1032,9 +1139,13 @@ export function CloudLibraryProvider({
       completeTotpMfaCb,
       deletePasskey,
       getPendingSupabaseMfaCb,
+      addRecentSearch,
+      clearRecentSearches,
       getProgressByVideoId,
+      getRecentSearches,
       getResumeSeconds,
       isCloudConfigured,
+      removeRecentSearch,
       isInWatchLaterFn,
       listPasskeys,
       passkeysSupported,

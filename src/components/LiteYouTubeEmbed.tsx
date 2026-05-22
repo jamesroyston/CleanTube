@@ -19,12 +19,23 @@ const ANONYMOUS_LOCAL_PERSIST_INTERVAL_MS = 10_000;
 const SIGNED_IN_CLOUD_SYNC_INTERVAL_MS = 15_000;
 
 let liteYtLoad: Promise<unknown> | null = null;
+let liteYtModuleReady = false;
 
 function loadLiteYt() {
   if (!liteYtLoad) {
-    liteYtLoad = import("lite-youtube-embed/src/lite-yt-embed.js");
+    liteYtLoad = import("lite-youtube-embed/src/lite-yt-embed.js").then(
+      (mod) => {
+        liteYtModuleReady = true;
+        return mod;
+      },
+    );
   }
   return liteYtLoad;
+}
+
+/** Warm the lite-yt module during watch progress / auth resolution to avoid a second skeleton. */
+export function preloadLiteYoutubeEmbed() {
+  void loadLiteYt();
 }
 
 const THEATRE_VIEWPORT_RESERVE = "152px";
@@ -73,7 +84,7 @@ export function LiteYouTubeEmbed({
   theatreMaximize = false,
 }: LiteYouTubeEmbedProps) {
   const { upsertWatchProgress, user } = useCloudLibrary();
-  const [ready, setReady] = useState(false);
+  const [ready, setReady] = useState(liteYtModuleReady);
   const shellRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<YT.Player | null>(null);
   const playerApiReadyRef = useRef(false);
@@ -92,6 +103,10 @@ export function LiteYouTubeEmbed({
   const start = useCommittedStartSeconds(videoId, startSeconds);
 
   useEffect(() => {
+    if (liteYtModuleReady) {
+      setReady(true);
+      return;
+    }
     void loadLiteYt().then(() => setReady(true));
   }, []);
 
