@@ -3,7 +3,7 @@ import Container from "@mui/material/Container";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
-import { BackToSearch } from "@/components/BackToSearch";
+import { WatchBackLink } from "@/components/WatchBackLink";
 import { WatchExperienceClient } from "@/components/WatchExperienceClient";
 import { WatchLaterBanner } from "@/components/WatchLaterBanner";
 import { toVideoSummaries } from "@/lib/serializeVideo";
@@ -116,7 +116,7 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
         >
           <WatchLaterBanner videoId={id} />
 
-          <BackToSearch />
+          <WatchBackLink />
         </Box>
       </Container>
 

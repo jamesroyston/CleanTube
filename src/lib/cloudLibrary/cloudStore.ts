@@ -1,6 +1,11 @@
 "use client";
 
-import type { Session, SupabaseClient, User } from "@supabase/supabase-js";
+import type {
+  AuthChangeEvent,
+  Session,
+  SupabaseClient,
+  User,
+} from "@supabase/supabase-js";
 
 import {
   type SavedChannel,
@@ -222,19 +227,33 @@ export async function signOut(
 export async function getInitialSession(
   supabase: SupabaseClient,
 ): Promise<{ session: Session | null; user: User | null }> {
-  const { data } = await supabase.auth.getSession();
-  return {
-    session: data.session,
-    user: data.session?.user ?? null,
-  };
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userData.user) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    return {
+      session: sessionData.session,
+      user: userData.user,
+    };
+  }
+
+  // Offline or transient network failure: keep local session until refresh succeeds.
+  if (userError) {
+    const { data } = await supabase.auth.getSession();
+    return {
+      session: data.session,
+      user: data.session?.user ?? null,
+    };
+  }
+
+  return { session: null, user: null };
 }
 
 export function subscribeToAuthChanges(
   supabase: SupabaseClient,
-  onChange: (session: Session | null) => void,
+  onChange: (event: AuthChangeEvent, session: Session | null) => void,
 ) {
-  return supabase.auth.onAuthStateChange((_event, session) => {
-    onChange(session);
+  return supabase.auth.onAuthStateChange((event, session) => {
+    onChange(event, session);
   });
 }
 

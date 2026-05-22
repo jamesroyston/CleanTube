@@ -545,6 +545,36 @@ export function CloudLibraryProvider({
     return () => window.removeEventListener("storage", onStorage);
   }, [hydrateFromLocal]);
 
+  const clearAuthDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyAuthenticatedState = useCallback(
+    (nextSession: Session) => {
+      if (clearAuthDebounceRef.current) {
+        clearTimeout(clearAuthDebounceRef.current);
+        clearAuthDebounceRef.current = null;
+      }
+      setSession(nextSession);
+      setUser(nextSession.user);
+      void syncFromCloud(nextSession.user).catch(() => {
+        setLibraryCloudSyncState("error");
+      });
+      setAuthStatus("ready");
+    },
+    [syncFromCloud],
+  );
+
+  const applySignedOutState = useCallback(() => {
+    if (clearAuthDebounceRef.current) {
+      clearTimeout(clearAuthDebounceRef.current);
+      clearAuthDebounceRef.current = null;
+    }
+    setSession(null);
+    setUser(null);
+    setLibraryCloudSyncState(supabase ? "local_only" : "unavailable");
+    hydrateFromLocal();
+    setAuthStatus("ready");
+  }, [hydrateFromLocal, supabase]);
+
   useEffect(() => {
     if (!supabase) return;
 
@@ -561,29 +591,67 @@ export function CloudLibraryProvider({
         } catch {
           setLibraryCloudSyncState("error");
         }
+      } else {
+        setLibraryCloudSyncState(supabase ? "local_only" : "unavailable");
       }
       if (!cancelled) setAuthStatus("ready");
     })();
 
-    const { data } = subscribeToAuthChanges(supabase, (nextSession) => {
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      if (nextSession?.user) {
-        void syncFromCloud(nextSession.user).catch(() => {
-          setLibraryCloudSyncState("error");
-        });
-      } else {
-        setLibraryCloudSyncState(supabase ? "local_only" : "unavailable");
-        hydrateFromLocal();
+    const { data } = subscribeToAuthChanges(supabase, (event, nextSession) => {
+      if (event === "SIGNED_OUT") {
+        applySignedOutState();
+        return;
       }
-      setAuthStatus("ready");
+
+      if (nextSession?.user) {
+        applyAuthenticatedState(nextSession);
+        return;
+      }
+
+      if (!nextSession) {
+        if (clearAuthDebounceRef.current) {
+          clearTimeout(clearAuthDebounceRef.current);
+        }
+        clearAuthDebounceRef.current = setTimeout(() => {
+          clearAuthDebounceRef.current = null;
+          applySignedOutState();
+        }, 300);
+      }
     });
 
     return () => {
       cancelled = true;
+      if (clearAuthDebounceRef.current) {
+        clearTimeout(clearAuthDebounceRef.current);
+        clearAuthDebounceRef.current = null;
+      }
       data.subscription.unsubscribe();
     };
-  }, [hydrateFromLocal, supabase, syncFromCloud]);
+  }, [applyAuthenticatedState, applySignedOutState, supabase, syncFromCloud]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const recoverSessionOnVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void supabase.auth.getUser().then(({ data: { user }, error }) => {
+        if (error || !user) return;
+        void supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session?.user) return;
+          if (clearAuthDebounceRef.current) {
+            clearTimeout(clearAuthDebounceRef.current);
+            clearAuthDebounceRef.current = null;
+          }
+          setSession(session);
+          setUser(user);
+        });
+      });
+    };
+
+    document.addEventListener("visibilitychange", recoverSessionOnVisible);
+    return () =>
+      document.removeEventListener("visibilitychange", recoverSessionOnVisible);
+  }, [supabase]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
