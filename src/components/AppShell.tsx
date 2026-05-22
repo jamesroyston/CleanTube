@@ -16,7 +16,10 @@ import {
   drawerRailTransition,
 } from "@/components/ChannelsSidebar";
 import { Header } from "@/components/Header";
+import { MobileSearchChrome } from "@/components/MobileSearchChrome";
 import { SavedChannelMigration } from "@/components/SavedChannelMigration";
+import { WatchReturnTracker } from "@/components/WatchReturnTracker";
+import { SearchChromeProvider } from "@/context/SearchChromeContext";
 
 function HeaderFallback() {
   return null;
@@ -142,6 +145,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         />
       ) : null}
       <Suspense fallback={<HeaderFallback />}>
+        <WatchReturnTracker />
         <Header
           ref={appBarRef}
           leading={headerLeading}
@@ -152,6 +156,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           }
         />
       </Suspense>
+      <MobileSearchChrome />
 
       {desktopRailPx != null ? (
         <Box
@@ -268,5 +273,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  return <AppShellInner>{children}</AppShellInner>;
+  return (
+    <SearchChromeProvider>
+      <AppShellInner>{children}</AppShellInner>
+    </SearchChromeProvider>
+  );
 }

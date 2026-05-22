@@ -19,6 +19,7 @@ import {
   buildChannelPageCacheKey,
   writeChannelPageCache,
 } from "@/lib/channelPageClientCache";
+import { setWatchReturnChannelLabel } from "@/lib/watchReturnNavigation";
 import { toVideoSummaries } from "@/lib/serializeVideo";
 import type { ChannelSortMode, ChannelVideosPage } from "@/lib/youtubeTypes";
 
@@ -68,6 +69,11 @@ export function ChannelBrowsePage({
     if (stale) return;
     writeChannelPageCache(cacheKey, page);
   }, [cacheKey, page, stale]);
+
+  useEffect(() => {
+    const name = page.channel.title?.trim();
+    if (name) setWatchReturnChannelLabel(name);
+  }, [page.channel.title]);
 
   const videos = toVideoSummaries(page.videos);
   const currentPage = Number.parseInt(page.pageToken ?? "1", 10) || 1;

@@ -13,6 +13,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -24,6 +25,7 @@ import { AccountMenu } from "@/components/AccountMenu";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
+import { useSearchChrome } from "@/context/SearchChromeContext";
 import { useNavigationProgress } from "@/context/NavigationProgressContext";
 import {
   getLastSearchSort,
@@ -60,6 +62,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const searchParams = useSearchParams();
     const { start, done } = useNavigationProgress();
     const { addRecentSearch, getRecentSearches } = useCloudLibrary();
+    const { registerOpenSearchOverlay } = useSearchChrome();
     const [isPending, startTransition] = useTransition();
     const hadPendingRef = useRef(false);
     const qParam = searchParams.get("q") ?? "";
@@ -115,11 +118,16 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       }
     }, [done, isPending, start]);
 
-    function openSearchOverlay() {
+    const openSearchOverlay = useCallback(() => {
       setRecentList(getRecentSearches());
       setOverlayQuery(query.trim() ? query : "");
       setSearchOverlayOpen(true);
-    }
+    }, [getRecentSearches, query]);
+
+    useEffect(() => {
+      registerOpenSearchOverlay(openSearchOverlay);
+      return () => registerOpenSearchOverlay(null);
+    }, [openSearchOverlay, registerOpenSearchOverlay]);
 
     function commitSearchLatestPreference(prefersLatest: boolean) {
       const mode: SearchSortMode = prefersLatest ? "newest" : "relevance";

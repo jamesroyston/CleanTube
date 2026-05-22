@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
 import { getSupabaseEnv } from "@/lib/supabase/env";
+import { supabaseCookieOptions } from "@/utils/supabase/cookieOptions";
 
 /**
  * Supabase browser session in a Route Handler (sets auth cookies on verify/sign-in).
@@ -13,6 +14,7 @@ export async function createSupabaseRouteHandlerClient() {
   const cookieStore = await cookies();
 
   return createServerClient(url, publishableKey, {
+    cookieOptions: supabaseCookieOptions,
     cookies: {
       getAll() {
         return cookieStore.getAll();
