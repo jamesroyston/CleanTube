@@ -12,6 +12,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 
+import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { VideoCard } from "@/components/VideoResultsGrid";
 import type { VideoSummary } from "@/components/VideoSummary";
 import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
@@ -32,6 +33,7 @@ function ChannelCard({ channel }: { channel: ChannelSearchResult }) {
       variant="outlined"
       sx={{
         height: "100%",
+        position: "relative",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
         "&:hover": {
           transform: "translateY(-2px)",
@@ -51,7 +53,7 @@ function ChannelCard({ channel }: { channel: ChannelSearchResult }) {
           <Stack spacing={1.5} alignItems="flex-start">
             <Chip
               icon={<SubscriptionsIcon />}
-              label="Channel"
+              label="Best match"
               size="small"
               color="primary"
               variant="outlined"
@@ -97,6 +99,26 @@ function ChannelCard({ channel }: { channel: ChannelSearchResult }) {
           </Stack>
         </CardContent>
       </CardActionArea>
+      <Box
+        sx={{
+          position: "absolute",
+          top: 8,
+          right: 8,
+          zIndex: 2,
+        }}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        <SaveChannelButton
+          compact
+          channelName={channel.title}
+          channelId={channel.id}
+          channelUrl={channel.channelUrl}
+          thumbnailUrl={channel.thumbnailUrl}
+        />
+      </Box>
     </Card>
   );
 }
