@@ -17,6 +17,7 @@ import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibi
 import { setWatchNarrowPlayerLayoutAction } from "@/app/actions/watchNarrowPlayerLayout";
 import { setWatchUpNextVisibleAction } from "@/app/actions/watchUpNextVisibility";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
+import { SearchChromeProvider } from "@/context/SearchChromeContext";
 import {
   type InitialThemeSettings,
   type ThemeMode,
@@ -417,7 +418,7 @@ export function AppProviders({
               <ThemeProvider theme={theme}>
                 <CssBaseline enableColorScheme />
                 <NavigationProgressProvider>
-                  {children}
+                  <SearchChromeProvider>{children}</SearchChromeProvider>
                 </NavigationProgressProvider>
               </ThemeProvider>
               </WatchCommentsVisibleContext.Provider>
