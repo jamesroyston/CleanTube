@@ -6,7 +6,14 @@ import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import { Suspense, useLayoutEffect, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { useLibrarySidebarCollapsed } from "@/app/providers";
 import {
@@ -34,8 +41,43 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
+  const drawerHistoryPushedRef = useRef(false);
   const { collapsed: railCollapsed, setLibrarySidebarCollapsed } =
     useLibrarySidebarCollapsed();
+
+  const closeMobileDrawer = useCallback((fromPopState = false) => {
+    setMobileOpen(false);
+    if (fromPopState) {
+      drawerHistoryPushedRef.current = false;
+      return;
+    }
+    if (drawerHistoryPushedRef.current) {
+      drawerHistoryPushedRef.current = false;
+      window.history.back();
+    }
+  }, []);
+
+  const openMobileDrawer = useCallback(() => {
+    setMobileOpen(true);
+    if (!drawerHistoryPushedRef.current) {
+      window.history.pushState(
+        { cleantubeOverlay: "drawer" },
+        "",
+        window.location.href,
+      );
+      drawerHistoryPushedRef.current = true;
+    }
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (drawerHistoryPushedRef.current) {
+        closeMobileDrawer(true);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [closeMobileDrawer]);
   const desktopRailPx = mdUp
     ? railCollapsed
       ? CHANNELS_COLLAPSED_DRAWER_WIDTH
@@ -83,7 +125,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       }
       onClick={() => {
         if (mdUp) setLibrarySidebarCollapsed(!railCollapsed);
-        else setMobileOpen((open) => !open);
+        else if (mobileOpen) closeMobileDrawer();
+        else openMobileDrawer();
       }}
     >
       <MenuIcon />
@@ -233,7 +276,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           <Drawer
             variant="temporary"
             open={temporaryOpen}
-            onClose={() => setMobileOpen(false)}
+            onClose={() => closeMobileDrawer()}
             elevation={0}
             ModalProps={{
               keepMounted: true,
@@ -258,7 +301,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           >
             <ChannelsRailContent
               miniMode={false}
-              onNavigate={() => setMobileOpen(false)}
+              onNavigate={() => closeMobileDrawer()}
             />
           </Drawer>
 

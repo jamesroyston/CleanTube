@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import type { ListedFactor } from "@/lib/cloudLibrary/mfaClient";
+import { sanitizeAuthNextPath } from "@/lib/authReturnNavigation";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 type Mode = "sign-in" | "sign-up" | "reset";
@@ -36,6 +37,11 @@ export function AuthPageClient() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlError = searchParams.get("error");
+  const nextParam = searchParams.get("next");
+
+  function redirectAfterSignIn() {
+    router.push(sanitizeAuthNextPath(nextParam));
+  }
 
   const {
     isCloudConfigured,
@@ -115,7 +121,7 @@ export function AuthPageClient() {
       return;
     }
     if (!mfa.needsMfa) {
-      setMessage("Signed in. You can register a passkey below, then use it from the Sign in tab next time.");
+      redirectAfterSignIn();
       return;
     }
 
@@ -184,7 +190,7 @@ export function AuthPageClient() {
       return;
     }
     setMfaPanel({ kind: "none" });
-    setMessage("Signed in. You can register a passkey below, then use it from the Sign in tab next time.");
+    redirectAfterSignIn();
   }
 
   async function onSendPhoneSms() {
@@ -216,7 +222,7 @@ export function AuthPageClient() {
       return;
     }
     setMfaPanel({ kind: "none" });
-    setMessage("Signed in. You can register a passkey below, then use it from the Sign in tab next time.");
+    redirectAfterSignIn();
   }
 
   async function onPasskeySignIn() {
@@ -228,7 +234,7 @@ export function AuthPageClient() {
       setError(res.error);
       return;
     }
-    router.push("/");
+    redirectAfterSignIn();
   }
 
   async function onRegisterPasskey() {

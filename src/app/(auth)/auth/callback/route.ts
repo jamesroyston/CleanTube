@@ -1,13 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { sanitizeAuthNextPath } from "@/lib/authReturnNavigation";
 import { createSupabaseRouteHandlerClient } from "@/utils/supabase/route";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const nextRaw = requestUrl.searchParams.get("next") ?? "/";
-  const nextPath =
-    nextRaw.startsWith("/") && !nextRaw.startsWith("//") ? nextRaw : "/";
+  const nextPath = sanitizeAuthNextPath(
+    requestUrl.searchParams.get("next") ?? "/",
+  );
 
   const authError =
     requestUrl.searchParams.get("error_description") ??
