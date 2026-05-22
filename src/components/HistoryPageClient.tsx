@@ -17,6 +17,7 @@ import { WatchProgressBar } from "@/components/WatchProgressBar";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
+import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 
 function timestamp(value: string): number {
   const ms = Date.parse(value);
@@ -83,6 +84,7 @@ export function HistoryPageClient() {
                     <Box
                       component={Link}
                       href={href}
+                      {...watchNavigationCaptureHandlers()}
                       sx={{
                         width: { xs: "100%", sm: 220 },
                         minWidth: { sm: 220 },
@@ -108,6 +110,7 @@ export function HistoryPageClient() {
                       <Typography
                         component={Link}
                         href={href}
+                        {...watchNavigationCaptureHandlers()}
                         variant="h6"
                         sx={{ color: "text.primary", fontWeight: 600, textDecoration: "none" }}
                       >

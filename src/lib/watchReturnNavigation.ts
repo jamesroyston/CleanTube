@@ -22,6 +22,16 @@ export function getWatchReturnChannelLabel(): string | null {
   }
 }
 
+export function clearWatchReturnTarget(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(HREF_KEY);
+    sessionStorage.removeItem(LABEL_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function setWatchReturnTarget(href: string, label: string): void {
   if (typeof window === "undefined") return;
   try {
@@ -83,4 +93,27 @@ export function deriveWatchReturnTarget(
   }
 
   return null;
+}
+
+/** Call before navigating to a watch page so back link is correct on first paint. */
+export function captureWatchReturnFromCurrentLocation(): void {
+  if (typeof window === "undefined") return;
+  const target = deriveWatchReturnTarget(
+    window.location.pathname,
+    window.location.search.replace(/^\?/, ""),
+  );
+  if (target) {
+    setWatchReturnTarget(target.href, target.label);
+  } else {
+    clearWatchReturnTarget();
+  }
+}
+
+/** Spread onto links/buttons that open `/watch/...`. */
+export function watchNavigationCaptureHandlers(): {
+  onPointerDown: () => void;
+} {
+  return {
+    onPointerDown: () => captureWatchReturnFromCurrentLocation(),
+  };
 }

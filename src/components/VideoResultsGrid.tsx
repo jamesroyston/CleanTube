@@ -21,6 +21,7 @@ import {
 } from "@/components/VideoCardThumbnailWithProgress";
 import { WatchLaterCardButton } from "@/components/WatchLaterCardButton";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
+import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 
 type VideoResultsGridProps = {
   videos: VideoSummary[];
@@ -50,6 +51,7 @@ export function VideoCard({ video }: { video: VideoSummary }) {
         <CardActionArea
           component={Link}
           href={watchHref}
+          {...watchNavigationCaptureHandlers()}
           sx={{
             display: "flex",
             flexDirection: "column",

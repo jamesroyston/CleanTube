@@ -3,33 +3,42 @@
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import Button from "@mui/material/Button";
 import Link from "next/link";
-import { useLayoutEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 
 import { getBackToSearchHref, getLastSearchQuery } from "@/lib/lastSearchSession";
 import { getWatchReturnTarget } from "@/lib/watchReturnNavigation";
 
+function resolveWatchBackLink(): { href: string; label: string } | null {
+  const target = getWatchReturnTarget();
+  if (target) return target;
+
+  const q = getLastSearchQuery()?.trim();
+  if (q) {
+    return { href: getBackToSearchHref(), label: "Back to results" };
+  }
+
+  return null;
+}
+
 export function WatchBackLink() {
+  const pathname = usePathname();
   const [href, setHref] = useState<string | null>(null);
   const [label, setLabel] = useState("");
 
-  useLayoutEffect(() => {
-    const target = getWatchReturnTarget();
-    if (target) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from sessionStorage
-      setHref(target.href);
-      setLabel(target.label);
-      return;
-    }
-
-    const q = getLastSearchQuery()?.trim();
-    if (q) {
-      setHref(getBackToSearchHref());
-      setLabel("Back to results");
-      return;
-    }
-
-    setHref(null);
+  const hydrate = useCallback(() => {
+    const resolved = resolveWatchBackLink();
+    setHref(resolved?.href ?? null);
+    setLabel(resolved?.label ?? "");
   }, []);
+
+  useLayoutEffect(() => {
+    hydrate();
+  }, [hydrate, pathname]);
+
+  useEffect(() => {
+    hydrate();
+  }, [hydrate, pathname]);
 
   if (!href) return null;
 
