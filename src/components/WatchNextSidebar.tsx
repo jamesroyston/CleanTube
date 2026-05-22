@@ -14,6 +14,7 @@ import {
 } from "@/components/VideoCardThumbnailWithProgress";
 import { WatchLaterCardButton } from "@/components/WatchLaterCardButton";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
+import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 
 type WatchNextSidebarProps = {
   videos: VideoSummary[];
@@ -33,6 +34,7 @@ function WatchNextCard({ video }: { video: VideoSummary }) {
       <Link
         href={watchHref}
         style={{ textDecoration: "none", color: "inherit" }}
+        {...watchNavigationCaptureHandlers()}
       >
         <Box
           sx={{

@@ -21,6 +21,7 @@ import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
 import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
+import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 
 type SortMode = "newest" | "oldest";
 
@@ -116,6 +117,7 @@ export function WatchLaterPageClient() {
                     <Box
                       component={Link}
                       href={href}
+                      {...watchNavigationCaptureHandlers()}
                       sx={{
                         width: { xs: "100%", sm: 220 },
                         minWidth: { sm: 220 },
@@ -141,6 +143,7 @@ export function WatchLaterPageClient() {
                       <Typography
                         component={Link}
                         href={href}
+                        {...watchNavigationCaptureHandlers()}
                         variant="h6"
                         sx={{ color: "text.primary", fontWeight: 600, textDecoration: "none" }}
                       >

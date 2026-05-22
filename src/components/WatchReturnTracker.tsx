@@ -1,9 +1,10 @@
 "use client";
 
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 
 import {
+  clearWatchReturnTarget,
   deriveWatchReturnTarget,
   setWatchReturnTarget,
 } from "@/lib/watchReturnNavigation";
@@ -17,7 +18,7 @@ export function WatchReturnTracker() {
   const searchParams = useSearchParams();
   const prevFullPathRef = useRef<string | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const search = searchParams.toString();
     const current = search ? `${pathname}?${search}` : pathname;
     const isWatch = pathname.startsWith("/watch/");
@@ -35,9 +36,11 @@ export function WatchReturnTracker() {
           );
           if (target) {
             setWatchReturnTarget(target.href, target.label);
+          } else {
+            clearWatchReturnTarget();
           }
         } catch {
-          /* ignore invalid prev path */
+          clearWatchReturnTarget();
         }
       }
     }
