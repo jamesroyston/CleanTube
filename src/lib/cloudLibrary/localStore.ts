@@ -132,6 +132,10 @@ function parseWatchProgress(raw: string | null): WatchProgressEntry[] {
         lastPositionSeconds,
         durationSeconds: normalizeSeconds(entry.durationSeconds),
         completed: entry.completed === true,
+        everCompleted:
+          entry.everCompleted === true || entry.completed === true
+            ? true
+            : undefined,
         lastWatchedAt: entry.lastWatchedAt,
         updatedAt: entry.updatedAt,
       },

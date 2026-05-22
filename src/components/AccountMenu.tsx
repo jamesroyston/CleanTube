@@ -36,6 +36,7 @@ import { clearChannelPageSessionBackups } from "@/lib/channelPageClientCache";
 import {
   useThemeMode,
   useWatchCommentsVisible,
+  useWatchNarrowPlayerLayout,
   useWatchUpNextVisible,
 } from "@/app/providers";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
@@ -55,6 +56,8 @@ export function AccountMenu() {
     useWatchCommentsVisible();
   const { visible: upNextVisible, setWatchUpNextVisible } =
     useWatchUpNextVisible();
+  const { enabled: narrowPlayerLayout, setWatchNarrowPlayerLayout } =
+    useWatchNarrowPlayerLayout();
   const router = useRouter();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
@@ -194,6 +197,39 @@ export function AccountMenu() {
                 checked={upNextVisible}
                 onChange={(_, v) => setWatchUpNextVisible(v)}
                 inputProps={{ "aria-label": "Show related videos column" }}
+              />
+            }
+          />
+        </Box>
+        <Box
+          sx={{ px: 2, py: 1, maxWidth: 320 }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <FormControlLabel
+            sx={{
+              m: 0,
+              width: "100%",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 1,
+            }}
+            label={
+              <Box sx={{ pr: 1, pt: 0.25 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Narrow player layout
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Keeps a narrower video on large screens when Up next is off
+                </Typography>
+              </Box>
+            }
+            labelPlacement="start"
+            control={
+              <Switch
+                size="small"
+                checked={narrowPlayerLayout}
+                onChange={(_, v) => setWatchNarrowPlayerLayout(v)}
+                inputProps={{ "aria-label": "Narrow player layout on watch" }}
               />
             }
           />

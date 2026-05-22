@@ -81,7 +81,7 @@ export default async function Home({ searchParams }: PageProps) {
   }
 
   return (
-    <Box component="main" sx={{ pb: 6, minHeight: "100vh" }}>
+    <Box component="main" sx={{ pb: 6 }}>
       <Suspense fallback={null}>
         <LastSearchSync />
       </Suspense>

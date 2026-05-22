@@ -20,11 +20,7 @@ import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { FormEvent, useCallback, useEffect, useRef } from "react";
 
-import {
-  clearRecentSearches,
-  getRecentSearches,
-  removeRecentSearch,
-} from "@/lib/recentSearches";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import type { SearchSortMode } from "@/lib/uploadedAtSort";
 
 export type SearchOverlayProps = {
@@ -78,6 +74,8 @@ export function SearchOverlay({
   onSearchSortChange,
   onSubmit,
 }: SearchOverlayProps) {
+  const { clearRecentSearches, getRecentSearches, removeRecentSearch } =
+    useCloudLibrary();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const focusInput = useCallback(() => {
@@ -212,8 +210,7 @@ export function SearchOverlay({
               size="small"
               startIcon={<ClearAllIcon fontSize="small" />}
               onClick={() => {
-                clearRecentSearches();
-                onRecentListChange([]);
+                void clearRecentSearches().then(() => onRecentListChange([]));
               }}
             >
               Clear
@@ -241,8 +238,9 @@ export function SearchOverlay({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    removeRecentSearch(item);
-                    onRecentListChange(getRecentSearches());
+                    void removeRecentSearch(item).then(() =>
+                      onRecentListChange(getRecentSearches()),
+                    );
                   }}
                 >
                   <CloseIcon fontSize="small" />

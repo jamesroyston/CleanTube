@@ -57,7 +57,7 @@ export function WatchLaterPageClient() {
   }
 
   return (
-    <Box component="main" sx={{ pb: 6, minHeight: "100vh" }}>
+    <Box component="main" sx={{ pb: 6 }}>
       <Container maxWidth="lg" sx={{ pt: 2 }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}

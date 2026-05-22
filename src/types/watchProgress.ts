@@ -6,6 +6,8 @@ export type WatchProgressEntry = {
   lastPositionSeconds: number;
   durationSeconds?: number;
   completed: boolean;
+  /** True once the user has finished this video; stays set during rewatch. */
+  everCompleted?: boolean;
   lastWatchedAt: string;
   updatedAt: string;
 };

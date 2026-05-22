@@ -23,11 +23,8 @@ import {
 import { AccountMenu } from "@/components/AccountMenu";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
 import { SearchOverlay } from "@/components/SearchOverlay";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useNavigationProgress } from "@/context/NavigationProgressContext";
-import {
-  addRecentSearch,
-  getRecentSearches,
-} from "@/lib/recentSearches";
 import {
   getLastSearchSort,
   setLastSearchQuery,
@@ -62,6 +59,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const { start, done } = useNavigationProgress();
+    const { addRecentSearch, getRecentSearches } = useCloudLibrary();
     const [isPending, startTransition] = useTransition();
     const hadPendingRef = useRef(false);
     const qParam = searchParams.get("q") ?? "";
@@ -146,7 +144,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       }
       setLastSearchQuery(trimmed);
       setLastSearchSort(sort);
-      addRecentSearch(trimmed);
+      void addRecentSearch(trimmed);
       const qs = new URLSearchParams();
       qs.set("q", trimmed);
       const resultSort = normalizeResultSortParam(
@@ -199,6 +197,10 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                 }
               : {
                   position: { xs: "static", sm: "sticky" },
+                  /** Mobile landscape: avoid sticky bar over video/content */
+                  "@media (max-width: 899.95px) and (orientation: landscape)": {
+                    position: "static",
+                  },
                 },
           ]}
         >

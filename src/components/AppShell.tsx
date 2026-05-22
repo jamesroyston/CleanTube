@@ -22,6 +22,12 @@ function HeaderFallback() {
   return null;
 }
 
+/**
+ * Desktop browse header spacer before measure: Toolbar minHeight 64 (sm+) + py 1 (8×2).
+ * Safe-area is applied on the fixed AppBar and included in ResizeObserver measurement.
+ */
+const DESKTOP_HEADER_INSET_FALLBACK_PX = 80;
+
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
@@ -35,7 +41,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     : null;
 
   const appBarRef = useRef<HTMLDivElement | null>(null);
-  const [headerInsetPx, setHeaderInsetPx] = useState(72);
+  const [headerInsetPx, setHeaderInsetPx] = useState(
+    DESKTOP_HEADER_INSET_FALLBACK_PX,
+  );
 
   useLayoutEffect(() => {
     const el = appBarRef.current;

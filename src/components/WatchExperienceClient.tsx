@@ -8,9 +8,16 @@ import Typography from "@mui/material/Typography";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useWatchCommentsVisible, useWatchUpNextVisible } from "@/app/providers";
+import {
+  useWatchCommentsVisible,
+  useWatchNarrowPlayerLayout,
+  useWatchUpNextVisible,
+} from "@/app/providers";
 import { GoToChannelButton } from "@/components/GoToChannelButton";
-import { LiteYouTubeEmbed } from "@/components/LiteYouTubeEmbed";
+import {
+  LiteYouTubeEmbed,
+  preloadLiteYoutubeEmbed,
+} from "@/components/LiteYouTubeEmbed";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { WatchLaterAddButton } from "@/components/WatchLaterAddButton";
 import { WatchComments } from "@/components/WatchComments";
@@ -83,7 +90,10 @@ export function WatchExperienceClient({
     user,
   } = useCloudLibrary();
   const { visible: upNextVisible } = useWatchUpNextVisible();
+  const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
   const { visible: commentsVisible } = useWatchCommentsVisible();
+
+  const reserveUpNextColumn = narrowPlayerLayout || upNextVisible;
 
   const urlStartSeconds =
     parseYouTubeTimeParam(searchParams.get("t")) ??
@@ -144,6 +154,10 @@ export function WatchExperienceClient({
     useState<VideoSummary[]>(watchNextInitial);
   const watchNextFetchAttemptedRef = useRef(false);
 
+  useEffect(() => {
+    preloadLiteYoutubeEmbed();
+  }, []);
+
   const fetchWatchNext = useCallback(async () => {
     const response = await fetch(
       `/api/videos/${encodeURIComponent(videoId)}/watch-next`,
@@ -195,7 +209,7 @@ export function WatchExperienceClient({
           [MOBILE_PORTRAIT]: { px: 0 },
         }}
       >
-        <Grid size={{ xs: 12, lg: upNextVisible ? 8 : 12 }}>
+        <Grid size={{ xs: 12, lg: reserveUpNextColumn ? 8 : 12 }}>
           <Stack spacing={1.5}>
             <Box sx={watchPlayerShellSx}>
               {showPlayer ? (
@@ -263,11 +277,15 @@ export function WatchExperienceClient({
             </Stack>
           </Stack>
         </Grid>
-        {upNextVisible ? (
+        {reserveUpNextColumn ? (
           <Grid size={{ xs: 12, lg: 4 }}>
-            <Box sx={watchSidebarPadSx}>
-              <WatchNextSidebar videos={watchNextVideos} />
-            </Box>
+            {upNextVisible ? (
+              <Box sx={watchSidebarPadSx}>
+                <WatchNextSidebar videos={watchNextVideos} />
+              </Box>
+            ) : (
+              <Box aria-hidden sx={{ minHeight: 0 }} />
+            )}
           </Grid>
         ) : null}
       </Grid>

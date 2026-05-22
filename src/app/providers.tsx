@@ -14,6 +14,7 @@ import {
 
 import { setLibrarySidebarCollapsedAction } from "@/app/actions/librarySidebarCollapsed";
 import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibility";
+import { setWatchNarrowPlayerLayoutAction } from "@/app/actions/watchNarrowPlayerLayout";
 import { setWatchUpNextVisibleAction } from "@/app/actions/watchUpNextVisibility";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
 import {
@@ -32,6 +33,11 @@ import {
   librarySidebarCollapsedToStorageValue,
   parseLibrarySidebarCollapsedCookie,
 } from "@/lib/librarySidebarPersistence";
+import {
+  WATCH_NARROW_PLAYER_LAYOUT_STORAGE_KEY,
+  parseWatchNarrowPlayerLayoutCookie,
+  watchNarrowPlayerLayoutToStorageValue,
+} from "@/lib/watchNarrowPlayerLayoutPersistence";
 import { applySemanticCssVariables, semanticTokensForMode } from "@/theme/semanticTokens";
 import { createAppTheme } from "@/theme/theme";
 
@@ -58,6 +64,14 @@ type WatchUpNextVisibleContextValue = {
 
 const WatchUpNextVisibleContext =
   createContext<WatchUpNextVisibleContextValue | null>(null);
+
+type WatchNarrowPlayerLayoutContextValue = {
+  enabled: boolean;
+  setWatchNarrowPlayerLayout: (enabled: boolean) => void;
+};
+
+const WatchNarrowPlayerLayoutContext =
+  createContext<WatchNarrowPlayerLayoutContextValue | null>(null);
 
 type LibrarySidebarCollapsedContextValue = {
   collapsed: boolean;
@@ -148,6 +162,28 @@ function writeLibrarySidebarStorage(collapsed: boolean): void {
   }
 }
 
+function readStoredWatchNarrowPlayerLayout(): boolean | undefined {
+  if (typeof window === "undefined") return undefined;
+  try {
+    const raw = localStorage.getItem(WATCH_NARROW_PLAYER_LAYOUT_STORAGE_KEY);
+    if (raw == null || raw === "") return undefined;
+    return parseWatchNarrowPlayerLayoutCookie(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function writeWatchNarrowPlayerLayoutStorage(enabled: boolean): void {
+  try {
+    localStorage.setItem(
+      WATCH_NARROW_PLAYER_LAYOUT_STORAGE_KEY,
+      watchNarrowPlayerLayoutToStorageValue(enabled),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export function useThemeMode() {
   const ctx = useContext(ThemeModeContext);
   if (!ctx) throw new Error("useThemeMode must be used within AppProviders");
@@ -172,6 +208,16 @@ export function useWatchUpNextVisible() {
   return ctx;
 }
 
+export function useWatchNarrowPlayerLayout() {
+  const ctx = useContext(WatchNarrowPlayerLayoutContext);
+  if (!ctx) {
+    throw new Error(
+      "useWatchNarrowPlayerLayout must be used within AppProviders",
+    );
+  }
+  return ctx;
+}
+
 export function useLibrarySidebarCollapsed() {
   const ctx = useContext(LibrarySidebarCollapsedContext);
   if (!ctx) {
@@ -187,15 +233,19 @@ export function AppProviders({
   initialTheme,
   initialWatchCommentsVisible,
   initialWatchUpNextVisible,
+  initialWatchNarrowPlayerLayout,
   initialLibrarySidebarCollapsed,
   librarySidebarHasCookie,
+  watchNarrowPlayerLayoutHasCookie,
 }: {
   children: React.ReactNode;
   initialTheme: InitialThemeSettings;
   initialWatchCommentsVisible: boolean;
   initialWatchUpNextVisible: boolean;
+  initialWatchNarrowPlayerLayout: boolean;
   initialLibrarySidebarCollapsed: boolean;
   librarySidebarHasCookie: boolean;
+  watchNarrowPlayerLayoutHasCookie: boolean;
 }) {
   const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode);
   const [watchCommentsVisible, setWatchCommentsVisibleState] = useState(
@@ -203,6 +253,9 @@ export function AppProviders({
   );
   const [watchUpNextVisible, setWatchUpNextVisibleState] = useState(
     initialWatchUpNextVisible,
+  );
+  const [watchNarrowPlayerLayout, setWatchNarrowPlayerLayoutState] = useState(
+    initialWatchNarrowPlayerLayout,
   );
   const [librarySidebarCollapsed, setLibrarySidebarCollapsedState] = useState(
     initialLibrarySidebarCollapsed,
@@ -227,6 +280,15 @@ export function AppProviders({
     setLibrarySidebarCollapsedState(stored);
     void setLibrarySidebarCollapsedAction(stored);
   }, [librarySidebarHasCookie]);
+
+  useEffect(() => {
+    if (watchNarrowPlayerLayoutHasCookie) return;
+    const stored = readStoredWatchNarrowPlayerLayout();
+    if (stored === undefined) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time migration from localStorage-only preference
+    setWatchNarrowPlayerLayoutState(stored);
+    void setWatchNarrowPlayerLayoutAction(stored);
+  }, [watchNarrowPlayerLayoutHasCookie]);
 
   useEffect(() => {
     if (initialTheme.hasStoredCookie) return;
@@ -284,6 +346,12 @@ export function AppProviders({
     void setWatchUpNextVisibleAction(next);
   }, []);
 
+  const setWatchNarrowPlayerLayout = useCallback((next: boolean) => {
+    setWatchNarrowPlayerLayoutState(next);
+    writeWatchNarrowPlayerLayoutStorage(next);
+    void setWatchNarrowPlayerLayoutAction(next);
+  }, []);
+
   const setLibrarySidebarCollapsed = useCallback((next: boolean) => {
     setLibrarySidebarCollapsedState(next);
     writeLibrarySidebarStorage(next);
@@ -317,6 +385,14 @@ export function AppProviders({
     [watchUpNextVisible, setWatchUpNextVisible],
   );
 
+  const watchNarrowPlayerLayoutValue = useMemo(
+    () => ({
+      enabled: watchNarrowPlayerLayout,
+      setWatchNarrowPlayerLayout,
+    }),
+    [watchNarrowPlayerLayout, setWatchNarrowPlayerLayout],
+  );
+
   const librarySidebarCollapsedValue = useMemo(
     () => ({
       collapsed: librarySidebarCollapsed,
@@ -332,16 +408,20 @@ export function AppProviders({
           value={librarySidebarCollapsedValue}
         >
           <WatchUpNextVisibleContext.Provider value={watchUpNextVisibleValue}>
-            <WatchCommentsVisibleContext.Provider
-              value={watchCommentsVisibleValue}
+            <WatchNarrowPlayerLayoutContext.Provider
+              value={watchNarrowPlayerLayoutValue}
             >
+              <WatchCommentsVisibleContext.Provider
+                value={watchCommentsVisibleValue}
+              >
               <ThemeProvider theme={theme}>
                 <CssBaseline enableColorScheme />
                 <NavigationProgressProvider>
                   {children}
                 </NavigationProgressProvider>
               </ThemeProvider>
-            </WatchCommentsVisibleContext.Provider>
+              </WatchCommentsVisibleContext.Provider>
+            </WatchNarrowPlayerLayoutContext.Provider>
           </WatchUpNextVisibleContext.Provider>
         </LibrarySidebarCollapsedContext.Provider>
       </ThemeModeContext.Provider>

@@ -43,6 +43,7 @@ type WatchProgressRow = {
   last_position_seconds: number;
   duration_seconds: number | null;
   completed: boolean;
+  ever_completed: boolean;
   last_watched_at: string;
   updated_at: string;
 };
@@ -100,6 +101,7 @@ function toWatchProgressEntry(row: WatchProgressRow): WatchProgressEntry {
     lastPositionSeconds: row.last_position_seconds,
     durationSeconds: row.duration_seconds ?? undefined,
     completed: row.completed,
+    everCompleted: row.ever_completed === true || row.completed,
     lastWatchedAt: row.last_watched_at,
     updatedAt: row.updated_at,
   };
@@ -111,13 +113,34 @@ export function mergeWatchProgressEntries(
   b: WatchProgressEntry[],
 ): WatchProgressEntry[] {
   const byId = new Map<string, WatchProgressEntry>();
+  const mergeEverCompleted = (
+    a: WatchProgressEntry,
+    b: WatchProgressEntry,
+  ): boolean =>
+    a.everCompleted === true ||
+    b.everCompleted === true ||
+    a.completed ||
+    b.completed;
+
   const put = (e: WatchProgressEntry) => {
     const cur = byId.get(e.videoId);
-    if (!cur || e.updatedAt > cur.updatedAt) {
-      byId.set(e.videoId, e);
-    } else if (e.updatedAt === cur.updatedAt && e.lastWatchedAt > cur.lastWatchedAt) {
-      byId.set(e.videoId, e);
+    if (!cur) {
+      byId.set(e.videoId, {
+        ...e,
+        everCompleted:
+          e.everCompleted === true || e.completed ? true : undefined,
+      });
+      return;
     }
+    const eNewer =
+      e.updatedAt > cur.updatedAt ||
+      (e.updatedAt === cur.updatedAt && e.lastWatchedAt > cur.lastWatchedAt);
+    const winner = eNewer ? e : cur;
+    const loser = eNewer ? cur : e;
+    byId.set(e.videoId, {
+      ...winner,
+      everCompleted: mergeEverCompleted(winner, loser) ? true : undefined,
+    });
   };
   for (const e of a) put(e);
   for (const e of b) put(e);
@@ -299,6 +322,8 @@ export async function upsertWatchProgressEntries(
     last_position_seconds: entry.lastPositionSeconds,
     duration_seconds: entry.durationSeconds ?? null,
     completed: entry.completed,
+    ever_completed:
+      entry.everCompleted === true || entry.completed === true,
     last_watched_at: entry.lastWatchedAt,
     updated_at: entry.updatedAt,
   }));

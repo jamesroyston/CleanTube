@@ -97,7 +97,6 @@ export default async function WatchPage({ params, searchParams }: PageProps) {
       component="main"
       sx={{
         pb: { xs: 4, sm: 6 },
-        minHeight: "100vh",
       }}
     >
       <Container

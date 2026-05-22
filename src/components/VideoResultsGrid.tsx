@@ -15,6 +15,10 @@ import Typography from "@mui/material/Typography";
 import Link from "next/link";
 
 import type { VideoSummary } from "@/components/VideoSummary";
+import {
+  useVideoWatchHref,
+  VideoCardThumbnailWithProgress,
+} from "@/components/VideoCardThumbnailWithProgress";
 import { WatchLaterCardButton } from "@/components/WatchLaterCardButton";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 
@@ -23,6 +27,8 @@ type VideoResultsGridProps = {
 };
 
 export function VideoCard({ video }: { video: VideoSummary }) {
+  const watchHref = useVideoWatchHref(video.id);
+
   return (
     <Card
       variant="outlined"
@@ -43,7 +49,7 @@ export function VideoCard({ video }: { video: VideoSummary }) {
       <Box sx={{ position: "relative" }}>
         <CardActionArea
           component={Link}
-          href={`/watch/${video.id}`}
+          href={watchHref}
           sx={{
             display: "flex",
             flexDirection: "column",
@@ -60,14 +66,16 @@ export function VideoCard({ video }: { video: VideoSummary }) {
                 bgcolor: "action.hover",
               }}
             >
-              <YouTubeThumbnailImage
-                src={video.thumbnailUrl}
-                fallbacks={video.thumbnailFallbackUrls}
-                alt=""
-                fill
-                sizes="(max-width: 600px) 100vw, (max-width: 900px) 50vw, 480px"
-                style={{ objectFit: "cover" }}
-              />
+              <VideoCardThumbnailWithProgress videoId={video.id}>
+                <YouTubeThumbnailImage
+                  src={video.thumbnailUrl}
+                  fallbacks={video.thumbnailFallbackUrls}
+                  alt=""
+                  fill
+                  sizes="(max-width: 600px) 100vw, (max-width: 900px) 50vw, 480px"
+                  style={{ objectFit: "cover" }}
+                />
+              </VideoCardThumbnailWithProgress>
             </CardMedia>
             <Chip
               label={video.durationFormatted}
@@ -77,6 +85,7 @@ export function VideoCard({ video }: { video: VideoSummary }) {
                 position: "absolute",
                 bottom: 8,
                 right: 8,
+                zIndex: 3,
                 fontWeight: 600,
                 fontVariantNumeric: "tabular-nums",
                 bgcolor: video.live ? undefined : "rgba(0,0,0,0.82)",

@@ -139,3 +139,9 @@ export function deriveResumeSeconds(
 export function isInProgress(entry: WatchProgressEntry): boolean {
   return !entry.completed && entry.lastPositionSeconds > 0;
 }
+
+/** User finished this video before and is watching again (not yet re-completed). */
+export function isRewatching(entry: WatchProgressEntry | undefined): boolean {
+  if (!entry || entry.completed) return false;
+  return entry.everCompleted === true;
+}
