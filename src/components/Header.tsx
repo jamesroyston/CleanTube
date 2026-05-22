@@ -34,6 +34,13 @@ import {
 } from "@/lib/lastSearchSession";
 import type { SearchSortMode } from "@/lib/uploadedAtSort";
 import {
+  channelPageHrefFromToken,
+  extractChannelRouteTokenFromUrl,
+  extractVideoIdFromUrl,
+  isLikelyYouTubeUrl,
+} from "@/lib/youtube";
+import { extractStartSecondsFromYoutubeInput } from "@/lib/youtubeTime";
+import {
   normalizeResultSortParam,
   normalizeSearchSortParam,
 } from "@/lib/uploadedAtSort";
@@ -70,6 +77,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const [searchSortDraft, setSearchSortDraft] =
       useState<SearchSortMode>("relevance");
     const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
+    const searchOverlayHistoryPushedRef = useRef(false);
     const [overlayQuery, setOverlayQuery] = useState("");
     const [recentList, setRecentList] = useState<string[]>([]);
 
@@ -118,11 +126,41 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       }
     }, [done, isPending, start]);
 
+    const closeSearchOverlay = useCallback((fromPopState = false) => {
+      setSearchOverlayOpen(false);
+      if (fromPopState) {
+        searchOverlayHistoryPushedRef.current = false;
+        return;
+      }
+      if (searchOverlayHistoryPushedRef.current) {
+        searchOverlayHistoryPushedRef.current = false;
+        window.history.back();
+      }
+    }, []);
+
     const openSearchOverlay = useCallback(() => {
       setRecentList(getRecentSearches());
       setOverlayQuery(query.trim() ? query : "");
       setSearchOverlayOpen(true);
+      if (!searchOverlayHistoryPushedRef.current) {
+        window.history.pushState(
+          { cleantubeOverlay: "search" },
+          "",
+          window.location.href,
+        );
+        searchOverlayHistoryPushedRef.current = true;
+      }
     }, [getRecentSearches, query]);
+
+    useEffect(() => {
+      const onPopState = () => {
+        if (searchOverlayHistoryPushedRef.current) {
+          closeSearchOverlay(true);
+        }
+      };
+      window.addEventListener("popstate", onPopState);
+      return () => window.removeEventListener("popstate", onPopState);
+    }, [closeSearchOverlay]);
 
     useEffect(() => {
       registerOpenSearchOverlay(openSearchOverlay);
@@ -138,10 +176,35 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     function runSearch(trimmed: string) {
       const sort = searchSortDraft;
       setQuery(trimmed);
+      if (trimmed && isLikelyYouTubeUrl(trimmed)) {
+        const fromUrl = extractVideoIdFromUrl(trimmed);
+        if (fromUrl) {
+          const startSeconds = extractStartSecondsFromYoutubeInput(trimmed);
+          const qs =
+            startSeconds != null && startSeconds > 0
+              ? `?t=${encodeURIComponent(String(startSeconds))}`
+              : "";
+          start();
+          startTransition(() => {
+            closeSearchOverlay(true);
+            router.push(`/watch/${fromUrl}${qs}`);
+          });
+          return;
+        }
+        const channelToken = extractChannelRouteTokenFromUrl(trimmed);
+        if (channelToken) {
+          start();
+          startTransition(() => {
+            closeSearchOverlay(true);
+            router.push(channelPageHrefFromToken(channelToken));
+          });
+          return;
+        }
+      }
       if (!trimmed) {
         start();
         startTransition(() => {
-          setSearchOverlayOpen(false);
+          closeSearchOverlay(true);
           if (pathname === "/" && searchParams.toString() === "") {
             router.refresh();
           } else {
@@ -167,7 +230,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       const currentHref = `${pathname}${currentSearch ? `?${currentSearch}` : ""}`;
       start();
       startTransition(() => {
-        setSearchOverlayOpen(false);
+        closeSearchOverlay(true);
         if (currentHref === href) {
           router.refresh();
         } else {
@@ -316,7 +379,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
           query={overlayQuery}
           searchSortDraft={searchSortDraft}
           recentList={recentList}
-          onClose={() => setSearchOverlayOpen(false)}
+          onClose={() => closeSearchOverlay()}
           onQueryChange={setOverlayQuery}
           onRecentListChange={setRecentList}
           onSearchSortChange={commitSearchLatestPreference}

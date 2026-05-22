@@ -26,11 +26,12 @@ import Switch from "@mui/material/Switch";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useMemo, useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 
+import { buildAuthPageHref } from "@/lib/authReturnNavigation";
 import { clearChannelPageSessionBackups } from "@/lib/channelPageClientCache";
 
 import {
@@ -59,6 +60,12 @@ export function AccountMenu() {
   const { enabled: narrowPlayerLayout, setWatchNarrowPlayerLayout } =
     useWatchNarrowPlayerLayout();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const authHref = useMemo(() => {
+    const search = searchParams.toString();
+    return buildAuthPageHref(pathname, search ? `?${search}` : undefined);
+  }, [pathname, searchParams]);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
   const signedInColor = user ? "success" : "inherit";
@@ -319,7 +326,7 @@ export function AccountMenu() {
             <MenuItem
               key="passkeys"
               component={Link}
-              href="/auth"
+              href={authHref}
               onClick={() => setAnchorEl(null)}
             >
               <ListItemIcon>
@@ -346,7 +353,7 @@ export function AccountMenu() {
         ) : (
           <MenuItem
             component={Link}
-            href="/auth"
+            href={authHref}
             onClick={() => setAnchorEl(null)}
             disabled={authStatus === "loading"}
           >

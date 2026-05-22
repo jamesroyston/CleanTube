@@ -98,6 +98,9 @@ export function deriveWatchReturnTarget(
 /** Call before navigating to a watch page so back link is correct on first paint. */
 export function captureWatchReturnFromCurrentLocation(): void {
   if (typeof window === "undefined") return;
+  if (window.location.pathname.startsWith("/watch/")) {
+    return;
+  }
   const target = deriveWatchReturnTarget(
     window.location.pathname,
     window.location.search.replace(/^\?/, ""),
