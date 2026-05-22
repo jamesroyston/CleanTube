@@ -19,7 +19,6 @@ import { Header } from "@/components/Header";
 import { MobileSearchChrome } from "@/components/MobileSearchChrome";
 import { SavedChannelMigration } from "@/components/SavedChannelMigration";
 import { WatchReturnTracker } from "@/components/WatchReturnTracker";
-import { SearchChromeProvider } from "@/context/SearchChromeContext";
 
 function HeaderFallback() {
   return null;
@@ -273,9 +272,5 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  return (
-    <SearchChromeProvider>
-      <AppShellInner>{children}</AppShellInner>
-    </SearchChromeProvider>
-  );
+  return <AppShellInner>{children}</AppShellInner>;
 }
