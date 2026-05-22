@@ -18,8 +18,7 @@ import type { Theme } from "@mui/material/styles";
 import Link from "next/link";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
-import { getLastSearchSort } from "@/lib/lastSearchSession";
-import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
+import { savedChannelBrowseHref } from "@/lib/savedChannelNavigation";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { SavedChannel } from "@/types/savedChannel";
 
@@ -57,23 +56,6 @@ export function ChannelsRailContent({
   const savedSearches = channels.filter(
     (channel) => effectiveSavedChannelKind(channel) === "pinned_search",
   );
-
-  function searchHref(q: string) {
-    const searchSort = getLastSearchSort();
-    const qs = new URLSearchParams();
-    qs.set("q", q);
-    if (searchSort !== "relevance") qs.set("searchSort", searchSort);
-    return `/?${qs.toString()}`;
-  }
-
-  function savedLibraryHref(channel: SavedChannel): string {
-    const kind = effectiveSavedChannelKind(channel);
-    if (kind === "pinned_search") return searchHref(channel.searchQuery);
-    if (channel.channelId) return channelPageHrefFromToken(channel.channelId);
-    const url = channel.channelUrl?.trim();
-    if (url) return url;
-    return searchHref(channel.searchQuery);
-  }
 
   const navLinks = [
     {
@@ -182,7 +164,7 @@ export function ChannelsRailContent({
               <Tooltip key={c.id} title={c.name} placement="right" enterDelay={400}>
                 <ListItemButton
                   component={Link}
-                  href={savedLibraryHref(c)}
+                  href={savedChannelBrowseHref(c)}
                   onClick={onNavigate}
                   sx={{
                     borderRadius: 1,
@@ -253,7 +235,7 @@ export function ChannelsRailContent({
                 <Tooltip key={c.id} title={c.name} placement="right" enterDelay={400}>
                   <ListItemButton
                     component={Link}
-                    href={searchHref(c.searchQuery)}
+                    href={savedChannelBrowseHref(c)}
                     onClick={onNavigate}
                     sx={{
                       borderRadius: 1,
