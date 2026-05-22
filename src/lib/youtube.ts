@@ -183,7 +183,7 @@ export async function searchMixedResults(
   sortMode: SearchSortMode = "relevance",
 ): Promise<MixedSearchResults> {
   const [channels, videos] = await Promise.all([
-    searchChannels(query, 4),
+    searchChannels(query, 1),
     searchVideos(query, limit, sortMode),
   ]);
   return { channels, videos };

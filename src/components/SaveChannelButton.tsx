@@ -13,6 +13,8 @@ type SaveChannelButtonProps = {
   channelId?: string;
   channelUrl?: string;
   thumbnailUrl?: string;
+  /** Shorter labels for dense surfaces (e.g. search cards). */
+  compact?: boolean;
 };
 
 export function SaveChannelButton({
@@ -20,6 +22,7 @@ export function SaveChannelButton({
   channelId,
   channelUrl,
   thumbnailUrl,
+  compact = false,
 }: SaveChannelButtonProps) {
   const { channels, addChannel, removeChannel } = useSavedChannels();
   const trimmedName = channelName.trim();
@@ -53,7 +56,7 @@ export function SaveChannelButton({
         onClick={() => removeChannel(savedMatch.id)}
         sx={{ alignSelf: "flex-start" }}
       >
-        Remove from saved
+        {compact ? "Saved" : "Remove from saved"}
       </Button>
     );
   }
@@ -75,7 +78,7 @@ export function SaveChannelButton({
       }
       sx={{ alignSelf: "flex-start" }}
     >
-      Save channel
+      {compact ? "Save" : "Save channel"}
     </Button>
   );
 }

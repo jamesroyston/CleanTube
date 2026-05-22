@@ -6,6 +6,7 @@ import { Suspense } from "react";
 
 import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
 import { LastSearchSync } from "@/components/LastSearchSync";
+import { pickBestGuessChannels } from "@/lib/channelSearchRelevance";
 import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 import { SearchSortBar } from "@/components/SearchSortBar";
 import { SaveSearchButton } from "@/components/SaveSearchButton";
@@ -70,7 +71,7 @@ export default async function Home({ searchParams }: PageProps) {
   if (query) {
     try {
       const results = await searchMixedResultsCached(query, 24, searchSortMode);
-      channels = results.channels;
+      channels = pickBestGuessChannels(query, results.channels);
       videos = sortVideoSummariesByUploadDate(
         toVideoSummaries(results.videos),
         resultSortMode,
