@@ -6,6 +6,7 @@ import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { usePathname } from "next/navigation";
 import {
   Suspense,
   useCallback,
@@ -39,6 +40,7 @@ const DESKTOP_HEADER_INSET_FALLBACK_PX = 80;
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
+  const pathname = usePathname();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
   const [mobileOpen, setMobileOpen] = useState(false);
   const drawerHistoryPushedRef = useRef(false);
@@ -56,6 +58,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       window.history.back();
     }
   }, []);
+
+  /** Sidebar link navigation: close drawer without history.back (avoids canceling the route change). */
+  const dismissMobileDrawerForNavigation = useCallback(() => {
+    setMobileOpen(false);
+    drawerHistoryPushedRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    setMobileOpen(false);
+    drawerHistoryPushedRef.current = false;
+  }, [pathname]);
 
   const openMobileDrawer = useCallback(() => {
     setMobileOpen(true);
@@ -301,7 +314,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           >
             <ChannelsRailContent
               miniMode={false}
-              onNavigate={() => closeMobileDrawer()}
+              onNavigate={dismissMobileDrawerForNavigation}
             />
           </Drawer>
 

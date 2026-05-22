@@ -14,7 +14,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
-import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
+import { savedChannelBrowseHref } from "@/lib/savedChannelNavigation";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { SavedChannel } from "@/types/savedChannel";
 
@@ -26,13 +26,7 @@ function SavedChannelRow({
   onRemove: () => void;
 }) {
   const kind = effectiveSavedChannelKind(channel);
-  const href =
-    kind === "pinned_search"
-      ? `/?q=${encodeURIComponent(channel.searchQuery)}`
-      : channel.channelId
-        ? channelPageHrefFromToken(channel.channelId)
-        : channel.channelUrl?.trim() ||
-          `/?q=${encodeURIComponent(channel.searchQuery)}`;
+  const href = savedChannelBrowseHref(channel);
 
   return (
     <ListItem
