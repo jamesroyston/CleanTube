@@ -6,6 +6,7 @@ import type { CloudSnapshot } from "@/lib/cloudLibrary/cloudStore";
 import { createSupabaseServerClient } from "@/utils/supabase/server";
 
 export type ForYouLibrarySignals = {
+  userId: string;
   snapshot: CloudSnapshot;
   recentSearches: RecentSearchEntry[];
   recentSearchQueries: string[];
@@ -39,6 +40,7 @@ export async function loadForYouLibrarySignals(): Promise<ForYouLibrarySignals |
   ]);
 
   return {
+    userId: user.id,
     snapshot,
     recentSearches,
     recentSearchQueries: entriesToQueryList(recentSearches),

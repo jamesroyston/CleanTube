@@ -16,7 +16,7 @@ import {
 import "lite-youtube-embed/src/lite-yt-embed.css";
 
 const PROGRESS_SAMPLE_INTERVAL_MS = 1_000;
-const SIGNED_IN_CLOUD_SYNC_INTERVAL_MS = 15_000;
+const SIGNED_IN_CLOUD_SYNC_INTERVAL_MS = 30_000;
 
 let liteYtLoad: Promise<unknown> | null = null;
 let liteYtModuleReady = false;

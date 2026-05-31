@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
@@ -8,6 +9,8 @@ import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 import type { ChannelDetails } from "@/lib/youtubeTypes";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
 import type { SavedChannel } from "@/types/savedChannel";
+
+const MIGRATION_DONE_KEY = "cleantube.savedChannelMigration.v1";
 
 /**
  * EXPERIMENTAL SAVED CHANNEL MIGRATION.
@@ -18,12 +21,18 @@ import type { SavedChannel } from "@/types/savedChannel";
  *
  * Scope is high-confidence only: canonical UC ids, @handles, and YouTube
  * channel URLs. Plain strings like "Computerphile" are left as search shortcuts.
+ *
+ * Hobby guardrails: skips watch pages, skips when nothing to migrate, and
+ * records completion in localStorage so repeat visits do not re-batch resolve.
  */
 export function SavedChannelMigration() {
+  const pathname = usePathname();
   const { channels, updateChannel } = useSavedChannels();
   const attemptedIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
+    if (pathname.startsWith("/watch")) return;
+
     const candidates = channels.filter((channel) => {
       if (effectiveSavedChannelKind(channel) !== "saved_channel") {
         return false;
@@ -34,7 +43,25 @@ export function SavedChannelMigration() {
       return Boolean(candidateLookup(channel));
     });
 
-    if (candidates.length === 0) return;
+    if (candidates.length === 0) {
+      try {
+        localStorage.setItem(MIGRATION_DONE_KEY, "1");
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
+    try {
+      if (localStorage.getItem(MIGRATION_DONE_KEY) === "1") {
+        const hasNewCandidates = candidates.some(
+          (c) => !attemptedIdsRef.current.has(c.id),
+        );
+        if (!hasNewCandidates) return;
+      }
+    } catch {
+      /* ignore */
+    }
 
     let cancelled = false;
 
@@ -73,6 +100,14 @@ export function SavedChannelMigration() {
             channelUrl: payload.channelUrl,
           });
         }
+
+        if (!cancelled && withLookup.every(({ lookup }) => byLookup.has(lookup))) {
+          try {
+            localStorage.setItem(MIGRATION_DONE_KEY, "1");
+          } catch {
+            /* ignore */
+          }
+        }
       } catch {
         /* Leave saved searches untouched if resolution fails. */
       }
@@ -81,7 +116,7 @@ export function SavedChannelMigration() {
     return () => {
       cancelled = true;
     };
-  }, [channels, updateChannel]);
+  }, [channels, pathname, updateChannel]);
 
   return null;
 }

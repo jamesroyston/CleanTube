@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { buildForYouFeed } from "@/lib/forYou/buildFeed";
+import { buildForYouFeedCached } from "@/lib/forYou/feedCache";
 import { loadForYouLibrarySignals } from "@/lib/forYou/loadLibrarySignals";
 
 export const runtime = "nodejs";
@@ -17,7 +17,7 @@ export async function GET() {
   }
 
   try {
-    const feed = await buildForYouFeed(signals);
+    const feed = await buildForYouFeedCached(signals.userId, signals);
     return NextResponse.json(feed);
   } catch (err) {
     console.error("[api/for-you]", err);
