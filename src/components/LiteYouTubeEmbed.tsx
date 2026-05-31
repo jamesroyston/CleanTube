@@ -15,7 +15,6 @@ import {
 import "lite-youtube-embed/src/lite-yt-embed.css";
 
 const PROGRESS_SAMPLE_INTERVAL_MS = 1_000;
-const ANONYMOUS_LOCAL_PERSIST_INTERVAL_MS = 10_000;
 const SIGNED_IN_CLOUD_SYNC_INTERVAL_MS = 15_000;
 
 let liteYtLoad: Promise<unknown> | null = null;
@@ -83,8 +82,9 @@ export function LiteYouTubeEmbed({
   enableGlobalShortcuts = true,
   theatreMaximize = false,
 }: LiteYouTubeEmbedProps) {
-  const { upsertWatchProgress, user } = useCloudLibrary();
+  const { upsertWatchProgress, canPersistLibrary } = useCloudLibrary();
   const [ready, setReady] = useState(liteYtModuleReady);
+  const [playerGeneration, setPlayerGeneration] = useState(0);
   const shellRef = useRef<HTMLDivElement>(null);
   const ytPlayerRef = useRef<YT.Player | null>(null);
   const playerApiReadyRef = useRef(false);
@@ -93,11 +93,7 @@ export function LiteYouTubeEmbed({
   /** User explicitly paused; do not resume on tab return or player remount. */
   const userPausedRef = useRef(false);
   const recordProgressRef = useRef<
-    (opts?: {
-      force?: boolean;
-      persistLocal?: boolean;
-      syncCloud?: boolean;
-    }) => Promise<void>
+    (opts?: { force?: boolean; syncCloud?: boolean }) => Promise<void>
   >(async () => {});
 
   const start = useCommittedStartSeconds(videoId, startSeconds);
@@ -132,13 +128,12 @@ export function LiteYouTubeEmbed({
   const recordProgress = useCallback(
     async ({
       force = false,
-      persistLocal = false,
       syncCloud = false,
     }: {
       force?: boolean;
-      persistLocal?: boolean;
       syncCloud?: boolean;
     } = {}) => {
+      if (!canPersistLibrary) return;
       const root = shellRef.current;
       if (!root || !playerApiReadyRef.current) return;
 
@@ -174,10 +169,9 @@ export function LiteYouTubeEmbed({
         durationSeconds > 0 &&
         durationSeconds - currentSeconds <= 30;
 
-      const writesOut = persistLocal || syncCloud;
       if (
         !force &&
-        !writesOut &&
+        !syncCloud &&
         Math.abs(currentSeconds - lastRecordedSecondsRef.current) < 1
       ) {
         return;
@@ -195,13 +189,10 @@ export function LiteYouTubeEmbed({
           durationSeconds,
           completed,
         },
-        {
-          persistLocal,
-          syncCloud,
-        },
+        { syncCloud },
       );
     },
-    [channelName, thumbnailUrl, title, upsertWatchProgress, videoId],
+    [canPersistLibrary, channelName, thumbnailUrl, title, upsertWatchProgress, videoId],
   );
 
   recordProgressRef.current = recordProgress;
@@ -228,7 +219,6 @@ export function LiteYouTubeEmbed({
       if (state === YT.PlayerState.PAUSED || state === YT.PlayerState.ENDED) {
         void recordProgressRef.current({
           force: true,
-          persistLocal: true,
           syncCloud: true,
         });
       }
@@ -264,10 +254,56 @@ export function LiteYouTubeEmbed({
         }
       }
     };
-  }, [ready, videoId]);
+  }, [ready, videoId, playerGeneration]);
 
   useEffect(() => {
     if (!ready) return;
+
+    const recoverPlayer = () => {
+      ytPlayerRef.current = null;
+      playerApiReadyRef.current = false;
+      playingRef.current = false;
+      setPlayerGeneration((g) => g + 1);
+    };
+
+    const reattachIfNeeded = () => {
+      if (document.visibilityState !== "visible") return;
+      const root = shellRef.current;
+      if (!root || playerApiReadyRef.current) return;
+      void getAttachedLiteYoutubePlayer(root).then((player) => {
+        if (player && isYoutubePlayerAttached(player)) {
+          ytPlayerRef.current = player;
+          playerApiReadyRef.current = true;
+          return;
+        }
+        recoverPlayer();
+      });
+    };
+
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) recoverPlayer();
+      else reattachIfNeeded();
+    };
+
+    const onResume = () => recoverPlayer();
+
+    window.addEventListener("pageshow", onPageShow);
+    if ("onresume" in document) {
+      document.addEventListener("resume", onResume);
+    }
+    document.addEventListener("visibilitychange", reattachIfNeeded);
+
+    return () => {
+      window.removeEventListener("pageshow", onPageShow);
+      if ("onresume" in document) {
+        document.removeEventListener("resume", onResume);
+      }
+      document.removeEventListener("visibilitychange", reattachIfNeeded);
+    };
+  }, [ready, videoId]);
+
+  useEffect(() => {
+    if (!ready || !canPersistLibrary) return;
 
     const sampleInterval = window.setInterval(() => {
       if (playingRef.current && playerApiReadyRef.current) {
@@ -275,25 +311,15 @@ export function LiteYouTubeEmbed({
       }
     }, PROGRESS_SAMPLE_INTERVAL_MS);
 
-    const persistInterval = window.setInterval(
-      () => {
-        if (!playingRef.current || !playerApiReadyRef.current) return;
-        void recordProgressRef.current(
-          user
-            ? { syncCloud: true }
-            : { persistLocal: true },
-        );
-      },
-      user
-        ? SIGNED_IN_CLOUD_SYNC_INTERVAL_MS
-        : ANONYMOUS_LOCAL_PERSIST_INTERVAL_MS,
-    );
+    const persistInterval = window.setInterval(() => {
+      if (!playingRef.current || !playerApiReadyRef.current) return;
+      void recordProgressRef.current({ syncCloud: true });
+    }, SIGNED_IN_CLOUD_SYNC_INTERVAL_MS);
 
     const flush = () => {
       if (!playerApiReadyRef.current) return;
       void recordProgressRef.current({
         force: true,
-        persistLocal: true,
         syncCloud: true,
       });
     };
@@ -340,7 +366,7 @@ export function LiteYouTubeEmbed({
       }
       flush();
     };
-  }, [ready, user]);
+  }, [canPersistLibrary, ready]);
 
   const shellSx = theatreMaximize
     ? {
@@ -393,7 +419,7 @@ export function LiteYouTubeEmbed({
   const player = (
     <Box ref={shellRef} sx={shellSx}>
       <lite-youtube
-        key={videoId}
+        key={`${videoId}-${playerGeneration}`}
         videoid={videoId}
         title={title ?? ""}
         params={params.toString()}

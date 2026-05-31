@@ -64,12 +64,19 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
   ) {
     const theme = useTheme();
     const compactSearch = useMediaQuery("(max-width:899.95px)");
+    const headerScrollsAway = useMediaQuery(
+      "(max-width:599.95px), (max-width:899.95px) and (orientation: landscape)",
+    );
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const { start, done } = useNavigationProgress();
     const { addRecentSearch, getRecentSearches } = useCloudLibrary();
-    const { registerOpenSearchOverlay } = useSearchChrome();
+    const {
+      registerOpenSearchOverlay,
+      mobileHeaderRevealProgress,
+      mobileHeaderOverlayMode,
+    } = useSearchChrome();
     const [isPending, startTransition] = useTransition();
     const hadPendingRef = useRef(false);
     const qParam = searchParams.get("q") ?? "";
@@ -243,21 +250,42 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       browseLayout.mode === "desktopRailMini" ? browseLayout.railWidthPx : null;
 
     const displayQuery = query.trim() || "";
+    const mobileScrollReveal =
+      compactSearch && desktopRail == null && headerScrollsAway;
+    const showOverlayChrome =
+      mobileScrollReveal && mobileHeaderOverlayMode;
+    const revealProgress = showOverlayChrome ? mobileHeaderRevealProgress : 0;
 
-    return (
-      <>
+    const appBar = (
         <AppBar
           ref={ref}
-          position={desktopRail != null ? "fixed" : "sticky"}
-          elevation={0}
+          position={
+            showOverlayChrome
+              ? "fixed"
+              : desktopRail != null
+                ? "fixed"
+                : "sticky"
+          }
+          elevation={revealProgress > 0.85 ? 1 : 0}
           color="default"
           sx={[
             {
               pt: "env(safe-area-inset-top, 0px)",
               boxSizing: "border-box",
-              zIndex: (t) => t.zIndex.drawer + 1,
+              zIndex: showOverlayChrome
+                ? (t) => t.zIndex.modal - 1
+                : (t) => t.zIndex.drawer + 1,
             },
-            desktopRail != null
+            showOverlayChrome
+              ? {
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  transform: `translate3d(0, calc((1 - ${revealProgress}) * -100%), 0)`,
+                  pointerEvents: revealProgress > 0.08 ? "auto" : "none",
+                  willChange: "transform",
+                }
+              : desktopRail != null
               ? {
                   transition: drawerRailTransition(theme),
                   left: `${desktopRail}px`,
@@ -372,6 +400,11 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
             </Box>
           </Toolbar>
         </AppBar>
+    );
+
+    return (
+      <>
+        {appBar}
 
         <SearchOverlay
           open={searchOverlayOpen}

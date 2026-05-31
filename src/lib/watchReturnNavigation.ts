@@ -1,6 +1,33 @@
+import {
+  readCurrentScrollTop,
+  saveScrollPosition,
+} from "@/lib/scrollRestoration";
+
 const HREF_KEY = "cleantube-watch-return-href";
 const LABEL_KEY = "cleantube-watch-return-label";
 const CHANNEL_LABEL_KEY = "cleantube-watch-return-channel-label";
+
+let scrollElementGetter: (() => HTMLElement | Window | null) | null = null;
+
+/** Registered by AppShell so scroll capture works on desktop inner scroller. */
+export function registerScrollElementGetter(
+  getter: (() => HTMLElement | Window | null) | null,
+): void {
+  scrollElementGetter = getter;
+}
+
+function captureScrollForCurrentLocation(videoId?: string): void {
+  if (typeof window === "undefined") return;
+  const scrollElement = scrollElementGetter?.() ?? window;
+  saveScrollPosition(
+    window.location.pathname,
+    window.location.search.replace(/^\?/, ""),
+    {
+      scrollTop: readCurrentScrollTop(scrollElement),
+      videoId,
+    },
+  );
+}
 
 export function setWatchReturnChannelLabel(name: string): void {
   if (typeof window === "undefined") return;
@@ -96,7 +123,7 @@ export function deriveWatchReturnTarget(
 }
 
 /** Call before navigating to a watch page so back link is correct on first paint. */
-export function captureWatchReturnFromCurrentLocation(): void {
+export function captureWatchReturnFromCurrentLocation(videoId?: string): void {
   if (typeof window === "undefined") return;
   if (window.location.pathname.startsWith("/watch/")) {
     return;
@@ -110,13 +137,14 @@ export function captureWatchReturnFromCurrentLocation(): void {
   } else {
     clearWatchReturnTarget();
   }
+  captureScrollForCurrentLocation(videoId);
 }
 
 /** Spread onto links/buttons that open `/watch/...`. */
-export function watchNavigationCaptureHandlers(): {
+export function watchNavigationCaptureHandlers(videoId?: string): {
   onPointerDown: () => void;
 } {
   return {
-    onPointerDown: () => captureWatchReturnFromCurrentLocation(),
+    onPointerDown: () => captureWatchReturnFromCurrentLocation(videoId),
   };
 }

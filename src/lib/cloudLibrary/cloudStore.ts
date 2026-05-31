@@ -362,3 +362,75 @@ export async function replaceWatchProgressEntries(
   if (deleteError) throw deleteError;
   await upsertWatchProgressEntries(supabase, userId, entries);
 }
+
+export async function deleteSavedChannelById(
+  supabase: SupabaseClient,
+  userId: string,
+  id: string,
+) {
+  const { error } = await supabase
+    .from("saved_channels")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteAllSavedChannels(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const { error } = await supabase
+    .from("saved_channels")
+    .delete()
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function deleteWatchLaterByVideoId(
+  supabase: SupabaseClient,
+  userId: string,
+  videoId: string,
+) {
+  const { error } = await supabase
+    .from("watch_later_entries")
+    .delete()
+    .eq("user_id", userId)
+    .eq("video_id", videoId);
+  if (error) throw error;
+}
+
+export async function deleteAllWatchLater(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const { error } = await supabase
+    .from("watch_later_entries")
+    .delete()
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function deleteWatchProgressByVideoId(
+  supabase: SupabaseClient,
+  userId: string,
+  videoId: string,
+) {
+  const { error } = await supabase
+    .from("watch_progress")
+    .delete()
+    .eq("user_id", userId)
+    .eq("video_id", videoId);
+  if (error) throw error;
+}
+
+export async function deleteAllWatchProgress(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const { error } = await supabase
+    .from("watch_progress")
+    .delete()
+    .eq("user_id", userId);
+  if (error) throw error;
+}

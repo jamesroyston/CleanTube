@@ -47,6 +47,7 @@ export function WatchBackLink() {
       component={Link}
       href={href}
       prefetch
+      scroll={false}
       startIcon={<ArrowBackIcon />}
       sx={{ mb: 2 }}
     >

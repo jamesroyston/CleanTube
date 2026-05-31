@@ -17,6 +17,7 @@ import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
@@ -40,7 +41,7 @@ function formatStartLabel(seconds: number): string {
 
 export function WatchLaterPageClient() {
   const { entries, removeByVideoId, clearEntries } = useWatchLater();
-  const { getResumeSeconds } = useCloudLibrary();
+  const { canPersistLibrary, getResumeSeconds } = useCloudLibrary();
   const [sortMode, setSortMode] = useState<SortMode>("newest");
 
   const sortedEntries = useMemo(
@@ -74,31 +75,38 @@ export function WatchLaterPageClient() {
               Sort your queued videos by added date and remove anything you no longer need.
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <FormControl size="small" sx={{ minWidth: 180 }}>
-              <InputLabel id="watch-later-sort-label">Sort by</InputLabel>
-              <Select
-                labelId="watch-later-sort-label"
-                value={sortMode}
-                label="Sort by"
-                onChange={handleSortChange}
+          {canPersistLibrary ? (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <FormControl size="small" sx={{ minWidth: 180 }}>
+                <InputLabel id="watch-later-sort-label">Sort by</InputLabel>
+                <Select
+                  labelId="watch-later-sort-label"
+                  value={sortMode}
+                  label="Sort by"
+                  onChange={handleSortChange}
+                >
+                  <MenuItem value="newest">Newest added</MenuItem>
+                  <MenuItem value="oldest">Oldest added</MenuItem>
+                </Select>
+              </FormControl>
+              <Button
+                variant="outlined"
+                color="error"
+                disabled={entries.length === 0}
+                onClick={clearEntries}
               >
-                <MenuItem value="newest">Newest added</MenuItem>
-                <MenuItem value="oldest">Oldest added</MenuItem>
-              </Select>
-            </FormControl>
-            <Button
-              variant="outlined"
-              color="error"
-              disabled={entries.length === 0}
-              onClick={clearEntries}
-            >
-              Clear all
-            </Button>
-          </Stack>
+                Clear all
+              </Button>
+            </Stack>
+          ) : null}
         </Stack>
 
-        {sortedEntries.length === 0 ? (
+        {!canPersistLibrary ? (
+          <LibrarySignInPrompt
+            title="Sign in to use Watch Later"
+            message="Save videos to your queue and pick up where you left off after you sign in."
+          />
+        ) : sortedEntries.length === 0 ? (
           <Typography color="text.secondary">
             Add videos from search results or the watch page and they will appear here.
           </Typography>

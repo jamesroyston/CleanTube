@@ -13,47 +13,32 @@ import {
 } from "react";
 
 import {
+  deleteAllRecentSearches,
+  deleteRecentSearchByQuery,
   fetchCloudRecentSearches,
-  replaceRecentSearches,
+  trimRecentSearchesToCap,
+  upsertRecentSearch,
 } from "@/lib/cloudRecentSearches/cloudStore";
+import { entriesToQueryList } from "@/lib/cloudRecentSearches/sync";
+import { RECENT_SEARCHES_MAX_ITEMS } from "@/lib/cloudRecentSearches/types";
 import {
-  addLocalRecentSearch,
-  clearLocalRecentSearches,
-  readLocalRecentSearches,
-  RECENT_SEARCHES_STORAGE_KEY,
-  removeLocalRecentSearch,
-  writeLocalRecentSearches,
-} from "@/lib/cloudRecentSearches/localStore";
-import {
-  entriesToQueryList,
-  localQueriesToEntries,
-  mergeRecentSearches,
-} from "@/lib/cloudRecentSearches/sync";
-import {
+  deleteAllSavedChannels,
+  deleteAllWatchLater,
+  deleteAllWatchProgress,
+  deleteSavedChannelById,
+  deleteWatchLaterByVideoId,
+  deleteWatchProgressByVideoId,
   fetchCloudSnapshot,
   getInitialSession,
-  mergeWatchProgressEntries,
-  replaceSavedChannels,
-  replaceWatchLaterEntries,
-  replaceWatchProgressEntries,
   resetPasswordForEmail,
   signInWithPassword,
   signOut,
   signUpWithPassword,
   subscribeToAuthChanges,
+  upsertSavedChannels,
+  upsertWatchLaterEntries,
   upsertWatchProgressEntries,
 } from "@/lib/cloudLibrary/cloudStore";
-import {
-  readLocalSnapshot,
-  SAVED_CHANNELS_STORAGE_KEY,
-  WATCH_LATER_STORAGE_KEY,
-  WATCH_PROGRESS_STORAGE_KEY,
-  clearLocalLibraryStorage,
-  writeLocalLibraryMirror,
-  writeLocalSavedChannels,
-  writeLocalWatchLater,
-  writeLocalWatchProgress,
-} from "@/lib/cloudLibrary/localStore";
 import {
   type ListedFactor,
   completePhoneMfa,
@@ -86,10 +71,10 @@ import type { WatchProgressEntry } from "@/types/watchProgress";
 
 type AuthStatus = "loading" | "ready";
 
-/** Signed-in cloud library sync phase; when `synced`, UI reflects the last successful cloud snapshot (mirrored to localStorage). */
+/** Cloud library sync phase for signed-in users. */
 export type LibraryCloudSyncState =
   | "unavailable"
-  | "local_only"
+  | "signed_out"
   | "syncing"
   | "synced"
   | "error";
@@ -105,15 +90,16 @@ type WatchProgressInput = {
 };
 
 type WatchProgressUpsertOptions = {
-  persistLocal?: boolean;
   syncCloud?: boolean;
 };
 
 type CloudLibraryContextValue = {
   authStatus: AuthStatus;
-  /** True after the first client read of localStorage (useLayoutEffect). */
+  /** True after auth bootstrap completes (library state is initialized). */
   localLibraryHydrated: boolean;
   isCloudConfigured: boolean;
+  /** True when the signed-in user can persist library data to the cloud. */
+  canPersistLibrary: boolean;
   libraryCloudSyncState: LibraryCloudSyncState;
   session: Session | null;
   user: User | null;
@@ -131,7 +117,6 @@ type CloudLibraryContextValue = {
     channelUrl?: string;
     thumbnailUrl?: string;
     searchQuery?: string;
-    /** Defaults to `"saved_channel"` when omitted so older callers behave as channel saves. */
     entryKind?: SavedChannelEntryKind;
   }) => Promise<void>;
   updateSavedChannel: (
@@ -212,7 +197,6 @@ function normalizeComparableUrl(raw: string | undefined): string | undefined {
   }
 }
 
-/** Dedupe identical rows when inserting (explicit kind first). */
 function isDuplicateSavedLibraryEntry(a: SavedChannel, b: SavedChannel): boolean {
   if (effectiveSavedChannelKind(a) !== effectiveSavedChannelKind(b)) return false;
 
@@ -260,7 +244,6 @@ function normalizeProgressInput(input: WatchProgressInput): WatchProgressEntry {
   };
 }
 
-/** In-memory-only playback samples merge here so React state does not re-render every tick. */
 type WatchProgressLivePatch = {
   lastPositionSeconds: number;
   durationSeconds?: number;
@@ -292,6 +275,39 @@ function mergeWatchProgressLivePatch(
   };
 }
 
+function normalizeRecentSearchQuery(query: string): string {
+  return query.trim();
+}
+
+function dedupeRecentSearchQueries(queries: string[]): string[] {
+  const seen = new Set<string>();
+  const next: string[] = [];
+  for (const raw of queries) {
+    const query = normalizeRecentSearchQuery(raw);
+    if (!query) continue;
+    const key = query.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    next.push(query);
+    if (next.length >= RECENT_SEARCHES_MAX_ITEMS) break;
+  }
+  return next;
+}
+
+function prependRecentSearchQuery(queries: string[], query: string): string[] {
+  const normalized = normalizeRecentSearchQuery(query);
+  if (!normalized) return queries;
+  const key = normalized.toLowerCase();
+  const rest = queries.filter((entry) => entry.toLowerCase() !== key);
+  return dedupeRecentSearchQueries([normalized, ...rest]);
+}
+
+function removeRecentSearchQuery(queries: string[], query: string): string[] {
+  const key = normalizeRecentSearchQuery(query).toLowerCase();
+  if (!key) return queries;
+  return queries.filter((entry) => entry.toLowerCase() !== key);
+}
+
 export function CloudLibraryProvider({
   children,
 }: {
@@ -307,243 +323,101 @@ export function CloudLibraryProvider({
   const [watchLaterEntries, setWatchLaterEntries] = useState<WatchLaterEntry[]>([]);
   const [savedChannels, setSavedChannels] = useState<SavedChannel[]>([]);
   const [watchProgress, setWatchProgress] = useState<WatchProgressEntry[]>([]);
-  const [localLibraryHydrated, setLocalLibraryHydrated] = useState(false);
-  /** Latest playback fields while sampling; avoids context churn on 1s ticks (esp. mobile Safari). */
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [localLibraryHydrated, setLocalLibraryHydrated] = useState(() =>
+    supabase == null,
+  );
   const watchProgressLiveRef = useRef<Map<string, WatchProgressLivePatch>>(new Map());
   const [passkeysSupported, setPasskeysSupported] = useState(false);
   const [libraryCloudSyncState, setLibraryCloudSyncState] =
-    useState<LibraryCloudSyncState>("local_only");
+    useState<LibraryCloudSyncState>(() =>
+      supabase == null ? "unavailable" : "signed_out",
+    );
+  const syncStartedAtRef = useRef<number | null>(null);
+  const syncInFlightRef = useRef<Promise<void> | null>(null);
+  const lastSyncedUserIdRef = useRef<string | null>(null);
+  const userRef = useRef<User | null>(null);
 
-  /** Coalesced payload for deferred `writeLocalWatchProgress` (idle / setTimeout). */
-  const watchProgressDiskQueueRef = useRef<WatchProgressEntry[] | null>(null);
-  const watchProgressDiskIdleIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
-  const cancelDeferredWatchProgressDiskWrite = useCallback(() => {
-    const id = watchProgressDiskIdleIdRef.current;
-    if (id == null) return;
-    if (typeof cancelIdleCallback === "function") {
-      cancelIdleCallback(id);
-    } else {
-      clearTimeout(id);
-    }
-    watchProgressDiskIdleIdRef.current = null;
-  }, []);
-
-  const scheduleDeferredWatchProgressDiskWrite = useCallback(
-    (entries: WatchProgressEntry[]) => {
-      watchProgressDiskQueueRef.current = entries;
-      if (watchProgressDiskIdleIdRef.current != null) return;
-      const flush = () => {
-        watchProgressDiskIdleIdRef.current = null;
-        const latest = watchProgressDiskQueueRef.current;
-        if (latest) {
-          writeLocalWatchProgress(latest);
-        }
-      };
-      watchProgressDiskIdleIdRef.current =
-        typeof requestIdleCallback !== "undefined"
-          ? requestIdleCallback(flush, { timeout: 2_000 })
-          : window.setTimeout(flush, 0);
-    },
-    [],
-  );
-
-  const persistLocalSnapshot = useCallback(
-    (
-      next: {
-        watchLater?: WatchLaterEntry[];
-        savedChannels?: SavedChannel[];
-        watchProgress?: WatchProgressEntry[];
-      },
-      diskOptions?: { deferWatchProgressDisk?: boolean },
-    ) => {
-      if (next.watchLater !== undefined) {
-        writeLocalWatchLater(next.watchLater);
-      }
-      if (next.savedChannels !== undefined) {
-        writeLocalSavedChannels(next.savedChannels);
-      }
-      if (next.watchProgress !== undefined) {
-        if (diskOptions?.deferWatchProgressDisk) {
-          scheduleDeferredWatchProgressDiskWrite(next.watchProgress);
-        } else {
-          cancelDeferredWatchProgressDiskWrite();
-          writeLocalWatchProgress(next.watchProgress);
-          watchProgressDiskQueueRef.current = null;
-        }
-      }
-    },
-    [
-      cancelDeferredWatchProgressDiskWrite,
-      scheduleDeferredWatchProgressDiskWrite,
-    ],
-  );
-
-  useLayoutEffect(
-    () => () => {
-      cancelDeferredWatchProgressDiskWrite();
-      const pending = watchProgressDiskQueueRef.current;
-      if (pending) {
-        writeLocalWatchProgress(pending);
-        watchProgressDiskQueueRef.current = null;
-      }
-    },
-    [cancelDeferredWatchProgressDiskWrite],
-  );
-
-  const hydrateFromLocal = useCallback(() => {
-    const snapshot = readLocalSnapshot();
+  const clearLibraryState = useCallback(() => {
     watchProgressLiveRef.current.clear();
-    setWatchLaterEntries(snapshot.watchLater);
-    setSavedChannels(snapshot.savedChannels);
-    setWatchProgress(snapshot.watchProgress);
+    setWatchLaterEntries([]);
+    setSavedChannels([]);
+    setWatchProgress([]);
+    setRecentSearches([]);
+    lastSyncedUserIdRef.current = null;
   }, []);
 
   const syncFromCloud = useCallback(
     async (nextUser: User) => {
       if (!supabase) return;
-      setLibraryCloudSyncState("syncing");
-
-      /* Wait for JWT on the browser client; otherwise RLS returns no rows. */
-      let { data: authData } = await supabase.auth.getSession();
-      let token = authData.session?.access_token;
-      let tokenUserId = authData.session?.user?.id;
-      if (!token || tokenUserId !== nextUser.id) {
-        await supabase.auth.refreshSession();
-        authData = (await supabase.auth.getSession()).data;
-        token = authData.session?.access_token;
-        tokenUserId = authData.session?.user?.id;
-      }
-      if (!token || tokenUserId !== nextUser.id) {
-        await new Promise<void>((resolve) => queueMicrotask(resolve));
-        authData = (await supabase.auth.getSession()).data;
-        token = authData.session?.access_token;
-        tokenUserId = authData.session?.user?.id;
-      }
-      if (!token || tokenUserId !== nextUser.id) {
-        setLibraryCloudSyncState("error");
-        return;
+      if (syncInFlightRef.current) {
+        return syncInFlightRef.current;
       }
 
-      try {
-        const localSnapshot = readLocalSnapshot();
-        const remote = await fetchCloudSnapshot(supabase);
+      const run = async () => {
+        syncStartedAtRef.current = Date.now();
+        setLibraryCloudSyncState("syncing");
 
-        const cloudEmpty =
-          remote.savedChannels.length === 0 &&
-          remote.watchLater.length === 0 &&
-          remote.watchProgress.length === 0;
-        const localHasData =
-          localSnapshot.savedChannels.length > 0 ||
-          localSnapshot.watchLater.length > 0 ||
-          localSnapshot.watchProgress.length > 0;
-
-        let nextWatchLater: WatchLaterEntry[];
-        let nextSaved: SavedChannel[];
-        let nextProgress: WatchProgressEntry[];
-
-        if (cloudEmpty && localHasData) {
-          await Promise.all([
-            replaceWatchLaterEntries(
-              supabase,
-              nextUser.id,
-              localSnapshot.watchLater,
-            ),
-            replaceSavedChannels(
-              supabase,
-              nextUser.id,
-              localSnapshot.savedChannels,
-            ),
-            replaceWatchProgressEntries(
-              supabase,
-              nextUser.id,
-              localSnapshot.watchProgress,
-            ),
-          ]);
-          nextWatchLater = localSnapshot.watchLater;
-          nextSaved = localSnapshot.savedChannels;
-          nextProgress = localSnapshot.watchProgress;
-        } else {
-          nextWatchLater = remote.watchLater.map((e) => ({ ...e }));
-          nextSaved = remote.savedChannels.map((c) => ({ ...c }));
-          nextProgress = mergeWatchProgressEntries(
-            remote.watchProgress.map((p) => ({ ...p })),
-            localSnapshot.watchProgress.map((p) => ({ ...p })),
-          );
-          const remoteProgressByVideo = new Map(
-            remote.watchProgress.map((p) => [p.videoId, p]),
-          );
-          const localAhead = localSnapshot.watchProgress.filter((entry) => {
-            const remoteEntry = remoteProgressByVideo.get(entry.videoId);
-            return (
-              remoteEntry === undefined ||
-              entry.updatedAt > remoteEntry.updatedAt
-            );
-          });
-          if (localAhead.length > 0) {
-            void upsertWatchProgressEntries(
-              supabase,
-              nextUser.id,
-              localAhead,
-            ).catch(() => {
-              /* keep merged state if cloud sync fails */
-            });
-          }
+        let { data: authData } = await supabase.auth.getSession();
+        let token = authData.session?.access_token;
+        let tokenUserId = authData.session?.user?.id;
+        if (!token || tokenUserId !== nextUser.id) {
+          await supabase.auth.refreshSession();
+          authData = (await supabase.auth.getSession()).data;
+          token = authData.session?.access_token;
+          tokenUserId = authData.session?.user?.id;
+        }
+        if (!token || tokenUserId !== nextUser.id) {
+          await new Promise<void>((resolve) => queueMicrotask(resolve));
+          authData = (await supabase.auth.getSession()).data;
+          token = authData.session?.access_token;
+          tokenUserId = authData.session?.user?.id;
+        }
+        if (!token || tokenUserId !== nextUser.id) {
+          setLibraryCloudSyncState("error");
+          syncStartedAtRef.current = null;
+          return;
         }
 
-        watchProgressLiveRef.current.clear();
-        setWatchLaterEntries(nextWatchLater);
-        setSavedChannels(nextSaved);
-        setWatchProgress(nextProgress);
-        writeLocalLibraryMirror({
-          watchLater: nextWatchLater,
-          savedChannels: nextSaved,
-          watchProgress: nextProgress,
-        });
+        try {
+          const [remote, remoteRecent] = await Promise.all([
+            fetchCloudSnapshot(supabase),
+            fetchCloudRecentSearches(supabase),
+          ]);
 
-        const localRecent = readLocalRecentSearches();
-        const remoteRecent = await fetchCloudRecentSearches(supabase);
-        const mergedRecent = mergeRecentSearches(localRecent, remoteRecent);
-        const mergedRecentQueries = entriesToQueryList(mergedRecent);
-        writeLocalRecentSearches(mergedRecentQueries);
-        await replaceRecentSearches(supabase, nextUser.id, mergedRecent);
+          watchProgressLiveRef.current.clear();
+          setWatchLaterEntries(remote.watchLater);
+          setSavedChannels(remote.savedChannels);
+          setWatchProgress(remote.watchProgress);
+          setRecentSearches(entriesToQueryList(remoteRecent));
+          lastSyncedUserIdRef.current = nextUser.id;
+          setLibraryCloudSyncState("synced");
+          syncStartedAtRef.current = null;
+        } catch {
+          setLibraryCloudSyncState("error");
+          syncStartedAtRef.current = null;
+          throw new Error("Library sync failed");
+        }
+      };
 
-        setLibraryCloudSyncState("synced");
-      } catch (err) {
-        setLibraryCloudSyncState("error");
-        throw err;
-      }
+      const promise = run().finally(() => {
+        if (syncInFlightRef.current === promise) {
+          syncInFlightRef.current = null;
+        }
+      });
+      syncInFlightRef.current = promise;
+      return promise;
     },
     [supabase],
   );
 
   useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hydrate from localStorage once on client
-    hydrateFromLocal();
-    setLocalLibraryHydrated(true);
-  }, [hydrateFromLocal]);
-
-  useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- detect WebAuthn once on client after mount
     setPasskeysSupported(browserSupportsPasskeys());
   }, []);
-
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.storageArea !== localStorage) return;
-      if (
-        e.key !== WATCH_PROGRESS_STORAGE_KEY &&
-        e.key !== WATCH_LATER_STORAGE_KEY &&
-        e.key !== SAVED_CHANNELS_STORAGE_KEY &&
-        e.key !== RECENT_SEARCHES_STORAGE_KEY
-      ) {
-        return;
-      }
-      hydrateFromLocal();
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [hydrateFromLocal]);
 
   const clearAuthDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -559,6 +433,7 @@ export function CloudLibraryProvider({
         setLibraryCloudSyncState("error");
       });
       setAuthStatus("ready");
+      setLocalLibraryHydrated(true);
     },
     [syncFromCloud],
   );
@@ -570,10 +445,11 @@ export function CloudLibraryProvider({
     }
     setSession(null);
     setUser(null);
-    setLibraryCloudSyncState(supabase ? "local_only" : "unavailable");
-    hydrateFromLocal();
+    clearLibraryState();
+    setLibraryCloudSyncState(supabase ? "signed_out" : "unavailable");
     setAuthStatus("ready");
-  }, [hydrateFromLocal, supabase]);
+    setLocalLibraryHydrated(true);
+  }, [clearLibraryState, supabase]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -592,9 +468,13 @@ export function CloudLibraryProvider({
           setLibraryCloudSyncState("error");
         }
       } else {
-        setLibraryCloudSyncState(supabase ? "local_only" : "unavailable");
+        clearLibraryState();
+        setLibraryCloudSyncState("signed_out");
       }
-      if (!cancelled) setAuthStatus("ready");
+      if (!cancelled) {
+        setAuthStatus("ready");
+        setLocalLibraryHydrated(true);
+      }
     })();
 
     const { data } = subscribeToAuthChanges(supabase, (event, nextSession) => {
@@ -604,6 +484,16 @@ export function CloudLibraryProvider({
       }
 
       if (nextSession?.user) {
+        if (
+          event === "TOKEN_REFRESHED" &&
+          lastSyncedUserIdRef.current === nextSession.user.id
+        ) {
+          setSession(nextSession);
+          setUser(nextSession.user);
+          setAuthStatus("ready");
+          setLocalLibraryHydrated(true);
+          return;
+        }
         applyAuthenticatedState(nextSession);
         return;
       }
@@ -627,7 +517,13 @@ export function CloudLibraryProvider({
       }
       data.subscription.unsubscribe();
     };
-  }, [applyAuthenticatedState, applySignedOutState, supabase, syncFromCloud]);
+  }, [
+    applyAuthenticatedState,
+    applySignedOutState,
+    clearLibraryState,
+    supabase,
+    syncFromCloud,
+  ]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -646,12 +542,19 @@ export function CloudLibraryProvider({
           setUser(user);
         });
       });
+
+      const activeUser = userRef.current;
+      if (!activeUser) return;
+      const syncStartedAt = syncStartedAtRef.current;
+      if (syncStartedAt == null) return;
+      if (Date.now() - syncStartedAt < 8_000) return;
+      void syncFromCloud(activeUser);
     };
 
     document.addEventListener("visibilitychange", recoverSessionOnVisible);
     return () =>
       document.removeEventListener("visibilitychange", recoverSessionOnVisible);
-  }, [supabase]);
+  }, [supabase, syncFromCloud]);
 
   const signIn = useCallback(
     async (email: string, password: string) => {
@@ -692,11 +595,9 @@ export function CloudLibraryProvider({
   const signOutUser = useCallback(async () => {
     if (!supabase) return;
     await signOut(supabase);
-    clearLocalLibraryStorage();
-    clearLocalRecentSearches();
-    setLibraryCloudSyncState("local_only");
-    hydrateFromLocal();
-  }, [hydrateFromLocal, supabase]);
+    clearLibraryState();
+    setLibraryCloudSyncState("signed_out");
+  }, [clearLibraryState, supabase]);
 
   const registerPasskey = useCallback(
     async (friendlyName: string, onStep?: (step: PasskeyRegistrationStep) => void) => {
@@ -774,6 +675,7 @@ export function CloudLibraryProvider({
       searchQuery?: string;
       entryKind?: SavedChannelEntryKind;
     }) => {
+      if (!supabase || !user) return;
       const name = input.name.trim();
       if (!name) return;
       const entryKind = input.entryKind ?? "saved_channel";
@@ -787,44 +689,40 @@ export function CloudLibraryProvider({
         entryKind,
       };
 
-      const updated = savedChannels.some((channel) =>
-        isDuplicateSavedLibraryEntry(channel, next),
-      )
-        ? savedChannels
-        : [next, ...savedChannels];
+      if (savedChannels.some((channel) => isDuplicateSavedLibraryEntry(channel, next))) {
+        return;
+      }
 
+      const updated = [next, ...savedChannels];
       setSavedChannels(updated);
-      persistLocalSnapshot({ savedChannels: updated });
-      if (supabase && user && updated !== savedChannels) {
-        try {
-          await replaceSavedChannels(supabase, user.id, updated);
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      try {
+        await upsertSavedChannels(supabase, user.id, [next]);
+      } catch {
+        setSavedChannels(savedChannels);
       }
     },
-    [persistLocalSnapshot, savedChannels, supabase, user],
+    [savedChannels, supabase, user],
   );
 
   const removeSavedChannel = useCallback(
     async (id: string) => {
+      if (!supabase || !user) return;
       const removed = savedChannels.find((channel) => channel.id === id);
+      if (!removed) return;
       const updated = savedChannels.filter((channel) => channel.id !== id);
       setSavedChannels(updated);
-      persistLocalSnapshot({ savedChannels: updated });
-      if (supabase && user && removed) {
-        try {
-          await replaceSavedChannels(supabase, user.id, updated);
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      try {
+        await deleteSavedChannelById(supabase, user.id, id);
+      } catch {
+        setSavedChannels(savedChannels);
       }
     },
-    [persistLocalSnapshot, savedChannels, supabase, user],
+    [savedChannels, supabase, user],
   );
 
   const updateSavedChannel = useCallback(
     async (id: string, patch: Partial<Omit<SavedChannel, "id">>) => {
+      if (!supabase || !user) return;
       const existing = savedChannels.find((channel) => channel.id === id);
       if (!existing) return;
 
@@ -854,16 +752,13 @@ export function CloudLibraryProvider({
       );
 
       setSavedChannels(updated);
-      persistLocalSnapshot({ savedChannels: updated });
-      if (supabase && user) {
-        try {
-          await replaceSavedChannels(supabase, user.id, updated);
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      try {
+        await upsertSavedChannels(supabase, user.id, [next]);
+      } catch {
+        setSavedChannels(savedChannels);
       }
     },
-    [persistLocalSnapshot, savedChannels, supabase, user],
+    [savedChannels, supabase, user],
   );
 
   const addOrUpdateWatchLater = useCallback(
@@ -874,10 +769,12 @@ export function CloudLibraryProvider({
       channelName: string;
       startSeconds?: number;
     }) => {
+      if (!supabase || !user) return;
       const videoId = input.videoId.trim();
       if (!videoId) return;
+      const existing = watchLaterEntries.find((entry) => entry.videoId === videoId);
       const next: WatchLaterEntry = {
-        entryId: randomId(),
+        entryId: existing?.entryId ?? randomId(),
         videoId,
         title: input.title.trim() || "Video",
         thumbnailUrl: input.thumbnailUrl,
@@ -886,49 +783,42 @@ export function CloudLibraryProvider({
           input.startSeconds != null && input.startSeconds > 0
             ? Math.floor(input.startSeconds)
             : undefined,
-        addedAt: new Date().toISOString(),
+        addedAt: existing?.addedAt ?? new Date().toISOString(),
       };
       const updated = [next, ...watchLaterEntries.filter((e) => e.videoId !== videoId)];
       setWatchLaterEntries(updated);
-      persistLocalSnapshot({ watchLater: updated });
-      if (supabase && user) {
-        try {
-          await replaceWatchLaterEntries(supabase, user.id, updated);
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      try {
+        await upsertWatchLaterEntries(supabase, user.id, [next]);
+      } catch {
+        setWatchLaterEntries(watchLaterEntries);
       }
     },
-    [persistLocalSnapshot, supabase, user, watchLaterEntries],
+    [supabase, user, watchLaterEntries],
   );
 
   const removeWatchLaterByVideoId = useCallback(
     async (videoId: string) => {
+      if (!supabase || !user) return;
       const updated = watchLaterEntries.filter((entry) => entry.videoId !== videoId);
       setWatchLaterEntries(updated);
-      persistLocalSnapshot({ watchLater: updated });
-      if (supabase && user) {
-        try {
-          await replaceWatchLaterEntries(supabase, user.id, updated);
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      try {
+        await deleteWatchLaterByVideoId(supabase, user.id, videoId);
+      } catch {
+        setWatchLaterEntries(watchLaterEntries);
       }
     },
-    [persistLocalSnapshot, supabase, user, watchLaterEntries],
+    [supabase, user, watchLaterEntries],
   );
 
   const clearWatchLater = useCallback(async () => {
+    if (!supabase || !user) return;
     setWatchLaterEntries([]);
-    persistLocalSnapshot({ watchLater: [] });
-    if (supabase && user) {
-      try {
-        await replaceWatchLaterEntries(supabase, user.id, []);
-      } catch {
-        /* keep local state if cloud sync fails */
-      }
+    try {
+      await deleteAllWatchLater(supabase, user.id);
+    } catch {
+      /* keep empty local state */
     }
-  }, [persistLocalSnapshot, supabase, user]);
+  }, [supabase, user]);
 
   const isInWatchLaterFn = useCallback(
     (videoId: string) => watchLaterEntries.some((entry) => entry.videoId === videoId),
@@ -937,14 +827,12 @@ export function CloudLibraryProvider({
 
   const upsertWatchProgress = useCallback(
     async (input: WatchProgressInput, options?: WatchProgressUpsertOptions) => {
-      if (!input.videoId.trim()) return;
-      const persistLocal = options?.persistLocal ?? true;
+      if (!supabase || !user || !input.videoId.trim()) return;
       const syncCloud = options?.syncCloud ?? true;
-      const memoryOnly = !persistLocal && !syncCloud;
+      const memoryOnly = !syncCloud;
       const normalized = normalizeProgressInput(input);
 
-      let snapshotForDisk: WatchProgressEntry[] = [];
-      let rowForCloud: WatchProgressEntry | null = null;
+      let snapshotForCloud: WatchProgressEntry | null = null;
 
       setWatchProgress((prev) => {
         const liveMap = watchProgressLiveRef.current;
@@ -987,7 +875,7 @@ export function CloudLibraryProvider({
             (existing.durationSeconds ?? undefined) ===
               (nextDuration ?? undefined)
           ) {
-            rowForCloud = null;
+            snapshotForCloud = null;
             return prev;
           }
           liveMap.set(normalized.videoId, {
@@ -995,7 +883,7 @@ export function CloudLibraryProvider({
             durationSeconds: nextDuration,
             completed: nextCompleted,
           });
-          rowForCloud = null;
+          snapshotForCloud = null;
           return prev;
         }
 
@@ -1022,63 +910,51 @@ export function CloudLibraryProvider({
           };
         }
 
-        rowForCloud = nextEntry;
-        const updated = [
+        snapshotForCloud = nextEntry;
+        return [
           nextEntry,
           ...prev.filter((entry) => entry.videoId !== normalized.videoId),
         ].sort(
           (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
         );
-        snapshotForDisk = updated;
-        return updated;
       });
 
-      if (persistLocal) {
-        persistLocalSnapshot(
-          { watchProgress: snapshotForDisk },
-          { deferWatchProgressDisk: persistLocal && !syncCloud },
-        );
-      }
-      if (syncCloud && supabase && user && rowForCloud) {
-        void upsertWatchProgressEntries(supabase, user.id, [rowForCloud]).catch(
+      if (syncCloud && snapshotForCloud) {
+        void upsertWatchProgressEntries(supabase, user.id, [snapshotForCloud]).catch(
           () => {
-            /* keep local state if cloud sync fails */
+            /* keep optimistic state if cloud sync fails */
           },
         );
       }
     },
-    [persistLocalSnapshot, supabase, user],
+    [supabase, user],
   );
 
   const removeWatchProgressByVideoId = useCallback(
     async (videoId: string) => {
+      if (!supabase || !user) return;
       watchProgressLiveRef.current.delete(videoId);
       const updated = watchProgress.filter((entry) => entry.videoId !== videoId);
       setWatchProgress(updated);
-      persistLocalSnapshot({ watchProgress: updated });
-      if (supabase && user) {
-        try {
-          await replaceWatchProgressEntries(supabase, user.id, updated);
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      try {
+        await deleteWatchProgressByVideoId(supabase, user.id, videoId);
+      } catch {
+        setWatchProgress(watchProgress);
       }
     },
-    [persistLocalSnapshot, supabase, user, watchProgress],
+    [supabase, user, watchProgress],
   );
 
   const clearWatchProgress = useCallback(async () => {
+    if (!supabase || !user) return;
     watchProgressLiveRef.current.clear();
     setWatchProgress([]);
-    persistLocalSnapshot({ watchProgress: [] });
-    if (supabase && user) {
-      try {
-        await replaceWatchProgressEntries(supabase, user.id, []);
-      } catch {
-        /* keep local state if cloud sync fails */
-      }
+    try {
+      await deleteAllWatchProgress(supabase, user.id);
+    } catch {
+      /* keep empty local state */
     }
-  }, [persistLocalSnapshot, supabase, user]);
+  }, [supabase, user]);
 
   const getProgressByVideoId = useCallback(
     (videoId: string) => {
@@ -1098,57 +974,48 @@ export function CloudLibraryProvider({
     [getProgressByVideoId],
   );
 
-  const getRecentSearches = useCallback(
-    () => readLocalRecentSearches(),
-    [],
-  );
+  const getRecentSearches = useCallback(() => recentSearches, [recentSearches]);
 
   const addRecentSearch = useCallback(
     async (query: string) => {
-      const next = addLocalRecentSearch(query);
-      if (supabase && user) {
-        try {
-          await replaceRecentSearches(
-            supabase,
-            user.id,
-            localQueriesToEntries(next),
-          );
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      if (!supabase || !user) return;
+      const next = prependRecentSearchQuery(recentSearches, query);
+      setRecentSearches(next);
+      try {
+        await upsertRecentSearch(supabase, user.id, normalizeRecentSearchQuery(query));
+        await trimRecentSearchesToCap(supabase, user.id, RECENT_SEARCHES_MAX_ITEMS);
+      } catch {
+        setRecentSearches(recentSearches);
       }
     },
-    [supabase, user],
+    [recentSearches, supabase, user],
   );
 
   const clearRecentSearches = useCallback(async () => {
-    clearLocalRecentSearches();
-    if (supabase && user) {
-      try {
-        await replaceRecentSearches(supabase, user.id, []);
-      } catch {
-        /* keep local state if cloud sync fails */
-      }
+    if (!supabase || !user) return;
+    setRecentSearches([]);
+    try {
+      await deleteAllRecentSearches(supabase, user.id);
+    } catch {
+      /* keep empty local state */
     }
   }, [supabase, user]);
 
   const removeRecentSearch = useCallback(
     async (query: string) => {
-      const next = removeLocalRecentSearch(query);
-      if (supabase && user) {
-        try {
-          await replaceRecentSearches(
-            supabase,
-            user.id,
-            localQueriesToEntries(next),
-          );
-        } catch {
-          /* keep local state if cloud sync fails */
-        }
+      if (!supabase || !user) return;
+      const next = removeRecentSearchQuery(recentSearches, query);
+      setRecentSearches(next);
+      try {
+        await deleteRecentSearchByQuery(supabase, user.id, query);
+      } catch {
+        setRecentSearches(recentSearches);
       }
     },
-    [supabase, user],
+    [recentSearches, supabase, user],
   );
+
+  const canPersistLibrary = user != null && isCloudConfigured;
 
   const effectiveLibraryCloudSyncState: LibraryCloudSyncState =
     supabase == null ? "unavailable" : libraryCloudSyncState;
@@ -1158,6 +1025,7 @@ export function CloudLibraryProvider({
       authStatus,
       localLibraryHydrated,
       isCloudConfigured,
+      canPersistLibrary,
       libraryCloudSyncState: effectiveLibraryCloudSyncState,
       session,
       user,
@@ -1197,27 +1065,28 @@ export function CloudLibraryProvider({
     }),
     [
       addOrUpdateWatchLater,
+      addRecentSearch,
       addSavedChannel,
       authStatus,
-      localLibraryHydrated,
+      canPersistLibrary,
+      clearRecentSearches,
       clearWatchLater,
-      effectiveLibraryCloudSyncState,
       clearWatchProgress,
       completePhoneMfaCb,
       completeTotpMfaCb,
       deletePasskey,
+      effectiveLibraryCloudSyncState,
       getPendingSupabaseMfaCb,
-      addRecentSearch,
-      clearRecentSearches,
       getProgressByVideoId,
       getRecentSearches,
       getResumeSeconds,
       isCloudConfigured,
-      removeRecentSearch,
       isInWatchLaterFn,
       listPasskeys,
+      localLibraryHydrated,
       passkeysSupported,
       registerPasskey,
+      removeRecentSearch,
       removeSavedChannel,
       removeWatchLaterByVideoId,
       removeWatchProgressByVideoId,
@@ -1229,8 +1098,8 @@ export function CloudLibraryProvider({
       signInWithPasskey,
       signOutUser,
       signUp,
-      upsertWatchProgress,
       updateSavedChannel,
+      upsertWatchProgress,
       user,
       watchLaterEntries,
       watchProgress,

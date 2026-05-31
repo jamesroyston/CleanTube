@@ -51,3 +51,74 @@ export async function replaceRecentSearches(
   const { error } = await supabase.from("recent_searches").insert(rows);
   if (error) throw error;
 }
+
+export async function upsertRecentSearch(
+  supabase: SupabaseClient,
+  userId: string,
+  query: string,
+) {
+  const searchedAt = new Date().toISOString();
+  const { data, error: updateError } = await supabase
+    .from("recent_searches")
+    .update({ searched_at: searchedAt })
+    .eq("user_id", userId)
+    .ilike("query", query)
+    .select("id");
+  if (updateError) throw updateError;
+  if (data && data.length > 0) return;
+
+  const { error: insertError } = await supabase.from("recent_searches").insert({
+    user_id: userId,
+    query,
+    searched_at: searchedAt,
+  });
+  if (insertError) throw insertError;
+}
+
+export async function deleteRecentSearchByQuery(
+  supabase: SupabaseClient,
+  userId: string,
+  query: string,
+) {
+  const { error } = await supabase
+    .from("recent_searches")
+    .delete()
+    .eq("user_id", userId)
+    .ilike("query", query);
+  if (error) throw error;
+}
+
+export async function deleteAllRecentSearches(
+  supabase: SupabaseClient,
+  userId: string,
+) {
+  const { error } = await supabase
+    .from("recent_searches")
+    .delete()
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function trimRecentSearchesToCap(
+  supabase: SupabaseClient,
+  userId: string,
+  cap = 15,
+) {
+  const { data, error: fetchError } = await supabase
+    .from("recent_searches")
+    .select("id")
+    .eq("user_id", userId)
+    .order("searched_at", { ascending: false })
+    .range(cap, 999_999);
+  if (fetchError) throw fetchError;
+  if (!data || data.length === 0) return;
+
+  const { error: deleteError } = await supabase
+    .from("recent_searches")
+    .delete()
+    .in(
+      "id",
+      data.map((row) => row.id),
+    );
+  if (deleteError) throw deleteError;
+}
