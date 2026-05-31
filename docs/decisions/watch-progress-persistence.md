@@ -17,7 +17,7 @@ CleanTube separates playback progress tracking from persistence:
 
 - Sample the active player position in memory every 1 second while playing.
 - For anonymous users, persist progress to `localStorage` every 10 seconds while playing.
-- For signed-in users, sync progress to Supabase every 15 seconds while playing.
+- For signed-in users, sync progress to Supabase every **15 seconds** while playing (production default in `LiteYouTubeEmbed.tsx`).
 - For signed-in users, write `localStorage` only on meaningful lifecycle events: pause, ended, page hide/unload, and component cleanup.
 
 ## Rationale
@@ -27,6 +27,22 @@ One-second in-memory sampling is cheap: it reads the player time and updates lig
 `localStorage.setItem` blocks the main thread, so it should be batched rather than called every second. Supabase writes should also be throttled to avoid unnecessary network traffic and database churn.
 
 Signed-in users rely on Supabase for cross-device continuity. `localStorage` remains useful as a local fallback and recovery checkpoint, but it should not mirror every cloud sync tick.
+
+## Vercel Hobby tuning
+
+Signed-in cloud sync is **not** a Vercel function invocation (browser → Supabase), but it still drives **database writes and egress**. On the [Hobby](https://vercel.com/docs/plans/hobby) plan, if Supabase write volume or cross-device lag is acceptable to trade off:
+
+- Increase `SIGNED_IN_CLOUD_SYNC_INTERVAL_MS` in `src/components/LiteYouTubeEmbed.tsx` from **15_000** to **30_000** (~half the periodic upserts while playing).
+
+**Keep 15s when:**
+
+- Cross-device resume should update within ~15s during an active watch.
+- Users often hard-close tabs without pause (periodic sync is the main backup before `pagehide` flush).
+
+**30s is reasonable when:**
+
+- Traffic is small and Supabase write quota matters more than mid-play sync freshness.
+- Same-device UX is enough (in-memory + React state still sample every 1s; pause/hide/ended still flush immediately).
 
 ## Future Options
 

@@ -4,6 +4,8 @@ This document records changes aimed at **reducing server-side CPU work** (InnerT
 
 **Vercel context:** [Fluid active CPU](https://vercel.com/docs/functions/fluid-compute) bills CPU while JS is doing real work (parsing, crypto, tight loops). Awaiting network I/O is generally cheaper; **duplicate `getInfo`**, **sequential batch `await`**, and **unbounded continuations** were the main cost drivers called out in review.
 
+**Hobby (non-Fluid):** For You feed caching, proxy auth narrowing, and related server work are documented in-repo via `vercel.json` and `src/lib/forYou/feedCache.ts`. Signed-in **watch progress** cloud interval (15s vs 30s) is a Supabase write tradeoff — see [watch-progress-persistence.md](./decisions/watch-progress-persistence.md#vercel-hobby-tuning).
+
 ### Subagent tracks (what landed in code)
 
 | Track | Focus | Primary files |
