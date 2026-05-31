@@ -4,7 +4,7 @@ import Typography from "@mui/material/Typography";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
-import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
+import { ForYouHome } from "@/components/ForYouHome";
 import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchScrollRestore } from "@/components/SearchScrollRestore";
 import { pickBestGuessChannels } from "@/lib/channelSearchRelevance";
@@ -90,7 +90,7 @@ export default async function Home({ searchParams }: PageProps) {
       </Suspense>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
         {!query ? (
-          <HomeHeroEmpty />
+          <ForYouHome />
         ) : errorMessage ? (
           <Typography color="error" sx={{ py: 4 }}>
             {errorMessage}

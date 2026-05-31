@@ -7,9 +7,18 @@ export async function readFetchJson<T>(response: Response): Promise<T> {
       `Unexpected server response (${response.status}). Please try again.`,
     );
   }
+  if (!text.trim()) {
+    throw new Error(
+      `Empty response from server (${response.status}). Please try again.`,
+    );
+  }
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new Error("Could not read JSON from server.");
+    throw new Error(
+      response.ok
+        ? "Could not read JSON from server."
+        : `Unexpected server response (${response.status}). Please try again.`,
+    );
   }
 }
