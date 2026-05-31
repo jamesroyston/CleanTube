@@ -140,6 +140,55 @@ export function isInProgress(entry: WatchProgressEntry): boolean {
   return !entry.completed && entry.lastPositionSeconds > 0;
 }
 
+/** True when the user has meaningfully reached the end (avoids marking short clips complete at t=0). */
+export function isNearlyCompleteWatch(
+  durationSeconds: number | undefined,
+  currentSeconds: number,
+): boolean {
+  if (durationSeconds == null || durationSeconds <= 0 || currentSeconds <= 0) {
+    return false;
+  }
+  const remaining = durationSeconds - currentSeconds;
+  if (remaining > 30) return false;
+  const minWatched = Math.max(3, Math.floor(durationSeconds * 0.1));
+  return currentSeconds >= minWatched;
+}
+
+/** Idle time before a partial watch drops off Continue watching. */
+export const IN_PROGRESS_CONTINUE_WATCHING_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+export function isStaleInProgress(
+  entry: WatchProgressEntry,
+  maxAgeMs: number = IN_PROGRESS_CONTINUE_WATCHING_MAX_AGE_MS,
+): boolean {
+  if (!isInProgress(entry)) return false;
+  const watchedAt = Date.parse(entry.lastWatchedAt);
+  if (!Number.isFinite(watchedAt)) return true;
+  return Date.now() - watchedAt > maxAgeMs;
+}
+
+/** Partial watch still eligible for Continue watching (first-time only, not rewatch). */
+export function isFreshInProgress(
+  entry: WatchProgressEntry,
+  maxAgeMs: number = IN_PROGRESS_CONTINUE_WATCHING_MAX_AGE_MS,
+): boolean {
+  return (
+    isInProgress(entry) &&
+    !isStaleInProgress(entry, maxAgeMs) &&
+    !isRewatching(entry)
+  );
+}
+
+export function sortWatchProgressByRecency(
+  entries: WatchProgressEntry[],
+): WatchProgressEntry[] {
+  return [...entries].sort((a, b) => {
+    const tb = Date.parse(b.lastWatchedAt);
+    const ta = Date.parse(a.lastWatchedAt);
+    return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
+  });
+}
+
 /** User finished this video before and is watching again (not yet re-completed). */
 export function isRewatching(entry: WatchProgressEntry | undefined): boolean {
   if (!entry || entry.completed) return false;

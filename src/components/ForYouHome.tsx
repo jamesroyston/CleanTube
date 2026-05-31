@@ -1,11 +1,14 @@
 import { ForYouFeedView } from "@/components/ForYouFeedView";
-import { buildForYouFeed } from "@/lib/forYou/buildFeed";
-import { loadForYouLibrarySignals } from "@/lib/forYou/loadLibrarySignals";
+import { forYouSignedIn } from "@/lib/forYou/loadLibrarySignals";
 
+/**
+ * Signed-in feed loads client-side via /api/for-you to avoid blocking home SSR
+ * with heavy InnerTube work on every visit (Vercel Hobby CPU budget).
+ */
 export async function ForYouHome() {
-  const signals = await loadForYouLibrarySignals();
+  const signedIn = await forYouSignedIn();
 
-  if (!signals) {
+  if (!signedIn) {
     return (
       <ForYouFeedView
         initialSections={[]}
@@ -15,26 +18,12 @@ export async function ForYouHome() {
     );
   }
 
-  try {
-    const feed = await buildForYouFeed(signals);
-    return (
-      <ForYouFeedView
-        initialSections={feed.sections}
-        initialEmpty={feed.empty}
-        signedIn
-      />
-    );
-  } catch (err) {
-    console.error("[ForYouHome]", err);
-    const message =
-      err instanceof Error ? err.message : "Failed to load your feed.";
-    return (
-      <ForYouFeedView
-        initialSections={[]}
-        initialEmpty
-        signedIn
-        initialError={message}
-      />
-    );
-  }
+  return (
+    <ForYouFeedView
+      initialSections={[]}
+      initialEmpty={false}
+      signedIn
+      loadFeedOnMount
+    />
+  );
 }

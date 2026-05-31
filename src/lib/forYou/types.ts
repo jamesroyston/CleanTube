@@ -12,6 +12,10 @@ export type ForYouCandidate = {
   source: ForYouCandidateSource;
   /** Optional channel name from the seed (saved channel title or history). */
   seedChannelName?: string;
+  /** History seed video id (watch_next sections only). */
+  seedVideoId?: string;
+  /** History seed title for section headings. */
+  seedHistoryTitle?: string;
 };
 
 export type ForYouFeedLimits = {

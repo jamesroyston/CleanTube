@@ -68,7 +68,8 @@ const { u8ToBase64 } = require(join(
 )) as { u8ToBase64: (u: Uint8Array) => string };
 
 /** Max top-level comment pages walked when locating a thread for direct reply fetch. */
-const DEFAULT_MAX_COMMENT_THREAD_WALK_PAGES = 64;
+/** Hobby-friendly default; tune via env if needed. */
+const DEFAULT_MAX_COMMENT_THREAD_WALK_PAGES = 16;
 const ENV_MAX_COMMENT_THREAD_WALK_PAGES = "CLEANTUBE_COMMENTS_MAX_THREAD_WALK_PAGES";
 
 function maxCommentThreadWalkPages(): number {
