@@ -8,12 +8,15 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import type { VideoSummary } from "@/components/VideoSummary";
-import { VideoResultsGrid } from "@/components/VideoResultsGrid";
+import {
+  VideoCarouselRow,
+  VideoCarouselRowSkeleton,
+} from "@/components/VideoCarouselRow";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { readFetchJson } from "@/lib/fetchJson";
 import { forYouHasLibrarySignals } from "@/lib/forYou/recommendations";
@@ -33,6 +36,8 @@ type ForYouFeedViewProps = {
   initialEmpty: boolean;
   signedIn: boolean;
   initialError?: string;
+  /** Fetch recommendations after library sync (avoids heavy home SSR). */
+  loadFeedOnMount?: boolean;
 };
 
 function inProgressToVideoSummaries(entries: WatchProgressEntry[]): VideoSummary[] {
@@ -57,6 +62,7 @@ export function ForYouFeedView({
   initialEmpty,
   signedIn,
   initialError,
+  loadFeedOnMount = false,
 }: ForYouFeedViewProps) {
   const {
     canPersistLibrary,
@@ -76,7 +82,9 @@ export function ForYouFeedView({
 
   const [sections, setSections] = useState(initialSections);
   const [feedEmpty, setFeedEmpty] = useState(initialEmpty);
-  const [feedLoading, setFeedLoading] = useState(false);
+  const [feedLoading, setFeedLoading] = useState(
+    loadFeedOnMount && signedIn && initialSections.length === 0,
+  );
   const [feedError, setFeedError] = useState<string | null>(initialError ?? null);
 
   const libraryReady =
@@ -132,6 +140,21 @@ export function ForYouFeedView({
     }
   }, [canPersistLibrary]);
 
+  useEffect(() => {
+    if (!loadFeedOnMount || !signedIn || !canPersistLibrary || !libraryReady) {
+      return;
+    }
+    if (initialSections.length > 0) return;
+    void refreshFeed();
+  }, [
+    loadFeedOnMount,
+    signedIn,
+    canPersistLibrary,
+    libraryReady,
+    initialSections.length,
+    refreshFeed,
+  ]);
+
   const showSyncSpinner =
     signedIn &&
     canPersistLibrary &&
@@ -166,17 +189,6 @@ export function ForYouFeedView({
           title="Sign in for your For You feed"
           message="Save channels, watch videos, and pin searches while signed in. Your feed is built from that library."
         />
-      ) : showSyncSpinner ? (
-        <Stack spacing={2} alignItems="center" sx={{ py: 6 }}>
-          <CircularProgress size={32} />
-          <Typography variant="body2" color="text.secondary">
-            Loading your library…
-          </Typography>
-        </Stack>
-      ) : libraryCloudSyncState === "error" ? (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          Your library could not be synced. Try again after refreshing.
-        </Alert>
       ) : (
         <>
           {continueWatchingVideos.length > 0 ? (
@@ -188,10 +200,30 @@ export function ForYouFeedView({
               >
                 Continue watching
               </Typography>
-              <VideoResultsGrid videos={continueWatchingVideos} />
+              <VideoCarouselRow
+                videos={continueWatchingVideos}
+                ariaLabel="Continue watching"
+              />
             </Box>
           ) : null}
 
+          {showSyncSpinner ? (
+            <Stack spacing={2} alignItems="center" sx={{ py: 6 }}>
+              <CircularProgress size={32} />
+              <Typography variant="body2" color="text.secondary">
+                Loading your library…
+              </Typography>
+            </Stack>
+          ) : libraryCloudSyncState === "error" ? (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Your library could not be synced. Recommendations may be
+              unavailable; Continue watching uses videos from this device
+              session.
+            </Alert>
+          ) : null}
+
+          {!showSyncSpinner ? (
+        <>
           {feedError ? (
             <Stack spacing={2} sx={{ mb: 3 }}>
               <Alert severity="error">{feedError}</Alert>
@@ -228,7 +260,10 @@ export function ForYouFeedView({
                   >
                     {section.title}
                   </Typography>
-                  <VideoResultsGrid videos={section.videos} />
+                  <VideoCarouselRow
+                    videos={section.videos}
+                    ariaLabel={section.title}
+                  />
                 </Box>
               ))}
             </Stack>
@@ -247,6 +282,8 @@ export function ForYouFeedView({
             </Box>
           ) : null}
         </>
+          ) : null}
+        </>
       )}
     </>
   );
@@ -258,26 +295,7 @@ function FeedSectionsSkeleton() {
       {Array.from({ length: 2 }, (_, sectionIndex) => (
         <Box key={sectionIndex}>
           <Skeleton variant="text" width={220} height={32} sx={{ mb: 2 }} />
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "1fr",
-                sm: "repeat(2, 1fr)",
-                md: "repeat(3, 1fr)",
-                lg: "repeat(4, 1fr)",
-              },
-              gap: 2.5,
-            }}
-          >
-            {Array.from({ length: 4 }, (_, i) => (
-              <Skeleton
-                key={i}
-                variant="rounded"
-                sx={{ aspectRatio: "16 / 9", width: "100%" }}
-              />
-            ))}
-          </Box>
+          <VideoCarouselRowSkeleton cardCount={4} />
         </Box>
       ))}
     </Stack>

@@ -4,6 +4,7 @@ import Box from "@mui/material/Box";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
+import { isNearlyCompleteWatch } from "@/lib/cloudLibrary/sync";
 import { useGlobalYoutubeShortcuts } from "@/hooks/useGlobalYoutubeShortcuts";
 import {
   getAttachedLiteYoutubePlayer,
@@ -164,10 +165,7 @@ export function LiteYouTubeEmbed({
       const durationRaw = readPlayerDuration(player);
       const durationSeconds =
         durationRaw != null ? Math.floor(durationRaw) : undefined;
-      const completed =
-        durationSeconds != null &&
-        durationSeconds > 0 &&
-        durationSeconds - currentSeconds <= 30;
+      const completed = isNearlyCompleteWatch(durationSeconds, currentSeconds);
 
       if (
         !force &&

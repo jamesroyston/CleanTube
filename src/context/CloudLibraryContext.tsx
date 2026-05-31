@@ -57,8 +57,10 @@ import {
 } from "@/lib/cloudLibrary/webauthnClient";
 import {
   deriveResumeSeconds,
+  isFreshInProgress,
   isInProgress,
   mergeSavedChannels,
+  sortWatchProgressByRecency,
 } from "@/lib/cloudLibrary/sync";
 import { getSupabaseBrowserClient } from "@/utils/supabase/client";
 import {
@@ -878,13 +880,21 @@ export function CloudLibraryProvider({
             snapshotForCloud = null;
             return prev;
           }
-          liveMap.set(normalized.videoId, {
+          const nextEntry: WatchProgressEntry = {
+            ...existing,
+            ...normalized,
             lastPositionSeconds: nextLastPosition,
-            durationSeconds: nextDuration,
             completed: nextCompleted,
-          });
+            everCompleted: nextEverCompleted ? true : undefined,
+            durationSeconds: nextDuration,
+          };
           snapshotForCloud = null;
-          return prev;
+          return [
+            nextEntry,
+            ...prev.filter((entry) => entry.videoId !== normalized.videoId),
+          ].sort(
+            (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+          );
         }
 
         liveMap.delete(normalized.videoId);
@@ -1032,7 +1042,16 @@ export function CloudLibraryProvider({
       watchLaterEntries,
       savedChannels,
       watchProgress,
-      inProgressEntries: watchProgress.filter(isInProgress),
+      inProgressEntries: sortWatchProgressByRecency(
+        watchProgress
+          .map((entry) =>
+            mergeWatchProgressLivePatch(
+              entry,
+              watchProgressLiveRef.current.get(entry.videoId),
+            ),
+          )
+          .filter(isFreshInProgress),
+      ),
       signIn,
       signUp,
       resetPassword,

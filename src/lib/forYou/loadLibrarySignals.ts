@@ -11,6 +11,18 @@ export type ForYouLibrarySignals = {
   recentSearchQueries: string[];
 };
 
+/** Auth-only check for home shell (avoids library snapshot reads on SSR). */
+export async function forYouSignedIn(): Promise<boolean> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return false;
+
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  return !userError && user != null;
+}
+
 export async function loadForYouLibrarySignals(): Promise<ForYouLibrarySignals | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;

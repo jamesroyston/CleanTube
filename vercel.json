@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "src/app/api/for-you/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/videos/[id]/comments/route.ts": {
+      "maxDuration": 20
+    },
+    "src/app/api/channels/resolve-batch/route.ts": {
+      "maxDuration": 20
+    }
+  }
+}

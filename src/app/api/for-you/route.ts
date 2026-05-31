@@ -5,7 +5,7 @@ import { loadForYouLibrarySignals } from "@/lib/forYou/loadLibrarySignals";
 
 export const runtime = "nodejs";
 /** Allow time for bounded InnerTube fetches when refreshing the feed. */
-export const maxDuration = 60;
+export const maxDuration = 30;
 
 export async function GET() {
   const signals = await loadForYouLibrarySignals();

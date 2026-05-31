@@ -8,6 +8,7 @@ import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 import type { SavedChannel } from "@/types/savedChannel";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
+import { isStaleInProgress } from "@/lib/cloudLibrary/sync";
 import type { WatchProgressEntry } from "@/types/watchProgress";
 import type { ForYouCandidate, ForYouFeedLimits } from "./types";
 import { DEFAULT_FOR_YOU_LIMITS } from "./types";
@@ -129,6 +130,7 @@ export function recentHistorySeeds(
   max: number,
 ): WatchProgressEntry[] {
   return [...watchProgress]
+    .filter((entry) => !isStaleInProgress(entry))
     .sort((a, b) => {
       const ta = Date.parse(a.lastWatchedAt);
       const tb = Date.parse(b.lastWatchedAt);
@@ -147,6 +149,8 @@ export async function fetchFromHistorySeed(
       video,
       source: "watch_next" as const,
       seedChannelName: entry.channelName,
+      seedVideoId: entry.videoId,
+      seedHistoryTitle: entry.title,
     }));
   } catch {
     return [];

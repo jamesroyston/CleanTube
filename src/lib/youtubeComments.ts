@@ -54,7 +54,8 @@ type CommentsPageLike = {
 const PAGE_SIZE = 8;
 
 /** Max InnerTube comment-section continuation fetches per request (includes walking to reach `page`). */
-const DEFAULT_MAX_COMMENT_CONTINUATION_PAGES = 96;
+/** Hobby-friendly default; override via CLEANTUBE_COMMENTS_MAX_CONTINUATION_PAGES. */
+const DEFAULT_MAX_COMMENT_CONTINUATION_PAGES = 16;
 const ENV_MAX_COMMENT_CONTINUATION_PAGES = "CLEANTUBE_COMMENTS_MAX_CONTINUATION_PAGES";
 
 function maxCommentContinuationPages(): number {
