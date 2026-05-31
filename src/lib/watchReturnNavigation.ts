@@ -96,7 +96,7 @@ export function deriveWatchReturnTarget(
 
   if (pathname === "/") {
     const q = new URLSearchParams(search).get("q")?.trim();
-    return { href, label: q ? "Back to results" : "Search" };
+    return { href, label: q ? "Back to results" : "Back to For You" };
   }
 
   if (pathname.startsWith("/channel/")) {
