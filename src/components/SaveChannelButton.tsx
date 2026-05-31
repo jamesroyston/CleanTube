@@ -6,6 +6,7 @@ import Button from "@mui/material/Button";
 import { useMemo } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
 
 type SaveChannelButtonProps = {
@@ -24,6 +25,7 @@ export function SaveChannelButton({
   thumbnailUrl,
   compact = false,
 }: SaveChannelButtonProps) {
+  const { canPersistLibrary } = useCloudLibrary();
   const { channels, addChannel, removeChannel } = useSavedChannels();
   const trimmedName = channelName.trim();
   const searchQuery = trimmedName;
@@ -43,6 +45,10 @@ export function SaveChannelButton({
   const alreadySaved = Boolean(savedMatch);
 
   if (!trimmedName || trimmedName === "Unknown channel") {
+    return null;
+  }
+
+  if (!canPersistLibrary) {
     return null;
   }
 

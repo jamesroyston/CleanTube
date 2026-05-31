@@ -32,6 +32,7 @@ export function VideoCard({ video }: { video: VideoSummary }) {
 
   return (
     <Card
+      id={`search-video-${video.id}`}
       variant="outlined"
       sx={{
         height: "100%",
@@ -51,7 +52,7 @@ export function VideoCard({ video }: { video: VideoSummary }) {
         <CardActionArea
           component={Link}
           href={watchHref}
-          {...watchNavigationCaptureHandlers()}
+          {...watchNavigationCaptureHandlers(video.id)}
           sx={{
             display: "flex",
             flexDirection: "column",

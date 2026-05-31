@@ -6,6 +6,7 @@ import Button from "@mui/material/Button";
 import { useMemo } from "react";
 
 import { useSavedChannels } from "@/context/SavedChannelsContext";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
 
 type SaveSearchButtonProps = {
@@ -13,6 +14,7 @@ type SaveSearchButtonProps = {
 };
 
 export function SaveSearchButton({ query }: SaveSearchButtonProps) {
+  const { canPersistLibrary } = useCloudLibrary();
   const { channels, addChannel } = useSavedChannels();
   const trimmedQuery = query.trim();
 
@@ -27,6 +29,10 @@ export function SaveSearchButton({ query }: SaveSearchButtonProps) {
   }, [channels, trimmedQuery]);
 
   if (!trimmedQuery) return null;
+
+  if (!canPersistLibrary) {
+    return null;
+  }
 
   if (alreadySaved) {
     return (

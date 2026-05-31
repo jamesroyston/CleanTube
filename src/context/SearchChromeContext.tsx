@@ -6,12 +6,19 @@ import {
   useContext,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 
 type SearchChromeContextValue = {
   openSearchOverlay: () => void;
   registerOpenSearchOverlay: (fn: (() => void) | null) => void;
+  /** 0 = hidden, 1 = fully revealed — tied to scroll-up gesture. */
+  mobileHeaderRevealProgress: number;
+  setMobileHeaderRevealProgress: (progress: number) => void;
+  /** True when scrollY is past the in-flow header threshold. */
+  mobileHeaderOverlayMode: boolean;
+  setMobileHeaderOverlayMode: (active: boolean) => void;
 };
 
 const SearchChromeContext = createContext<SearchChromeContextValue | null>(
@@ -20,6 +27,9 @@ const SearchChromeContext = createContext<SearchChromeContextValue | null>(
 
 export function SearchChromeProvider({ children }: { children: ReactNode }) {
   const openRef = useRef<(() => void) | null>(null);
+  const [mobileHeaderRevealProgress, setMobileHeaderRevealProgress] =
+    useState(0);
+  const [mobileHeaderOverlayMode, setMobileHeaderOverlayMode] = useState(false);
 
   const registerOpenSearchOverlay = useCallback((fn: (() => void) | null) => {
     openRef.current = fn;
@@ -30,8 +40,20 @@ export function SearchChromeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ openSearchOverlay, registerOpenSearchOverlay }),
-    [openSearchOverlay, registerOpenSearchOverlay],
+    () => ({
+      openSearchOverlay,
+      registerOpenSearchOverlay,
+      mobileHeaderRevealProgress,
+      setMobileHeaderRevealProgress,
+      mobileHeaderOverlayMode,
+      setMobileHeaderOverlayMode,
+    }),
+    [
+      openSearchOverlay,
+      registerOpenSearchOverlay,
+      mobileHeaderRevealProgress,
+      mobileHeaderOverlayMode,
+    ],
   );
 
   return (

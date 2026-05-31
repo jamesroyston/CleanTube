@@ -4,6 +4,7 @@ import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
 import Button from "@mui/material/Button";
 
 import { useWatchLater } from "@/context/WatchLaterContext";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 type WatchLaterAddButtonProps = {
   videoId: string;
@@ -21,8 +22,13 @@ export function WatchLaterAddButton({
   channelName,
   startSecondsContext,
 }: WatchLaterAddButtonProps) {
+  const { canPersistLibrary } = useCloudLibrary();
   const { addOrUpdateEntry, isInWatchLater } = useWatchLater();
   const saved = isInWatchLater(videoId);
+
+  if (!canPersistLibrary) {
+    return null;
+  }
 
   if (saved) {
     return (

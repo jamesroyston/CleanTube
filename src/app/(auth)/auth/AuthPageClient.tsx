@@ -93,12 +93,12 @@ export function AuthPageClient() {
 
   const helperCopy = useMemo(() => {
     if (mode === "sign-up") {
-      return "Create an account to sync watch later, saved channels, and progress. Passkeys are added after you can sign in—see the note on this tab.";
+      return "Create an account to save watch later, saved channels, watch history, and pinned searches across devices. Passkeys are added after you can sign in—see the note on this tab.";
     }
     if (mode === "reset") {
       return "Send a password reset email for your Supabase account.";
     }
-    return "Sign in to merge your local library into the cloud.";
+    return "Sign in to save watch history, Watch Later, saved channels, and pinned searches to your account.";
   }, [mode]);
 
   const passkeyRegistrationCopy = useMemo(() => {
@@ -276,7 +276,7 @@ export function AuthPageClient() {
         ) : user ? (
           <Stack spacing={2}>
             <Alert severity="success">
-              Signed in as {user.email ?? "your account"}. Local library data will sync automatically.
+              Signed in as {user.email ?? "your account"}. Your library syncs to your account.
               {passkeysSupported ? " Register a passkey below to use this device for future sign-ins." : null}
             </Alert>
             {message ? <Alert severity="success">{message}</Alert> : null}

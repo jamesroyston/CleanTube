@@ -27,6 +27,8 @@ import { Header } from "@/components/Header";
 import { MobileSearchChrome } from "@/components/MobileSearchChrome";
 import { SavedChannelMigration } from "@/components/SavedChannelMigration";
 import { WatchReturnTracker } from "@/components/WatchReturnTracker";
+import { ScrollContainerProvider } from "@/context/ScrollContainerContext";
+import { registerScrollElementGetter } from "@/lib/watchReturnNavigation";
 
 function HeaderFallback() {
   return null;
@@ -98,9 +100,17 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     : null;
 
   const appBarRef = useRef<HTMLDivElement | null>(null);
+  const mainScrollRef = useRef<HTMLDivElement | null>(null);
   const [headerInsetPx, setHeaderInsetPx] = useState(
     DESKTOP_HEADER_INSET_FALLBACK_PX,
   );
+
+  useEffect(() => {
+    registerScrollElementGetter(() =>
+      mdUp ? mainScrollRef.current : window,
+    );
+    return () => registerScrollElementGetter(null);
+  }, [mdUp]);
 
   useLayoutEffect(() => {
     const el = appBarRef.current;
@@ -155,6 +165,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
    */
   const mainScroll = mdUp ? (
     <Box
+      ref={mainScrollRef}
       sx={{
         flex: 1,
         minHeight: 0,
@@ -174,6 +185,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   );
 
   return (
+    <ScrollContainerProvider
+      scrollRef={mainScrollRef}
+      mobileDocumentScroll={!mdUp}
+    >
     <Box
       sx={{
         display: "flex",
@@ -324,6 +339,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         </Box>
       )}
     </Box>
+    </ScrollContainerProvider>
   );
 }
 

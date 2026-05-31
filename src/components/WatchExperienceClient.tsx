@@ -84,10 +84,9 @@ export function WatchExperienceClient({
   const {
     getResumeSeconds,
     authStatus,
-    isCloudConfigured,
     localLibraryHydrated,
+    canPersistLibrary,
     libraryCloudSyncState,
-    user,
   } = useCloudLibrary();
   const { visible: upNextVisible } = useWatchUpNextVisible();
   const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
@@ -100,27 +99,30 @@ export function WatchExperienceClient({
     parseYouTubeTimeParam(searchParams.get("start"));
   const hasUrlStart = urlStartSeconds != null && urlStartSeconds > 0;
 
-  /** URL `?t=` / `?start=` wins; else wait for local + auth + cloud sync before mounting. */
-  const cloudSnapshotReady =
-    !isCloudConfigured ||
-    user == null ||
-    libraryCloudSyncState !== "syncing";
+  const libraryReadyForPlayback =
+    !canPersistLibrary ||
+    libraryCloudSyncState === "synced" ||
+    libraryCloudSyncState === "error";
+
+  /** Mount player once auth (and cloud sync, when signed in) are ready. */
   const progressResolvable =
-    hasUrlStart ||
-    (localLibraryHydrated &&
-      (!isCloudConfigured || authStatus === "ready") &&
-      cloudSnapshotReady);
+    localLibraryHydrated &&
+    authStatus === "ready" &&
+    libraryReadyForPlayback;
 
   const effectiveStartSeconds = useMemo(() => {
     if (hasUrlStart) return urlStartSeconds!;
     if (!progressResolvable) return startSeconds;
-    const resume = getResumeSeconds(videoId);
-    if (resume != null && resume > 0) return resume;
+    if (canPersistLibrary) {
+      const resume = getResumeSeconds(videoId);
+      if (resume != null && resume > 0) return resume;
+    }
     return startSeconds;
   }, [
     hasUrlStart,
     urlStartSeconds,
     progressResolvable,
+    canPersistLibrary,
     videoId,
     getResumeSeconds,
     startSeconds,

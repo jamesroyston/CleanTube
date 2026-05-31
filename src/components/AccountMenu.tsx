@@ -51,7 +51,7 @@ function emailLocalPart(email: string | undefined): string {
 export function AccountMenu() {
   const theme = useTheme();
   const compactAccount = useMediaQuery(theme.breakpoints.down("md"));
-  const { user, isCloudConfigured, signOutUser, authStatus } = useCloudLibrary();
+  const { user, isCloudConfigured, canPersistLibrary, signOutUser, authStatus } = useCloudLibrary();
   const { mode, toggleMode } = useThemeMode();
   const { visible: commentsVisible, setWatchCommentsVisible } =
     useWatchCommentsVisible();
@@ -362,13 +362,15 @@ export function AccountMenu() {
             </ListItemIcon>
             <ListItemText
               primary="Sign in or create account"
-              secondary="Sync library across devices"
+              secondary="Save your library across devices"
             />
           </MenuItem>
         )}
         <Divider />
         <Typography variant="caption" color="text.secondary" sx={{ px: 2, py: 1, display: "block", maxWidth: 280 }}>
-          Signed-out browsing uses local storage on this device. Sign in to load your cloud library; sign out clears that local copy.
+          {canPersistLibrary
+            ? "Your library is saved to your account and syncs across devices."
+            : "History, Watch Later, saved channels, and pinned searches require signing in."}
         </Typography>
       </Menu>
     </>

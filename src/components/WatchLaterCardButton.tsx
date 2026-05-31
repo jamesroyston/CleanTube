@@ -7,12 +7,18 @@ import Tooltip from "@mui/material/Tooltip";
 
 import type { VideoSummary } from "@/components/VideoSummary";
 import { useWatchLater } from "@/context/WatchLaterContext";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 type WatchLaterCardButtonProps = { video: VideoSummary };
 
 export function WatchLaterCardButton({ video }: WatchLaterCardButtonProps) {
+  const { canPersistLibrary } = useCloudLibrary();
   const { addOrUpdateEntry, removeByVideoId, isInWatchLater } = useWatchLater();
   const saved = isInWatchLater(video.id);
+
+  if (!canPersistLibrary) {
+    return null;
+  }
 
   return (
     <Tooltip

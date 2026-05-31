@@ -6,6 +6,7 @@ import { Suspense } from "react";
 
 import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
 import { LastSearchSync } from "@/components/LastSearchSync";
+import { SearchScrollRestore } from "@/components/SearchScrollRestore";
 import { pickBestGuessChannels } from "@/lib/channelSearchRelevance";
 import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 import { SearchSortBar } from "@/components/SearchSortBar";
@@ -85,6 +86,7 @@ export default async function Home({ searchParams }: PageProps) {
     <Box component="main" sx={{ pb: 6 }}>
       <Suspense fallback={null}>
         <LastSearchSync />
+        <SearchScrollRestore />
       </Suspense>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
         {!query ? (

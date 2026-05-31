@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { WatchProgressBar } from "@/components/WatchProgressBar";
+import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
@@ -26,6 +27,7 @@ function timestamp(value: string): number {
 
 export function HistoryPageClient() {
   const {
+    canPersistLibrary,
     watchProgress,
     getResumeSeconds,
     removeWatchProgressByVideoId,
@@ -56,16 +58,23 @@ export function HistoryPageClient() {
               Watched videos are ordered by last watch time, with saved progress for resuming.
             </Typography>
           </Box>
-          <Button
-            variant="outlined"
-            color="error"
-            disabled={orderedHistory.length === 0}
-            onClick={clearWatchProgress}
-          >
-            Clear history
-          </Button>
+          {canPersistLibrary ? (
+            <Button
+              variant="outlined"
+              color="error"
+              disabled={orderedHistory.length === 0}
+              onClick={clearWatchProgress}
+            >
+              Clear history
+            </Button>
+          ) : null}
         </Stack>
-        {orderedHistory.length === 0 ? (
+        {!canPersistLibrary ? (
+          <LibrarySignInPrompt
+            title="Sign in to track watch history"
+            message="Your watch history and resume progress are saved to your account when you sign in."
+          />
+        ) : orderedHistory.length === 0 ? (
           <Typography color="text.secondary">
             Your watch history will appear here once progress tracking starts.
           </Typography>

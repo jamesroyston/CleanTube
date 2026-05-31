@@ -13,6 +13,8 @@ import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 
+import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
+import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { savedChannelBrowseHref } from "@/lib/savedChannelNavigation";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
@@ -72,6 +74,7 @@ function SavedChannelRow({
 }
 
 export function LibraryManageClient() {
+  const { canPersistLibrary } = useCloudLibrary();
   const { channels, removeChannel } = useSavedChannels();
   const savedChannels = channels
     .filter((c) => effectiveSavedChannelKind(c) === "saved_channel")
@@ -85,6 +88,13 @@ export function LibraryManageClient() {
 
   return (
     <Stack spacing={3}>
+      {!canPersistLibrary ? (
+        <LibrarySignInPrompt
+          title="Sign in to manage your library"
+          message="Saved channels and pinned searches are stored in your account when you sign in."
+        />
+      ) : (
+        <>
       <Typography variant="body2" color="text.secondary">
         Remove pins you no longer need. Opening an item still works from the sidebar
         without deleting it here.
@@ -126,6 +136,8 @@ export function LibraryManageClient() {
           </List>
         )}
       </Paper>
+        </>
+      )}
     </Stack>
   );
 }
