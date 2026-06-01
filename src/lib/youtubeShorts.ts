@@ -1,6 +1,6 @@
 import { YTNodes } from "youtubei.js";
 
-import { lockupViewShortToVideoLike } from "@/lib/youtubeiAdapters";
+import { shortFeedItemToVideoLike } from "@/lib/youtubeiAdapters";
 import { getInnertube } from "@/lib/youtubeiClient";
 import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
 
@@ -25,27 +25,30 @@ function withChannelName(
   return { ...item, channelName: channelName.trim() };
 }
 
-function listShortLockups(feed: FeedLike): unknown[] {
+function listShortItemsFromMemo(feed: FeedLike): unknown[] {
   const memo = feed.memo;
   if (!memo || typeof memo.getType !== "function") return [];
   try {
+    const shortsLockups = memo.getType(YTNodes.ShortsLockupView) as unknown[];
+    const reels = memo.getType(YTNodes.ReelItem) as unknown[];
     const lockups = memo.getType(YTNodes.LockupView) as { content_type?: string }[];
-    return lockups.filter((lv) => lv.content_type === "SHORT");
+    const shortLockups = lockups.filter((lv) => lv.content_type === "SHORT");
+    return [...shortsLockups, ...reels, ...shortLockups];
   } catch {
     return [];
   }
 }
 
 function shortItemsFromFeed(feed: FeedLike): unknown[] {
-  const feedVideos = feed.videos ?? [];
-  if (feedVideos.length > 0) return feedVideos;
-  return listShortLockups(feed);
+  const fromVideos = feed.videos ?? [];
+  const fromMemo = listShortItemsFromMemo(feed);
+  if (fromVideos.length === 0) return fromMemo;
+  if (fromMemo.length === 0) return fromVideos;
+  return [...fromVideos, ...fromMemo];
 }
 
 function feedItemToShortVideo(item: unknown): VideoLikeForSummary | null {
-  const fromLockup = lockupViewShortToVideoLike(item);
-  if (fromLockup) return fromLockup;
-  return null;
+  return shortFeedItemToVideoLike(item);
 }
 
 export async function getChannelShorts(input: {
