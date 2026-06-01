@@ -294,7 +294,11 @@ function FeedSectionsSkeleton() {
     <Stack spacing={4}>
       {Array.from({ length: 2 }, (_, sectionIndex) => (
         <Box key={sectionIndex}>
-          <Skeleton variant="text" width={220} height={32} sx={{ mb: 2 }} />
+          <Skeleton
+            variant="text"
+            height={32}
+            sx={{ mb: 2, width: { xs: 180, sm: 220 } }}
+          />
           <VideoCarouselRowSkeleton cardCount={4} />
         </Box>
       ))}

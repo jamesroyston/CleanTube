@@ -1,6 +1,7 @@
 "use client";
 
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
+import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import SubscriptionsIcon from "@mui/icons-material/Subscriptions";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
@@ -94,6 +95,29 @@ export function ChannelsRailContent({
         }}
       >
         <List disablePadding sx={{ mb: 1 }}>
+          {!miniMode ? (
+            <ListItemButton
+              component={Link}
+              href="/"
+              onClick={onNavigate}
+              sx={{
+                borderRadius: 1,
+                minHeight: 44,
+                justifyContent: "flex-start",
+              }}
+            >
+              <ListItemIcon
+                sx={{
+                  minWidth: 36,
+                  color: "text.secondary",
+                  justifyContent: "center",
+                }}
+              >
+                <HomeOutlinedIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText primary="Home" />
+            </ListItemButton>
+          ) : null}
           {navLinks.map((item) => (
             <Tooltip
               key={item.href}

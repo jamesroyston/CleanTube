@@ -27,7 +27,13 @@ type VideoResultsGridProps = {
   videos: VideoSummary[];
 };
 
-export function VideoCard({ video }: { video: VideoSummary }) {
+type VideoCardProps = {
+  video: VideoSummary;
+  /** In horizontal carousels: allow vertical page scroll when touch starts on card. */
+  carousel?: boolean;
+};
+
+export function VideoCard({ video, carousel = false }: VideoCardProps) {
   const watchHref = useVideoWatchHref(video.id);
 
   return (
@@ -39,6 +45,12 @@ export function VideoCard({ video }: { video: VideoSummary }) {
         display: "flex",
         flexDirection: "column",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
+        ...(carousel
+          ? {
+              touchAction: "pan-x pan-y",
+              WebkitTapHighlightColor: "transparent",
+            }
+          : {}),
         "&:hover": {
           transform: "translateY(-2px)",
           boxShadow: (t) =>
@@ -58,6 +70,15 @@ export function VideoCard({ video }: { video: VideoSummary }) {
             flexDirection: "column",
             alignItems: "stretch",
             height: "100%",
+            ...(carousel
+              ? {
+                  touchAction: "pan-x pan-y",
+                  WebkitTapHighlightColor: "transparent",
+                  "&:focus:not(:focus-visible)": {
+                    backgroundColor: "transparent",
+                  },
+                }
+              : {}),
           }}
         >
           <Box sx={{ position: "relative", width: "100%" }}>
