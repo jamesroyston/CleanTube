@@ -35,6 +35,7 @@ export function MobileSearchChrome() {
   } = useSearchChrome();
   const lastScrollYRef = useRef(0);
   const revealProgressRef = useRef(0);
+  const overlayModeActiveRef = useRef(false);
   const hideTimerRef = useRef<number | null>(null);
   const idleHideFrameRef = useRef<number | null>(null);
   const showFabRef = useRef(false);
@@ -120,11 +121,16 @@ export function MobileSearchChrome() {
 
         setFabVisible(y > FAB_SCROLL_THRESHOLD_PX);
 
-        if (y <= SCROLL_UP_THRESHOLD_PX) {
+        const shouldActivateOverlayMode =
+          y > SCROLL_UP_THRESHOLD_PX || (overlayModeActiveRef.current && y > 0);
+
+        if (!shouldActivateOverlayMode) {
+          overlayModeActiveRef.current = false;
           clearHideTimer();
           setMobileHeaderOverlayMode(false);
           setProgress(0);
         } else {
+          overlayModeActiveRef.current = true;
           setMobileHeaderOverlayMode(true);
 
           if (delta < 0) {
@@ -158,6 +164,7 @@ export function MobileSearchChrome() {
       window.removeEventListener("scroll", onScroll);
       clearHideTimer();
       cancelIdleHide();
+      overlayModeActiveRef.current = false;
       revealProgressRef.current = 0;
       setMobileHeaderRevealProgress(0);
       setMobileHeaderOverlayMode(false);

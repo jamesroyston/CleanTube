@@ -157,12 +157,12 @@ export function ForYouFeedView({
 
   const showSyncSpinner =
     signedIn &&
-    canPersistLibrary &&
     (authStatus !== "ready" ||
       !localLibraryHydrated ||
-      libraryCloudSyncState === "syncing");
+      (canPersistLibrary && libraryCloudSyncState === "syncing"));
 
-  const showSignedOutLanding = !signedIn && !canPersistLibrary;
+  const showSignInPrompt = authStatus === "ready" && !canPersistLibrary;
+  const showSignedOutLanding = !signedIn && showSignInPrompt;
 
   return (
     <>
@@ -184,7 +184,7 @@ export function ForYouFeedView({
         </Typography>
       </Stack>
 
-      {!canPersistLibrary ? (
+      {showSignInPrompt ? (
         <LibrarySignInPrompt
           title="Sign in for your For You feed"
           message="Save channels, watch videos, and pin searches while signed in. Your feed is built from that library."
