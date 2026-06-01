@@ -880,21 +880,13 @@ export function CloudLibraryProvider({
             snapshotForCloud = null;
             return prev;
           }
-          const nextEntry: WatchProgressEntry = {
-            ...existing,
-            ...normalized,
+          liveMap.set(normalized.videoId, {
             lastPositionSeconds: nextLastPosition,
-            completed: nextCompleted,
-            everCompleted: nextEverCompleted ? true : undefined,
             durationSeconds: nextDuration,
-          };
+            completed: nextCompleted,
+          });
           snapshotForCloud = null;
-          return [
-            nextEntry,
-            ...prev.filter((entry) => entry.videoId !== normalized.videoId),
-          ].sort(
-            (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
-          );
+          return prev;
         }
 
         liveMap.delete(normalized.videoId);
