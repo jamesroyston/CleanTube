@@ -35,7 +35,8 @@ function lockupToVideoLike(item: unknown): VideoLikeForSummary | null {
   if (o.type !== "LockupView") return null;
   const id = o.content_id;
   if (typeof id !== "string" || !isValidYoutubeVideoId(id)) return null;
-  if (o.content_type && o.content_type !== "VIDEO") return null;
+  const contentType = o.content_type?.trim().toUpperCase();
+  if (contentType && contentType !== "VIDEO" && contentType !== "SHORT") return null;
 
   const title = o.metadata?.title?.toString?.().trim() || "Video";
   const rows = o.metadata?.metadata?.metadata_rows ?? [];
@@ -65,6 +66,7 @@ function lockupToVideoLike(item: unknown): VideoLikeForSummary | null {
 
   return {
     id,
+    kind: contentType === "SHORT" ? "short" : "video",
     title,
     channelName,
     durationFormatted: live ? "LIVE" : durationFormatted,
@@ -94,6 +96,32 @@ export async function getWatchNextRelatedVideos(
       if (!v || seen.has(v.id)) continue;
       seen.add(v.id);
       if (v.id === videoId) continue;
+      if ((v.kind ?? "video") !== "short") out.push(v);
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+export async function getWatchNextRelatedShorts(
+  videoId: string,
+): Promise<VideoLikeForSummary[]> {
+  if (!isValidYoutubeVideoId(videoId)) return [];
+  try {
+    const info = await getCachedInnertubeVideoInfo(videoId);
+    if (!info) return [];
+    const feed = info.watch_next_feed;
+    if (!feed) return [];
+    const list = Array.isArray(feed) ? feed : Object.values(feed);
+    const out: VideoLikeForSummary[] = [];
+    const seen = new Set<string>();
+    for (const item of list) {
+      const v = lockupToVideoLike(item);
+      if (!v || seen.has(v.id)) continue;
+      seen.add(v.id);
+      if (v.id === videoId) continue;
+      if ((v.kind ?? "video") !== "short") continue;
       out.push(v);
     }
     return out;

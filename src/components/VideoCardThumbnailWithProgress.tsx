@@ -14,12 +14,16 @@ type VideoCardThumbnailWithProgressProps = {
   children: ReactNode;
 };
 
-export function useVideoWatchHref(videoId: string): string {
+export function useVideoWatchHref(
+  videoId: string,
+  kind: "video" | "short" = "video",
+): string {
   const { getResumeSeconds } = useCloudLibrary();
   const resume = getResumeSeconds(videoId);
+  const basePath = kind === "short" ? `/shorts/${videoId}` : `/watch/${videoId}`;
   return resume && resume > 0
-    ? `/watch/${videoId}?t=${encodeURIComponent(String(resume))}`
-    : `/watch/${videoId}`;
+    ? `${basePath}?t=${encodeURIComponent(String(resume))}`
+    : basePath;
 }
 
 export function VideoCardThumbnailWithProgress({

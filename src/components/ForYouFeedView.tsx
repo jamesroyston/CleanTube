@@ -43,6 +43,7 @@ type ForYouFeedViewProps = {
 function inProgressToVideoSummaries(entries: WatchProgressEntry[]): VideoSummary[] {
   return entries.map((entry) => ({
     id: entry.videoId,
+    kind: "video" as const,
     title: entry.title,
     thumbnailUrl: entry.thumbnailUrl,
     thumbnailFallbackUrls: youtubeThumbnailFallbackUrls(

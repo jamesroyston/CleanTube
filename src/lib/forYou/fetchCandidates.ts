@@ -5,6 +5,7 @@ import { searchMixedResultsCached } from "@/lib/youtubeSearchCache";
 import { getChannelVideosPageCached } from "@/lib/youtubeChannel";
 import { getChannelDetailsCached } from "@/lib/youtubeChannelResolveCache";
 import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
+import { getChannelShorts } from "@/lib/youtubeShorts";
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 import type { SavedChannel } from "@/types/savedChannel";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
@@ -96,6 +97,29 @@ export async function fetchFromSavedChannel(
     return page.videos.map((video) => ({
       video,
       source: "saved_channel" as const,
+      seedChannelName: channel.name,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchShortsFromSavedChannel(
+  channel: SavedChannel,
+  limits: ForYouFeedLimits,
+): Promise<ForYouCandidate[]> {
+  const channelId = await resolveChannelIdForFetch(channel);
+  if (!channelId) return [];
+
+  try {
+    const shorts = await getChannelShorts({
+      channelId,
+      channelName: channel.name,
+      limit: limits.maxShortsPerChannel,
+    });
+    return shorts.map((video) => ({
+      video,
+      source: "saved_channel_shorts" as const,
       seedChannelName: channel.name,
     }));
   } catch {
@@ -201,6 +225,9 @@ export async function fetchForYouCandidates(
   const batches = await Promise.all([
     mapWithBoundedConcurrency(channelEntries, FETCH_CONCURRENCY, (ch) =>
       fetchFromSavedChannel(ch, limits),
+    ),
+    mapWithBoundedConcurrency(channelEntries, FETCH_CONCURRENCY, (ch) =>
+      fetchShortsFromSavedChannel(ch, limits),
     ),
     mapWithBoundedConcurrency(pinnedSearches, FETCH_CONCURRENCY, (ch) =>
       fetchFromPinnedSearch(ch, limits),

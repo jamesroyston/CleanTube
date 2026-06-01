@@ -109,6 +109,7 @@ export function toVideoSummary(video: VideoLikeForSummary): VideoSummary | null 
   return {
     id,
     title: video.title?.trim() || "Untitled",
+    kind: video.kind ?? "video",
     thumbnailUrl,
     thumbnailFallbackUrls,
     channelName: video.channelName?.trim() || "Unknown channel",

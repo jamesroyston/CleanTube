@@ -150,9 +150,39 @@ export function lockupViewVideoToVideoLike(v: unknown): VideoLikeForSummary | nu
 
   return {
     id,
+    kind: "video",
     title,
     channelName: "Unknown channel",
     durationFormatted,
+    uploadedAt,
+    live: false,
+    thumbnailUrls,
+  };
+}
+
+/**
+ * Rich grid Shorts lockups expose `content_type: "SHORT"` with the same core fields as video lockups.
+ */
+export function lockupViewShortToVideoLike(v: unknown): VideoLikeForSummary | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.type !== "LockupView") return null;
+  const ct = typeof o.content_type === "string" ? o.content_type : "";
+  if (ct !== "SHORT") return null;
+  const id = typeof o.content_id === "string" ? o.content_id.trim() : "";
+  if (!FEED_VIDEO_ID.test(id)) return null;
+
+  const md = o.metadata as Record<string, unknown> | undefined;
+  const title = md ? textish(md.title) : undefined;
+  const thumbnailUrls = thumbnailUrlsFromLockupContentImage(o.content_image);
+  const uploadedAt = md ? uploadedAtFromLockupMetadata(md) : undefined;
+
+  return {
+    id,
+    kind: "short",
+    title,
+    channelName: "Unknown channel",
+    durationFormatted: "SHORT",
     uploadedAt,
     live: false,
     thumbnailUrls,
@@ -272,6 +302,7 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
 
   return {
     id,
+    kind: "video",
     title,
     channelName,
     durationFormatted,
@@ -354,6 +385,7 @@ export function videoInfoToWatchDetails(
 
   const videoLike: VideoLikeForSummary = {
     id,
+    kind: "video",
     title,
     channelName,
     durationFormatted: live ? "LIVE" : formatYoutubeDurationSeconds(bi.duration),

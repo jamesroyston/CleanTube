@@ -64,7 +64,7 @@ export function setWatchReturnTarget(href: string, label: string): void {
   try {
     const url = new URL(href, window.location.origin);
     if (url.origin !== window.location.origin) return;
-    if (url.pathname.startsWith("/watch/")) return;
+    if (url.pathname.startsWith("/watch/") || url.pathname.startsWith("/shorts/")) return;
     const stored = `${url.pathname}${url.search}`;
     sessionStorage.setItem(HREF_KEY, stored);
     sessionStorage.setItem(LABEL_KEY, label);
@@ -81,7 +81,9 @@ export function getWatchReturnTarget(): { href: string; label: string } | null {
     if (!href || !label) return null;
     const url = new URL(href, window.location.origin);
     if (url.origin !== window.location.origin) return null;
-    if (url.pathname.startsWith("/watch/")) return null;
+    if (url.pathname.startsWith("/watch/") || url.pathname.startsWith("/shorts/")) {
+      return null;
+    }
     return { href: `${url.pathname}${url.search}`, label };
   } catch {
     return null;
@@ -125,7 +127,10 @@ export function deriveWatchReturnTarget(
 /** Call before navigating to a watch page so back link is correct on first paint. */
 export function captureWatchReturnFromCurrentLocation(videoId?: string): void {
   if (typeof window === "undefined") return;
-  if (window.location.pathname.startsWith("/watch/")) {
+  if (
+    window.location.pathname.startsWith("/watch/") ||
+    window.location.pathname.startsWith("/shorts/")
+  ) {
     return;
   }
   const target = deriveWatchReturnTarget(
