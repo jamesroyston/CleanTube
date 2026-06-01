@@ -347,7 +347,6 @@ export function LiteYouTubeEmbed({
       enforcePauseIfUserPaused();
     };
 
-    window.addEventListener("beforeunload", flush);
     window.addEventListener("pagehide", flush);
     document.addEventListener("visibilitychange", onVisibilityChange);
     if ("onfreeze" in document) {
@@ -357,7 +356,6 @@ export function LiteYouTubeEmbed({
     return () => {
       window.clearInterval(sampleInterval);
       window.clearInterval(persistInterval);
-      window.removeEventListener("beforeunload", flush);
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       if ("onfreeze" in document) {
