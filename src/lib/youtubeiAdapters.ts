@@ -150,6 +150,7 @@ export function lockupViewVideoToVideoLike(v: unknown): VideoLikeForSummary | nu
 
   return {
     id,
+    kind: "video",
     title,
     channelName: "Unknown channel",
     durationFormatted,
@@ -157,6 +158,128 @@ export function lockupViewVideoToVideoLike(v: unknown): VideoLikeForSummary | nu
     live: false,
     thumbnailUrls,
   };
+}
+
+/**
+ * Rich grid Shorts lockups expose `content_type: "SHORT"` with the same core fields as video lockups.
+ */
+function videoIdFromNavigationEndpoint(endpoint: unknown): string | null {
+  if (!endpoint || typeof endpoint !== "object") return null;
+  const ep = endpoint as { payload?: unknown; toURL?: () => string | undefined };
+  const payload = ep.payload;
+  if (payload && typeof payload === "object") {
+    const p = payload as Record<string, unknown>;
+    for (const key of ["videoId", "video_id"]) {
+      const id = p[key];
+      if (typeof id === "string" && FEED_VIDEO_ID.test(id.trim())) return id.trim();
+    }
+  }
+  const url = typeof ep.toURL === "function" ? ep.toURL() : undefined;
+  if (url) {
+    const fromShortsPath = url.match(/\/shorts\/([a-zA-Z0-9_-]{11})/i);
+    if (fromShortsPath?.[1] && FEED_VIDEO_ID.test(fromShortsPath[1])) {
+      return fromShortsPath[1];
+    }
+  }
+  return null;
+}
+
+/** Innertube often uses `shorts-shelf-item-{videoId}` rather than a bare id. */
+function videoIdFromShortEntityId(entityId: string): string | null {
+  const trimmed = entityId.trim();
+  if (FEED_VIDEO_ID.test(trimmed)) return trimmed;
+  const shelfMatch = trimmed.match(/(?:^|[-_/])([a-zA-Z0-9_-]{11})$/);
+  if (shelfMatch?.[1] && FEED_VIDEO_ID.test(shelfMatch[1])) return shelfMatch[1];
+  return null;
+}
+
+export function lockupViewShortToVideoLike(v: unknown): VideoLikeForSummary | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.type !== "LockupView") return null;
+  const ct = typeof o.content_type === "string" ? o.content_type : "";
+  if (ct !== "SHORT") return null;
+  const id = typeof o.content_id === "string" ? o.content_id.trim() : "";
+  if (!FEED_VIDEO_ID.test(id)) return null;
+
+  const md = o.metadata as Record<string, unknown> | undefined;
+  const title = md ? textish(md.title) : undefined;
+  const thumbnailUrls = thumbnailUrlsFromLockupContentImage(o.content_image);
+  const uploadedAt = md ? uploadedAtFromLockupMetadata(md) : undefined;
+
+  return {
+    id,
+    kind: "short",
+    title,
+    channelName: "Unknown channel",
+    durationFormatted: "SHORT",
+    uploadedAt,
+    live: false,
+    thumbnailUrls,
+  };
+}
+
+/** Channel Shorts tabs often return {@link ShortsLockupView} instead of SHORT {@link LockupView}. */
+export function shortsLockupViewToVideoLike(v: unknown): VideoLikeForSummary | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.type !== "ShortsLockupView") return null;
+
+  const entityId = typeof o.entity_id === "string" ? o.entity_id.trim() : "";
+  const id =
+    videoIdFromShortEntityId(entityId) ??
+    videoIdFromNavigationEndpoint(o.on_tap_endpoint) ??
+    videoIdFromNavigationEndpoint(o.inline_player_data);
+  if (!id) return null;
+
+  const overlay = o.overlay_metadata as Record<string, unknown> | undefined;
+  const title = textish(overlay?.primary_text) ?? "Short";
+  const channelName = textish(overlay?.secondary_text) ?? "Unknown channel";
+  const thumbnailUrls = collectThumbnailUrls(
+    o.thumbnail as Thumbnailish[] | undefined,
+  );
+
+  return {
+    id,
+    kind: "short",
+    title,
+    channelName,
+    durationFormatted: "SHORT",
+    live: false,
+    thumbnailUrls,
+  };
+}
+
+/** Reel shelf items on channel Shorts surfaces. */
+export function reelItemToVideoLike(v: unknown): VideoLikeForSummary | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (o.type !== "ReelItem") return null;
+  const id = typeof o.id === "string" ? o.id.trim() : "";
+  if (!FEED_VIDEO_ID.test(id)) return null;
+
+  const title = textish(o.title) ?? "Short";
+  const thumbnailUrls = collectThumbnailUrls(o.thumbnails as Thumbnailish[] | undefined);
+  const viewsText = textish(o.views);
+
+  return {
+    id,
+    kind: "short",
+    title,
+    channelName: "Unknown channel",
+    durationFormatted: viewsText ?? "SHORT",
+    live: false,
+    thumbnailUrls,
+  };
+}
+
+/** Map any known Shorts node shape from channel tabs or watch-next. */
+export function shortFeedItemToVideoLike(v: unknown): VideoLikeForSummary | null {
+  return (
+    shortsLockupViewToVideoLike(v) ??
+    reelItemToVideoLike(v) ??
+    lockupViewShortToVideoLike(v)
+  );
 }
 
 function extractVideoIdFromChannelFeedNode(
@@ -272,6 +395,7 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
 
   return {
     id,
+    kind: "video",
     title,
     channelName,
     durationFormatted,
@@ -354,6 +478,7 @@ export function videoInfoToWatchDetails(
 
   const videoLike: VideoLikeForSummary = {
     id,
+    kind: "video",
     title,
     channelName,
     durationFormatted: live ? "LIVE" : formatYoutubeDurationSeconds(bi.duration),

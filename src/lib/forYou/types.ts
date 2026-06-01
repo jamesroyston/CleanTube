@@ -3,6 +3,7 @@ import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
 
 export type ForYouCandidateSource =
   | "saved_channel"
+  | "saved_channel_shorts"
   | "pinned_search"
   | "watch_next"
   | "recent_search";
@@ -22,18 +23,22 @@ export type ForYouFeedLimits = {
   maxSavedChannels: number;
   maxHistorySeeds: number;
   maxVideosPerChannel: number;
+  maxShortsPerChannel: number;
   maxVideosPerSearch: number;
   maxVideosPerWatchNext: number;
   maxResults: number;
+  maxShortsResults: number;
 };
 
 export const DEFAULT_FOR_YOU_LIMITS: ForYouFeedLimits = {
   maxSavedChannels: 6,
   maxHistorySeeds: 4,
   maxVideosPerChannel: 8,
+  maxShortsPerChannel: 8,
   maxVideosPerSearch: 10,
   maxVideosPerWatchNext: 6,
   maxResults: 48,
+  maxShortsResults: 20,
 };
 
 export type ForYouSection = {

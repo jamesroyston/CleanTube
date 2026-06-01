@@ -5,6 +5,7 @@ export type VideoLikeForSummary = {
   id: string;
   title?: string;
   channelName?: string;
+  kind?: "video" | "short";
   durationFormatted: string;
   uploadedAt?: string;
   live: boolean;
