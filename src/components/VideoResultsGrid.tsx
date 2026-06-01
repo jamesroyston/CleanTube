@@ -34,7 +34,8 @@ type VideoCardProps = {
 };
 
 export function VideoCard({ video, carousel = false }: VideoCardProps) {
-  const watchHref = useVideoWatchHref(video.id);
+  const watchHref = useVideoWatchHref(video.id, video.kind ?? "video");
+  const isShort = (video.kind ?? "video") === "short";
 
   return (
     <Card
@@ -102,7 +103,7 @@ export function VideoCard({ video, carousel = false }: VideoCardProps) {
               </VideoCardThumbnailWithProgress>
             </CardMedia>
             <Chip
-              label={video.durationFormatted}
+              label={isShort ? "SHORT" : video.durationFormatted}
               size="small"
               color={video.live ? "error" : "default"}
               sx={{
@@ -117,6 +118,21 @@ export function VideoCard({ video, carousel = false }: VideoCardProps) {
                 "& .MuiChip-label": { px: 0.75 },
               }}
             />
+            {isShort ? (
+              <Chip
+                label="Short"
+                size="small"
+                color="secondary"
+                sx={{
+                  position: "absolute",
+                  top: 8,
+                  right: 8,
+                  zIndex: 3,
+                  fontWeight: 700,
+                  "& .MuiChip-label": { px: 0.75 },
+                }}
+              />
+            ) : null}
           </Box>
           <CardContent sx={{ flexGrow: 1, pt: 1.5 }}>
             <Typography

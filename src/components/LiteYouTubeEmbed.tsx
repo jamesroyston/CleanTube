@@ -49,6 +49,7 @@ type LiteYouTubeEmbedProps = {
   title?: string;
   thumbnailUrl?: string;
   channelName?: string;
+  aspectRatio?: "16 / 9" | "9 / 16";
   /** Iframe `start` in seconds (from `?t=` on the watch page). */
   startSeconds?: number;
   enableGlobalShortcuts?: boolean;
@@ -80,6 +81,7 @@ export function LiteYouTubeEmbed({
   title,
   thumbnailUrl,
   channelName,
+  aspectRatio = "16 / 9",
   startSeconds,
   enableGlobalShortcuts = true,
   theatreMaximize = false,
@@ -368,9 +370,9 @@ export function LiteYouTubeEmbed({
   const shellSx = theatreMaximize
     ? {
         width: "100%",
-        maxWidth: `min(100%, calc((100dvh - ${THEATRE_VIEWPORT_RESERVE}) * 16 / 9))`,
+        maxWidth: `min(100%, calc((100dvh - ${THEATRE_VIEWPORT_RESERVE}) * ${aspectRatio === "9 / 16" ? "9 / 16" : "16 / 9"}))`,
         maxHeight: `calc(100dvh - ${THEATRE_VIEWPORT_RESERVE})`,
-        aspectRatio: "16 / 9",
+        aspectRatio,
         "@media (min-aspect-ratio: 1/1)": {
           maxWidth: "100%",
           maxHeight: "none",
@@ -391,7 +393,7 @@ export function LiteYouTubeEmbed({
       <Box
         sx={{
           ...shellSx,
-          aspectRatio: "16 / 9",
+          aspectRatio,
           borderRadius: 1,
           bgcolor: "action.hover",
           [MOBILE_PORTRAIT]: { borderRadius: 0 },
@@ -425,6 +427,8 @@ export function LiteYouTubeEmbed({
           width: "100%",
           maxWidth: "100%",
           display: "block",
+          ["--lite-youtube-aspect-ratio" as string]:
+            aspectRatio === "9 / 16" ? "177.7778%" : "56.25%",
         }}
       />
     </Box>

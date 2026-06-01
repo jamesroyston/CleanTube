@@ -1,7 +1,6 @@
 import type { CloudSnapshot } from "@/lib/cloudLibrary/cloudStore";
 import { toVideoSummaries } from "@/lib/serializeVideo";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
-import type { SavedChannel } from "@/types/savedChannel";
 
 import { fetchForYouCandidates, recentHistorySeeds } from "./fetchCandidates";
 import type { ForYouLibrarySignals } from "./loadLibrarySignals";
@@ -182,6 +181,25 @@ function buildRecentSearchSection(
   };
 }
 
+function buildSavedChannelShortsSection(
+  snapshot: CloudSnapshot,
+  pool: ForYouCandidate[],
+  limits: typeof DEFAULT_FOR_YOU_LIMITS,
+): ForYouSection | null {
+  const shorts = pool.filter(
+    (c) =>
+      c.source === "saved_channel_shorts" &&
+      (c.video.kind ?? "video") === "short",
+  );
+  const videos = rankSection(shorts, snapshot, limits.maxShortsResults);
+  if (videos.length === 0) return null;
+  return {
+    id: "shorts-from-subscriptions",
+    title: "Shorts from your subscriptions",
+    videos,
+  };
+}
+
 function buildMoreForYouSection(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
@@ -222,12 +240,14 @@ export async function buildForYouFeed(
     limits,
   );
   const pinnedSections = buildPinnedSearchSections(snapshot, pool, limits);
+  const shortsSection = buildSavedChannelShortsSection(snapshot, pool, limits);
   const recentSection = buildRecentSearchSection(snapshot, pool);
   const moreSection = buildMoreForYouSection(snapshot, pool, limits);
 
   const primary = [
     ...channelSections,
     ...becauseYouWatchedSections,
+    ...(shortsSection ? [shortsSection] : []),
     ...pinnedSections,
     ...(recentSection ? [recentSection] : []),
   ];

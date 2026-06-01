@@ -9,6 +9,7 @@ import { DEFAULT_FOR_YOU_LIMITS } from "./types";
 
 const SOURCE_WEIGHT: Record<ForYouCandidate["source"], number> = {
   saved_channel: 40,
+  saved_channel_shorts: 34,
   watch_next: 28,
   pinned_search: 16,
   recent_search: 10,

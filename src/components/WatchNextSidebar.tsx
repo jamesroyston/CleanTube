@@ -21,7 +21,7 @@ type WatchNextSidebarProps = {
 };
 
 function WatchNextCard({ video }: { video: VideoSummary }) {
-  const watchHref = useVideoWatchHref(video.id);
+  const watchHref = useVideoWatchHref(video.id, video.kind ?? "video");
 
   return (
     <Box
