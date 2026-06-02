@@ -8,22 +8,5 @@ import { forYouSignedIn } from "@/lib/forYou/loadLibrarySignals";
 export async function ForYouHome() {
   const signedIn = await forYouSignedIn();
 
-  if (!signedIn) {
-    return (
-      <ForYouFeedView
-        initialSections={[]}
-        initialEmpty
-        signedIn={false}
-      />
-    );
-  }
-
-  return (
-    <ForYouFeedView
-      initialSections={[]}
-      initialEmpty={false}
-      signedIn
-      loadFeedOnMount
-    />
-  );
+  return <ForYouFeedView signedIn={signedIn} />;
 }

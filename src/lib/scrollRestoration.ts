@@ -69,6 +69,54 @@ export function readCurrentScrollTop(
   return (scrollElement as HTMLElement).scrollTop;
 }
 
+function readScrollHeight(
+  scrollElement: HTMLElement | Window | null,
+): number {
+  if (!scrollElement) return 0;
+  if (scrollElement === window) {
+    return document.documentElement.scrollHeight;
+  }
+  return (scrollElement as HTMLElement).scrollHeight;
+}
+
+function readViewportHeight(
+  scrollElement: HTMLElement | Window | null,
+): number {
+  if (!scrollElement) return 0;
+  if (scrollElement === window) return window.innerHeight;
+  return (scrollElement as HTMLElement).clientHeight;
+}
+
+/** True when the scroll container can honor the saved offset (layout tall enough). */
+export function canApplyScrollPosition(
+  scrollElement: HTMLElement | Window | null,
+  position: SavedScrollPosition,
+): boolean {
+  if (!scrollElement) return false;
+
+  if (position.videoId) {
+    return (
+      document.getElementById(`search-video-${position.videoId}`) != null
+    );
+  }
+
+  const maxScrollTop = Math.max(
+    0,
+    readScrollHeight(scrollElement) - readViewportHeight(scrollElement),
+  );
+  return maxScrollTop + 16 >= position.scrollTop;
+}
+
+export function isForYouFeedReady(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.querySelector("[data-for-you-feed-ready]") != null;
+}
+
+export function isChannelGridReady(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.querySelector("[data-channel-grid-ready]") != null;
+}
+
 export function applyScrollPosition(
   scrollElement: HTMLElement | Window | null,
   position: SavedScrollPosition,
@@ -83,6 +131,7 @@ export function applyScrollPosition(
       anchor.scrollIntoView({ block: "center", behavior: "instant" });
       return true;
     }
+    return false;
   }
 
   if (scrollElement === window) {

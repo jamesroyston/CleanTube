@@ -19,6 +19,7 @@ import {
   trimRecentSearchesToCap,
   upsertRecentSearch,
 } from "@/lib/cloudRecentSearches/cloudStore";
+import { clearForYouFeedCache } from "@/hooks/useForYouFeed";
 import { entriesToQueryList } from "@/lib/cloudRecentSearches/sync";
 import { RECENT_SEARCHES_MAX_ITEMS } from "@/lib/cloudRecentSearches/types";
 import {
@@ -339,10 +340,19 @@ export function CloudLibraryProvider({
   const syncInFlightRef = useRef<Promise<void> | null>(null);
   const lastSyncedUserIdRef = useRef<string | null>(null);
   const userRef = useRef<User | null>(null);
+  const savedChannelsRef = useRef(savedChannels);
+  const watchProgressRef = useRef(watchProgress);
+  const watchLaterEntriesRef = useRef(watchLaterEntries);
 
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    savedChannelsRef.current = savedChannels;
+    watchProgressRef.current = watchProgress;
+    watchLaterEntriesRef.current = watchLaterEntries;
+  }, [savedChannels, watchProgress, watchLaterEntries]);
 
   const clearLibraryState = useCallback(() => {
     watchProgressLiveRef.current.clear();
@@ -361,8 +371,17 @@ export function CloudLibraryProvider({
       }
 
       const run = async () => {
-        syncStartedAtRef.current = Date.now();
-        setLibraryCloudSyncState("syncing");
+        const hasLibraryInMemory =
+          lastSyncedUserIdRef.current === nextUser.id ||
+          savedChannelsRef.current.length > 0 ||
+          watchProgressRef.current.length > 0 ||
+          watchLaterEntriesRef.current.length > 0;
+        const isInitialSync = !hasLibraryInMemory;
+
+        if (isInitialSync) {
+          syncStartedAtRef.current = Date.now();
+          setLibraryCloudSyncState("syncing");
+        }
 
         let { data: authData } = await supabase.auth.getSession();
         let token = authData.session?.access_token;
@@ -380,7 +399,9 @@ export function CloudLibraryProvider({
           tokenUserId = authData.session?.user?.id;
         }
         if (!token || tokenUserId !== nextUser.id) {
-          setLibraryCloudSyncState("error");
+          if (isInitialSync) {
+            setLibraryCloudSyncState("error");
+          }
           syncStartedAtRef.current = null;
           return;
         }
@@ -400,9 +421,11 @@ export function CloudLibraryProvider({
           setLibraryCloudSyncState("synced");
           syncStartedAtRef.current = null;
         } catch {
-          setLibraryCloudSyncState("error");
           syncStartedAtRef.current = null;
-          throw new Error("Library sync failed");
+          if (isInitialSync) {
+            setLibraryCloudSyncState("error");
+            throw new Error("Library sync failed");
+          }
         }
       };
 
@@ -449,6 +472,7 @@ export function CloudLibraryProvider({
     setUser(null);
     clearLibraryState();
     setLibraryCloudSyncState(supabase ? "signed_out" : "unavailable");
+    clearForYouFeedCache();
     setAuthStatus("ready");
     setLocalLibraryHydrated(true);
   }, [clearLibraryState, supabase]);
@@ -597,6 +621,7 @@ export function CloudLibraryProvider({
   const signOutUser = useCallback(async () => {
     if (!supabase) return;
     await signOut(supabase);
+    clearForYouFeedCache();
     clearLibraryState();
     setLibraryCloudSyncState("signed_out");
   }, [clearLibraryState, supabase]);

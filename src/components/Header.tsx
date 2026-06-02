@@ -76,6 +76,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       registerOpenSearchOverlay,
       mobileHeaderRevealProgress,
       mobileHeaderOverlayMode,
+      mobileHeaderScrollSettled,
     } = useSearchChrome();
     const [isPending, startTransition] = useTransition();
     const hadPendingRef = useRef(false);
@@ -266,7 +267,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                 ? "fixed"
                 : "sticky"
           }
-          elevation={revealProgress > 0.85 ? 1 : 0}
+          elevation={revealProgress > 0.7 ? 1 : 0}
           color="default"
           sx={[
             {
@@ -282,8 +283,11 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                   left: 0,
                   right: 0,
                   transform: `translate3d(0, calc((1 - ${revealProgress}) * -100%), 0)`,
-                  pointerEvents: revealProgress > 0.08 ? "auto" : "none",
+                  pointerEvents: revealProgress > 0.2 ? "auto" : "none",
                   willChange: "transform",
+                  transition: mobileHeaderScrollSettled
+                    ? "transform 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms cubic-bezier(0.4, 0, 0.2, 1)"
+                    : "none",
                 }
               : desktopRail != null
               ? {

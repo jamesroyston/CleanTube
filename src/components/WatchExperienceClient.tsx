@@ -87,6 +87,9 @@ export function WatchExperienceClient({
     localLibraryHydrated,
     canPersistLibrary,
     libraryCloudSyncState,
+    watchProgress,
+    savedChannels,
+    watchLaterEntries,
   } = useCloudLibrary();
   const { visible: upNextVisible } = useWatchUpNextVisible();
   const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
@@ -99,10 +102,16 @@ export function WatchExperienceClient({
     parseYouTubeTimeParam(searchParams.get("start"));
   const hasUrlStart = urlStartSeconds != null && urlStartSeconds > 0;
 
+  const hasLibraryInMemory =
+    watchProgress.length > 0 ||
+    savedChannels.length > 0 ||
+    watchLaterEntries.length > 0;
+
   const libraryReadyForPlayback =
     !canPersistLibrary ||
     libraryCloudSyncState === "synced" ||
-    libraryCloudSyncState === "error";
+    libraryCloudSyncState === "error" ||
+    (libraryCloudSyncState === "syncing" && hasLibraryInMemory);
 
   /** Mount player once auth (and cloud sync, when signed in) are ready. */
   const progressResolvable =

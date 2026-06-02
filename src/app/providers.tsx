@@ -18,6 +18,7 @@ import { setWatchNarrowPlayerLayoutAction } from "@/app/actions/watchNarrowPlaye
 import { setWatchUpNextVisibleAction } from "@/app/actions/watchUpNextVisibility";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
 import { SearchChromeProvider } from "@/context/SearchChromeContext";
+import { SWRConfig } from "swr";
 import {
   type InitialThemeSettings,
   type ThemeMode,
@@ -418,7 +419,15 @@ export function AppProviders({
               <ThemeProvider theme={theme}>
                 <CssBaseline enableColorScheme />
                 <NavigationProgressProvider>
-                  <SearchChromeProvider>{children}</SearchChromeProvider>
+                  <SWRConfig
+                    value={{
+                      revalidateOnFocus: true,
+                      shouldRetryOnError: true,
+                      errorRetryCount: 2,
+                    }}
+                  >
+                    <SearchChromeProvider>{children}</SearchChromeProvider>
+                  </SWRConfig>
                 </NavigationProgressProvider>
               </ThemeProvider>
               </WatchCommentsVisibleContext.Provider>
