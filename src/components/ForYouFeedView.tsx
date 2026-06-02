@@ -81,6 +81,9 @@ export function ForYouFeedView({
       libraryCloudSyncState === "error" ||
       (libraryCloudSyncState === "syncing" && hasLibraryInMemory));
 
+  /** Client auth wins after hydration; SSR prop can lag after passkey sign-in. */
+  const effectiveSignedIn = signedIn || canPersistLibrary;
+
   const {
     sections,
     feedEmpty,
@@ -90,7 +93,7 @@ export function ForYouFeedView({
     refreshFeed,
   } = useForYouFeed({
     userId: user?.id,
-    enabled: signedIn && canPersistLibrary && libraryReady,
+    enabled: effectiveSignedIn && canPersistLibrary && libraryReady,
   });
 
   const hasCachedFeed = sections.length > 0;
@@ -102,7 +105,7 @@ export function ForYouFeedView({
   );
 
   const showSyncSpinner =
-    signedIn &&
+    effectiveSignedIn &&
     !hasCachedFeed &&
     !hasLibraryInMemory &&
     (authStatus !== "ready" ||
@@ -110,7 +113,7 @@ export function ForYouFeedView({
       (canPersistLibrary && libraryCloudSyncState === "syncing"));
 
   const showSignInPrompt = authStatus === "ready" && !canPersistLibrary;
-  const showSignedOutLanding = !signedIn && showSignInPrompt;
+  const showSignedOutLanding = !effectiveSignedIn && showSignInPrompt;
   const resolvedFeedError = feedError ?? initialError ?? null;
 
   return (
@@ -130,7 +133,7 @@ export function ForYouFeedView({
           ) : null}
         </Stack>
         <Typography variant="body2" color="text.secondary">
-          {signedIn
+          {effectiveSignedIn
             ? "Recommendations from your saved channels, watch history, and pinned searches."
             : "Sign in to personalize this page with your library."}
         </Typography>
@@ -228,7 +231,7 @@ export function ForYouFeedView({
                 </Stack>
               )}
 
-              {signedIn && libraryReady && !isInitialLoad ? (
+              {effectiveSignedIn && libraryReady && !isInitialLoad ? (
                 <Box sx={{ mt: 3 }}>
                   <Button
                     variant="text"

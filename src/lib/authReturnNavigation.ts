@@ -48,3 +48,36 @@ export function getAuthReturnPathFromStorage(): string | null {
     return null;
   }
 }
+
+export function clearAuthReturnPathStorage(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(AUTH_RETURN_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Post-auth destination from `?next=` or sessionStorage fallback. */
+export function resolveAuthReturnPath(
+  nextParam: string | null | undefined,
+): string {
+  const fromUrl = nextParam?.trim();
+  if (fromUrl) return sanitizeAuthNextPath(fromUrl);
+  const fromStorage = getAuthReturnPathFromStorage();
+  if (fromStorage) return sanitizeAuthNextPath(fromStorage);
+  return "/";
+}
+
+/**
+ * Full navigation after sign-in so SSR and client bootstrap both see fresh auth
+ * cookies. Client `router.push` alone can render stale signed-out server props.
+ */
+export function completeAuthRedirect(
+  nextParam: string | null | undefined,
+): void {
+  if (typeof window === "undefined") return;
+  const destination = resolveAuthReturnPath(nextParam);
+  clearAuthReturnPathStorage();
+  window.location.assign(destination);
+}

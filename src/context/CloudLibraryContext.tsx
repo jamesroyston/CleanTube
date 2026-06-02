@@ -23,7 +23,6 @@ import { clearForYouFeedCache } from "@/hooks/useForYouFeed";
 import { entriesToQueryList } from "@/lib/cloudRecentSearches/sync";
 import { RECENT_SEARCHES_MAX_ITEMS } from "@/lib/cloudRecentSearches/types";
 import {
-  deleteAllSavedChannels,
   deleteAllWatchLater,
   deleteAllWatchProgress,
   deleteSavedChannelById,
@@ -59,7 +58,6 @@ import {
 import {
   deriveResumeSeconds,
   isFreshInProgress,
-  isInProgress,
   mergeSavedChannels,
   sortWatchProgressByRecency,
 } from "@/lib/cloudLibrary/sync";
@@ -330,7 +328,9 @@ export function CloudLibraryProvider({
   const [localLibraryHydrated, setLocalLibraryHydrated] = useState(() =>
     supabase == null,
   );
-  const watchProgressLiveRef = useRef<Map<string, WatchProgressLivePatch>>(new Map());
+  const [watchProgressLivePatches, setWatchProgressLivePatches] = useState<
+    Map<string, WatchProgressLivePatch>
+  >(() => new Map());
   const [passkeysSupported, setPasskeysSupported] = useState(false);
   const [libraryCloudSyncState, setLibraryCloudSyncState] =
     useState<LibraryCloudSyncState>(() =>
@@ -355,7 +355,7 @@ export function CloudLibraryProvider({
   }, [savedChannels, watchProgress, watchLaterEntries]);
 
   const clearLibraryState = useCallback(() => {
-    watchProgressLiveRef.current.clear();
+    setWatchProgressLivePatches(new Map());
     setWatchLaterEntries([]);
     setSavedChannels([]);
     setWatchProgress([]);
@@ -412,7 +412,7 @@ export function CloudLibraryProvider({
             fetchCloudRecentSearches(supabase),
           ]);
 
-          watchProgressLiveRef.current.clear();
+          setWatchProgressLivePatches(new Map());
           setWatchLaterEntries(remote.watchLater);
           setSavedChannels(remote.savedChannels);
           setWatchProgress(remote.watchProgress);
@@ -585,10 +585,19 @@ export function CloudLibraryProvider({
   const signIn = useCallback(
     async (email: string, password: string) => {
       if (!supabase) return { error: "Supabase is not configured." };
-      const { error } = await signInWithPassword(supabase, email, password);
-      return { error: error?.message ?? null };
+      const { data, error } = await signInWithPassword(supabase, email, password);
+      if (error) return { error: error.message };
+
+      const session =
+        data.session ??
+        (await supabase.auth.getSession()).data.session;
+      if (session?.user) {
+        applyAuthenticatedState(session);
+      }
+
+      return { error: null };
     },
-    [supabase],
+    [applyAuthenticatedState, supabase],
   );
 
   const signUp = useCallback(
@@ -639,10 +648,23 @@ export function CloudLibraryProvider({
       if (!supabase) return { error: "Supabase is not configured." };
       const result = await signInWithPasskeyApi(email);
       if (result.error) return result;
-      await supabase.auth.getSession();
+
+      await supabase.auth.refreshSession();
+      const {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
+      if (sessionError || !session?.user) {
+        return {
+          error:
+            "Signed in, but your session could not be loaded. Please try again.",
+        };
+      }
+
+      applyAuthenticatedState(session);
       return { error: null };
     },
-    [supabase],
+    [applyAuthenticatedState, supabase],
   );
 
   const deletePasskey = useCallback(
@@ -670,9 +692,20 @@ export function CloudLibraryProvider({
   const completeTotpMfaCb = useCallback(
     async (factorId: string, code: string) => {
       if (!supabase) return { error: "Supabase is not configured." };
-      return completeTotpMfa(supabase, code, factorId);
+      const result = await completeTotpMfa(supabase, code, factorId);
+      if (result.error) return result;
+
+      await supabase.auth.refreshSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user) {
+        applyAuthenticatedState(session);
+      }
+
+      return { error: null };
     },
-    [supabase],
+    [applyAuthenticatedState, supabase],
   );
 
   const sendPhoneMfaChallengeCb = useCallback(
@@ -688,9 +721,25 @@ export function CloudLibraryProvider({
   const completePhoneMfaCb = useCallback(
     async (factorId: string, challengeId: string, code: string) => {
       if (!supabase) return { error: "Supabase is not configured." };
-      return completePhoneMfa(supabase, factorId, challengeId, code);
+      const result = await completePhoneMfa(
+        supabase,
+        factorId,
+        challengeId,
+        code,
+      );
+      if (result.error) return result;
+
+      await supabase.auth.refreshSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.user) {
+        applyAuthenticatedState(session);
+      }
+
+      return { error: null };
     },
-    [supabase],
+    [applyAuthenticatedState, supabase],
   );
 
   const addSavedChannel = useCallback(
@@ -861,15 +910,17 @@ export function CloudLibraryProvider({
 
       let snapshotForCloud: WatchProgressEntry | null = null;
 
+      let nextLivePatch: WatchProgressLivePatch | null = null;
+      let removeLivePatch = false;
+
       setWatchProgress((prev) => {
-        const liveMap = watchProgressLiveRef.current;
         const existingBase = prev.find(
           (entry) => entry.videoId === normalized.videoId,
         );
         const existing = existingBase
           ? mergeWatchProgressLivePatch(
               existingBase,
-              liveMap.get(normalized.videoId),
+              watchProgressLivePatches.get(normalized.videoId),
             )
           : undefined;
 
@@ -905,16 +956,16 @@ export function CloudLibraryProvider({
             snapshotForCloud = null;
             return prev;
           }
-          liveMap.set(normalized.videoId, {
+          nextLivePatch = {
             lastPositionSeconds: nextLastPosition,
             durationSeconds: nextDuration,
             completed: nextCompleted,
-          });
+          };
           snapshotForCloud = null;
           return prev;
         }
 
-        liveMap.delete(normalized.videoId);
+        removeLivePatch = true;
 
         let nextEntry: WatchProgressEntry;
 
@@ -946,6 +997,21 @@ export function CloudLibraryProvider({
         );
       });
 
+      if (nextLivePatch) {
+        setWatchProgressLivePatches((patches) => {
+          const next = new Map(patches);
+          next.set(normalized.videoId, nextLivePatch!);
+          return next;
+        });
+      } else if (removeLivePatch) {
+        setWatchProgressLivePatches((patches) => {
+          if (!patches.has(normalized.videoId)) return patches;
+          const next = new Map(patches);
+          next.delete(normalized.videoId);
+          return next;
+        });
+      }
+
       if (syncCloud && snapshotForCloud) {
         void upsertWatchProgressEntries(supabase, user.id, [snapshotForCloud]).catch(
           () => {
@@ -954,13 +1020,18 @@ export function CloudLibraryProvider({
         );
       }
     },
-    [supabase, user],
+    [supabase, user, watchProgressLivePatches],
   );
 
   const removeWatchProgressByVideoId = useCallback(
     async (videoId: string) => {
       if (!supabase || !user) return;
-      watchProgressLiveRef.current.delete(videoId);
+      setWatchProgressLivePatches((patches) => {
+        if (!patches.has(videoId)) return patches;
+        const next = new Map(patches);
+        next.delete(videoId);
+        return next;
+      });
       const updated = watchProgress.filter((entry) => entry.videoId !== videoId);
       setWatchProgress(updated);
       try {
@@ -974,7 +1045,7 @@ export function CloudLibraryProvider({
 
   const clearWatchProgress = useCallback(async () => {
     if (!supabase || !user) return;
-    watchProgressLiveRef.current.clear();
+    setWatchProgressLivePatches(new Map());
     setWatchProgress([]);
     try {
       await deleteAllWatchProgress(supabase, user.id);
@@ -989,10 +1060,10 @@ export function CloudLibraryProvider({
       if (!base) return undefined;
       return mergeWatchProgressLivePatch(
         base,
-        watchProgressLiveRef.current.get(videoId),
+        watchProgressLivePatches.get(videoId),
       );
     },
-    [watchProgress],
+    [watchProgress, watchProgressLivePatches],
   );
 
   const getResumeSeconds = useCallback(
@@ -1047,6 +1118,19 @@ export function CloudLibraryProvider({
   const effectiveLibraryCloudSyncState: LibraryCloudSyncState =
     supabase == null ? "unavailable" : libraryCloudSyncState;
 
+  const inProgressEntries = useMemo(() => {
+    return sortWatchProgressByRecency(
+      watchProgress
+        .map((entry) =>
+          mergeWatchProgressLivePatch(
+            entry,
+            watchProgressLivePatches.get(entry.videoId),
+          ),
+        )
+        .filter(isFreshInProgress),
+    );
+  }, [watchProgress, watchProgressLivePatches]);
+
   const value = useMemo<CloudLibraryContextValue>(
     () => ({
       authStatus,
@@ -1059,16 +1143,7 @@ export function CloudLibraryProvider({
       watchLaterEntries,
       savedChannels,
       watchProgress,
-      inProgressEntries: sortWatchProgressByRecency(
-        watchProgress
-          .map((entry) =>
-            mergeWatchProgressLivePatch(
-              entry,
-              watchProgressLiveRef.current.get(entry.videoId),
-            ),
-          )
-          .filter(isFreshInProgress),
-      ),
+      inProgressEntries,
       signIn,
       signUp,
       resetPassword,
@@ -1116,6 +1191,7 @@ export function CloudLibraryProvider({
       getProgressByVideoId,
       getRecentSearches,
       getResumeSeconds,
+      inProgressEntries,
       isCloudConfigured,
       isInWatchLaterFn,
       listPasskeys,
