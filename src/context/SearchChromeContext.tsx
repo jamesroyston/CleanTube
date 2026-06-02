@@ -19,6 +19,9 @@ type SearchChromeContextValue = {
   /** True when scrollY is past the in-flow header threshold. */
   mobileHeaderOverlayMode: boolean;
   setMobileHeaderOverlayMode: (active: boolean) => void;
+  /** False while the user is actively scrolling (enables CSS snap transitions). */
+  mobileHeaderScrollSettled: boolean;
+  setMobileHeaderScrollSettled: (settled: boolean) => void;
 };
 
 const SearchChromeContext = createContext<SearchChromeContextValue | null>(
@@ -30,6 +33,8 @@ export function SearchChromeProvider({ children }: { children: ReactNode }) {
   const [mobileHeaderRevealProgress, setMobileHeaderRevealProgress] =
     useState(0);
   const [mobileHeaderOverlayMode, setMobileHeaderOverlayMode] = useState(false);
+  const [mobileHeaderScrollSettled, setMobileHeaderScrollSettled] =
+    useState(true);
 
   const registerOpenSearchOverlay = useCallback((fn: (() => void) | null) => {
     openRef.current = fn;
@@ -47,12 +52,15 @@ export function SearchChromeProvider({ children }: { children: ReactNode }) {
       setMobileHeaderRevealProgress,
       mobileHeaderOverlayMode,
       setMobileHeaderOverlayMode,
+      mobileHeaderScrollSettled,
+      setMobileHeaderScrollSettled,
     }),
     [
       openSearchOverlay,
       registerOpenSearchOverlay,
       mobileHeaderRevealProgress,
       mobileHeaderOverlayMode,
+      mobileHeaderScrollSettled,
     ],
   );
 

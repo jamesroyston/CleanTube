@@ -10,15 +10,24 @@ import { useSearchChrome } from "@/context/SearchChromeContext";
 
 /** Below this scroll offset, the in-flow header is the primary chrome. */
 const SCROLL_UP_THRESHOLD_PX = 80;
+/** Deactivate overlay mode when scrolling back near the top. */
+const SCROLL_DOWN_DEACTIVATE_PX = 40;
 /** Scroll-up distance (px) for a fully revealed header overlay. */
-const REVEAL_DISTANCE_PX = 56;
+const REVEAL_DISTANCE_PX = 88;
 const FAB_SCROLL_THRESHOLD_PX = 320;
 /** Hide the revealed header after idle scroll time when not at top. */
 const AUTO_HIDE_MS = 3_000;
-const IDLE_HIDE_MS = 180;
+const IDLE_HIDE_MS = 300;
+/** Lerp factor per frame for display progress toward target. */
+const DISPLAY_LERP = 0.16;
+const SCROLL_SETTLE_MS = 120;
 
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(1, value));
+}
+
+function easeInOut(t: number): number {
+  return (1 - Math.cos(t * Math.PI)) / 2;
 }
 
 export function MobileSearchChrome() {
@@ -32,20 +41,26 @@ export function MobileSearchChrome() {
     openSearchOverlay,
     setMobileHeaderRevealProgress,
     setMobileHeaderOverlayMode,
+    setMobileHeaderScrollSettled,
   } = useSearchChrome();
   const lastScrollYRef = useRef(0);
-  const revealProgressRef = useRef(0);
+  const targetProgressRef = useRef(0);
+  const displayProgressRef = useRef(0);
   const overlayModeActiveRef = useRef(false);
   const hideTimerRef = useRef<number | null>(null);
   const idleHideFrameRef = useRef<number | null>(null);
+  const smoothFrameRef = useRef<number | null>(null);
+  const scrollSettleTimerRef = useRef<number | null>(null);
   const showFabRef = useRef(false);
   const fabRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!mobile || !headerScrollsAway) {
-      revealProgressRef.current = 0;
+      targetProgressRef.current = 0;
+      displayProgressRef.current = 0;
       setMobileHeaderRevealProgress(0);
       setMobileHeaderOverlayMode(false);
+      setMobileHeaderScrollSettled(true);
       return;
     }
 
@@ -65,28 +80,78 @@ export function MobileSearchChrome() {
       }
     }
 
-    function setProgress(next: number) {
+    function cancelSmoothLoop() {
+      if (smoothFrameRef.current != null) {
+        cancelAnimationFrame(smoothFrameRef.current);
+        smoothFrameRef.current = null;
+      }
+    }
+
+    function clearScrollSettleTimer() {
+      if (scrollSettleTimerRef.current != null) {
+        window.clearTimeout(scrollSettleTimerRef.current);
+        scrollSettleTimerRef.current = null;
+      }
+    }
+
+    function markScrolling() {
+      setMobileHeaderScrollSettled(false);
+      clearScrollSettleTimer();
+      scrollSettleTimerRef.current = window.setTimeout(() => {
+        scrollSettleTimerRef.current = null;
+        setMobileHeaderScrollSettled(true);
+      }, SCROLL_SETTLE_MS);
+    }
+
+    function publishDisplayProgress(next: number) {
       const clamped = clampProgress(next);
-      if (Math.abs(clamped - revealProgressRef.current) < 0.002) return;
-      revealProgressRef.current = clamped;
+      if (Math.abs(clamped - displayProgressRef.current) < 0.002) return;
+      displayProgressRef.current = clamped;
       setMobileHeaderRevealProgress(clamped);
+    }
+
+    function setTargetProgress(next: number) {
+      targetProgressRef.current = clampProgress(next);
+    }
+
+    function ensureSmoothLoop() {
+      if (smoothFrameRef.current != null) return;
+
+      const step = () => {
+        const target = targetProgressRef.current;
+        const display = displayProgressRef.current;
+        const next = display + (target - display) * DISPLAY_LERP;
+        publishDisplayProgress(next);
+
+        const settled =
+          Math.abs(target - displayProgressRef.current) < 0.002 &&
+          idleHideFrameRef.current == null;
+        if (settled && Math.abs(target) < 0.002) {
+          smoothFrameRef.current = null;
+          return;
+        }
+
+        smoothFrameRef.current = requestAnimationFrame(step);
+      };
+
+      smoothFrameRef.current = requestAnimationFrame(step);
     }
 
     function idleHideHeader() {
       cancelIdleHide();
-      const start = revealProgressRef.current;
+      const start = targetProgressRef.current;
       if (start <= 0) return;
       const startTime = performance.now();
 
       const step = (now: number) => {
         const t = Math.min(1, (now - startTime) / IDLE_HIDE_MS);
-        const eased = 1 - (1 - t) ** 2;
-        setProgress(start * (1 - eased));
+        setTargetProgress(start * (1 - easeInOut(t)));
+        ensureSmoothLoop();
         if (t < 1) {
           idleHideFrameRef.current = requestAnimationFrame(step);
         } else {
           idleHideFrameRef.current = null;
-          setProgress(0);
+          setTargetProgress(0);
         }
       };
 
@@ -116,42 +181,45 @@ export function MobileSearchChrome() {
       ticking = true;
       requestAnimationFrame(() => {
         cancelIdleHide();
+        markScrolling();
         const y = window.scrollY;
         const delta = y - lastScrollYRef.current;
 
         setFabVisible(y > FAB_SCROLL_THRESHOLD_PX);
 
         const shouldActivateOverlayMode =
-          y > SCROLL_UP_THRESHOLD_PX || (overlayModeActiveRef.current && y > 0);
+          y > SCROLL_UP_THRESHOLD_PX ||
+          (overlayModeActiveRef.current && y > SCROLL_DOWN_DEACTIVATE_PX);
 
         if (!shouldActivateOverlayMode) {
           overlayModeActiveRef.current = false;
           clearHideTimer();
           setMobileHeaderOverlayMode(false);
-          setProgress(0);
+          setTargetProgress(0);
         } else {
           overlayModeActiveRef.current = true;
           setMobileHeaderOverlayMode(true);
 
           if (delta < 0) {
-            setProgress(
-              revealProgressRef.current + -delta / REVEAL_DISTANCE_PX,
+            setTargetProgress(
+              targetProgressRef.current + -delta / REVEAL_DISTANCE_PX,
             );
             scheduleHide();
           } else if (delta > 0) {
-            setProgress(
-              revealProgressRef.current - delta / REVEAL_DISTANCE_PX,
+            setTargetProgress(
+              targetProgressRef.current - delta / REVEAL_DISTANCE_PX,
             );
-            if (revealProgressRef.current <= 0) {
+            if (targetProgressRef.current <= 0) {
               clearHideTimer();
             } else {
               scheduleHide();
             }
-          } else if (revealProgressRef.current > 0) {
+          } else if (targetProgressRef.current > 0) {
             scheduleHide();
           }
         }
 
+        ensureSmoothLoop();
         lastScrollYRef.current = y;
         ticking = false;
       });
@@ -164,16 +232,21 @@ export function MobileSearchChrome() {
       window.removeEventListener("scroll", onScroll);
       clearHideTimer();
       cancelIdleHide();
+      cancelSmoothLoop();
+      clearScrollSettleTimer();
       overlayModeActiveRef.current = false;
-      revealProgressRef.current = 0;
+      targetProgressRef.current = 0;
+      displayProgressRef.current = 0;
       setMobileHeaderRevealProgress(0);
       setMobileHeaderOverlayMode(false);
+      setMobileHeaderScrollSettled(true);
     };
   }, [
     mobile,
     headerScrollsAway,
     setMobileHeaderRevealProgress,
     setMobileHeaderOverlayMode,
+    setMobileHeaderScrollSettled,
   ]);
 
   if (!mobile) return null;

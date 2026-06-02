@@ -193,7 +193,9 @@ export function ChannelBrowsePage({
             partialLoad={page.gridPartialLoad}
           />
         ) : (
-          <VideoResultsGrid videos={videos} />
+          <Box data-channel-grid-ready>
+            <VideoResultsGrid videos={videos} />
+          </Box>
         )}
 
         <Stack alignItems="center" sx={{ mt: 4 }}>
