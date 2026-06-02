@@ -16,11 +16,11 @@ import Tabs from "@mui/material/Tabs";
 import Link from "@mui/material/Link";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import type { ListedFactor } from "@/lib/cloudLibrary/mfaClient";
-import { sanitizeAuthNextPath } from "@/lib/authReturnNavigation";
+import { completeAuthRedirect } from "@/lib/authReturnNavigation";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 type Mode = "sign-in" | "sign-up" | "reset";
@@ -34,13 +34,12 @@ type MfaPanel =
 type PasskeyRegistrationStatus = "preparing" | "prompt" | "saving" | null;
 
 export function AuthPageClient() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const urlError = searchParams.get("error");
   const nextParam = searchParams.get("next");
 
   function redirectAfterSignIn() {
-    router.push(sanitizeAuthNextPath(nextParam));
+    completeAuthRedirect(nextParam);
   }
 
   const {
@@ -234,7 +233,7 @@ export function AuthPageClient() {
       setError(res.error);
       return;
     }
-    redirectAfterSignIn();
+    await finishSignIn();
   }
 
   async function onRegisterPasskey() {
