@@ -15,8 +15,13 @@ import { useMemo } from "react";
 
 import { WatchProgressBar } from "@/components/WatchProgressBar";
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
+import { MobilePageHeader } from "@/components/MobilePageHeader";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
+import {
+  compactMainPaddingBottom,
+  useShowBottomNav,
+} from "@/hooks/useCompactViewport";
 import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
 import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 
@@ -26,6 +31,7 @@ function timestamp(value: string): number {
 }
 
 export function HistoryPageClient() {
+  const showBottomNav = useShowBottomNav();
   const {
     canPersistLibrary,
     watchProgress,
@@ -42,33 +48,63 @@ export function HistoryPageClient() {
   );
 
   return (
-    <Box component="main" sx={{ pb: 6 }}>
-      <Container maxWidth="lg" sx={{ pt: 2 }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          sx={{ mb: 3 }}
-          alignItems={{ xs: "stretch", sm: "flex-start" }}
-        >
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 700 }}>
-              History
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
+    <Box
+      component="main"
+      sx={{ pb: compactMainPaddingBottom(showBottomNav, 24) ?? 6 }}
+    >
+      <Container maxWidth="lg" sx={{ pt: 2, px: { xs: 2, sm: 3 } }}>
+        {showBottomNav ? (
+          <MobilePageHeader title="History" backHref="/library" />
+        ) : (
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ mb: 3 }}
+            alignItems={{ xs: "stretch", sm: "flex-start" }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 700 }}>
+                History
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Watched videos are ordered by last watch time, with saved progress for resuming.
+              </Typography>
+            </Box>
+            {canPersistLibrary ? (
+              <Button
+                variant="outlined"
+                color="error"
+                disabled={orderedHistory.length === 0}
+                onClick={clearWatchProgress}
+              >
+                Clear history
+              </Button>
+            ) : null}
+          </Stack>
+        )}
+        {showBottomNav ? (
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ mb: 3 }}
+            alignItems={{ xs: "stretch", sm: "flex-start" }}
+          >
+            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }}>
               Watched videos are ordered by last watch time, with saved progress for resuming.
             </Typography>
-          </Box>
-          {canPersistLibrary ? (
-            <Button
-              variant="outlined"
-              color="error"
-              disabled={orderedHistory.length === 0}
-              onClick={clearWatchProgress}
-            >
-              Clear history
-            </Button>
-          ) : null}
-        </Stack>
+            {canPersistLibrary ? (
+              <Button
+                variant="outlined"
+                color="error"
+                disabled={orderedHistory.length === 0}
+                onClick={clearWatchProgress}
+                sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
+              >
+                Clear history
+              </Button>
+            ) : null}
+          </Stack>
+        ) : null}
         {!canPersistLibrary ? (
           <LibrarySignInPrompt
             title="Sign in to track watch history"

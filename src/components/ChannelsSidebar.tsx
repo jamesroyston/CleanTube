@@ -301,7 +301,7 @@ export function ChannelsRailContent({
         <Tooltip title={miniMode ? "Manage library" : ""} placement="right">
           <ListItemButton
             component={Link}
-            href="/library"
+            href="/library/manage"
             onClick={onNavigate}
             sx={{
               borderRadius: 1,
