@@ -1,15 +1,15 @@
 "use client";
 
 import Box from "@mui/material/Box";
-import { useTheme } from "@mui/material/styles";
 
 const VIEW = 64;
 
 export type CleanTubeLogoVariant =
   | "wave"
-  | "ring"
-  | "minimal"
-  | "lanes";
+  | "dawn"
+  | "leaf"
+  | "ripple"
+  | "horizon";
 
 export type CleanTubeLogoMarkProps = {
   size?: number;
@@ -65,9 +65,10 @@ export function CleanTubeLogoMark({
         }}
       >
         {variant === "wave" ? <WaveMark /> : null}
-        {variant === "ring" ? <RingMark /> : null}
-        {variant === "minimal" ? <MinimalMark /> : null}
-        {variant === "lanes" ? <LanesMark /> : null}
+        {variant === "dawn" ? <DawnMark /> : null}
+        {variant === "leaf" ? <LeafMark /> : null}
+        {variant === "ripple" ? <RippleMark /> : null}
+        {variant === "horizon" ? <HorizonMark /> : null}
       </Box>
     </Box>
   );
@@ -106,21 +107,21 @@ function WaveMark() {
   );
 }
 
-/** Play inside a soft ring — app-icon friendly. */
-function RingMark() {
+/** Soft sunrise arc — calm, hopeful start to watching. */
+function DawnMark() {
   return (
     <>
-      <circle
-        cx="32"
-        cy="32"
-        r="22"
+      <path
+        d="M 8 44 A 24 24 0 0 1 56 44"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2.5"
-        opacity={0.35}
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        opacity={0.4}
       />
+      <circle cx="32" cy="44" r="3" fill="currentColor" opacity={0.55} />
       <path
-        d="M 26 20 L 26 44 L 44 32 Z"
+        d="M 26 20 L 26 40 L 40 30 Z"
         fill="currentColor"
         stroke="currentColor"
         strokeWidth="1.5"
@@ -130,32 +131,89 @@ function RingMark() {
   );
 }
 
-/** Single bold play — maximum legibility at small sizes. */
-function MinimalMark() {
+/** Organic leaf silhouette — nature, growth, gentle focus. */
+function LeafMark() {
   return (
-    <path
-      d="M 22 16 L 22 48 L 48 32 Z"
-      fill="currentColor"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-    />
+    <>
+      <path
+        d="M 32 10 C 20 22, 18 38, 32 54 C 46 38, 44 22, 32 10 Z"
+        fill="currentColor"
+        opacity={0.22}
+      />
+      <path
+        d="M 32 16 L 32 48 M 32 28 C 26 32, 22 40, 32 48"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        opacity={0.35}
+      />
+      <path
+        d="M 28 26 L 28 42 L 40 34 Z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </>
   );
 }
 
-/** Feed lanes + play dot — “clean timeline” metaphor. */
-function LanesMark() {
-  const theme = useTheme();
-  const playCut =
-    theme.palette.mode === "dark" ? theme.palette.primary.contrastText : "#FFFFFF";
-
+/** Still-water ripples — peace, breath, unhurried viewing. */
+function RippleMark() {
   return (
     <>
-      <rect x="10" y="18" width="44" height="5" rx="2.5" fill="currentColor" opacity={0.28} />
-      <rect x="10" y="29" width="36" height="5" rx="2.5" fill="currentColor" opacity={0.4} />
-      <rect x="10" y="40" width="28" height="5" rx="2.5" fill="currentColor" opacity={0.55} />
-      <circle cx="48" cy="48" r="9" fill="currentColor" />
-      <path d="M 45 44 L 45 52 L 52 48 Z" fill={playCut} />
+      <circle
+        cx="32"
+        cy="32"
+        r="20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        opacity={0.2}
+      />
+      <circle
+        cx="32"
+        cy="32"
+        r="13"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        opacity={0.32}
+      />
+      <circle cx="32" cy="32" r="6" fill="currentColor" opacity={0.5} />
+      <path d="M 30 30 L 30 34 L 34 32 Z" fill="currentColor" />
+    </>
+  );
+}
+
+/** Open horizon — spacious calm, play at the meeting of sky and sea. */
+function HorizonMark() {
+  return (
+    <>
+      <path
+        d="M 6 40 C 18 34, 26 36, 32 38 C 38 36, 46 34, 58 40"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        opacity={0.35}
+      />
+      <path
+        d="M 6 48 H 58"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        opacity={0.5}
+      />
+      <path
+        d="M 24 12 L 24 34 L 38 23 Z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
     </>
   );
 }
@@ -166,18 +224,22 @@ export const LOGO_VARIANT_LABELS: Record<
 > = {
   wave: {
     title: "Wave (current)",
-    blurb: "Play + calm waves — used in the header today.",
+    blurb: "Play over gentle waves — used in the header today.",
   },
-  ring: {
-    title: "Ring",
-    blurb: "Contained play button; works well as a home-screen icon.",
+  dawn: {
+    title: "Dawn",
+    blurb: "Sunrise arc and play — hopeful, quiet morning energy.",
   },
-  minimal: {
-    title: "Minimal",
-    blurb: "Bold play only; clearest at 24px.",
+  leaf: {
+    title: "Leaf",
+    blurb: "Organic leaf and play — nature, growth, gentle focus.",
   },
-  lanes: {
-    title: "Lanes",
-    blurb: "Feed stripes + play; emphasizes a clean timeline.",
+  ripple: {
+    title: "Ripple",
+    blurb: "Still rings around play — peace, breath, unhurried calm.",
+  },
+  horizon: {
+    title: "Horizon",
+    blurb: "Sky line and play — open, spacious, emotional quiet.",
   },
 };

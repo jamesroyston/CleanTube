@@ -69,6 +69,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  /** iOS: shrink layout when keyboard opens (search overlay, auth). */
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: darkMeta.themeColor },
     { media: "(prefers-color-scheme: light)", color: lightMeta.themeColor },

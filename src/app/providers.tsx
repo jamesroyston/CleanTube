@@ -439,13 +439,14 @@ export function AppProviders({
                 >
                   <CssBaseline enableColorScheme />
                   <NavigationProgressProvider>
-                    <SWRConfig
-                      value={{
-                        revalidateOnFocus: true,
-                        shouldRetryOnError: true,
-                        errorRetryCount: 2,
-                      }}
-                    >
+                  <SWRConfig
+                    value={{
+                      keepPreviousData: true,
+                      revalidateOnFocus: false,
+                      shouldRetryOnError: true,
+                      errorRetryCount: 2,
+                    }}
+                  >
                       <CompactLayoutProvider initialHint={initialCompactLayoutHint}>
                         <BrowseLayoutProvider>{children}</BrowseLayoutProvider>
                       </CompactLayoutProvider>

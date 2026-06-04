@@ -38,14 +38,17 @@ type UseForYouFeedOptions = {
 };
 
 export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
-  const swrKey: ForYouFeedKey | null =
-    enabled && userId ? (["for-you-feed", userId] as const) : null;
+  const swrKey: ForYouFeedKey | null = userId
+    ? (["for-you-feed", userId] as const)
+    : null;
 
   const { data, error, isLoading, isValidating, mutate } = useSWR(
     swrKey,
     fetchForYouFeed,
     {
-      revalidateOnFocus: true,
+      isPaused: () => !enabled,
+      keepPreviousData: true,
+      revalidateOnFocus: false,
       revalidateOnReconnect: true,
       dedupingInterval: 30_000,
     },
@@ -55,8 +58,8 @@ export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
     sections: data?.sections ?? [],
     feedEmpty: data?.empty ?? false,
     feedError: error instanceof Error ? error.message : null,
-    /** True only on first load when no cached sections exist yet. */
-    isInitialLoad: isLoading,
+    /** True only when there is no cached feed yet (not on revisit). */
+    isInitialLoad: isLoading && !data,
     /** Background refetch while stale sections remain visible. */
     isRefreshing: isValidating && Boolean(data),
     refreshFeed: () => mutate(),
