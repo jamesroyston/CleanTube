@@ -252,9 +252,8 @@ function detailsFromChannel(
       firstThumbnailUrl(metadata?.thumbnail) ||
       firstThumbnailUrl(objectValue(header, "box_art")) ||
       firstThumbnailUrl(objectValue(header, "avatar")),
-    bannerUrl:
-      lastThumbnailUrl(objectValue(header, "banner")) ||
-      lastThumbnailUrl(metadata?.thumbnail),
+    /** Only a real channel banner — never fall back to avatar/metadata thumbnails. */
+    bannerUrl: lastThumbnailUrl(objectValue(header, "banner")),
     subscriberText:
       text(objectValue(aboutMetadata, "subscriber_count")) ||
       headerText(header, "subscribers"),

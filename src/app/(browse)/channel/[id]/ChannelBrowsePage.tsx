@@ -85,27 +85,30 @@ export function ChannelBrowsePage({
 
   const emptyHint = page.emptyGridHint ?? "likely_empty";
 
+  const showBanner =
+    Boolean(page.channel.bannerUrl) &&
+    page.channel.bannerUrl !== page.channel.thumbnailUrl;
+
   return (
     <Box component="main" sx={{ pb: 6 }}>
+      {showBanner ? (
+        <Box
+          sx={{
+            width: "100%",
+            minHeight: { xs: 140, sm: 200 },
+            backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.45) 100%), url(${page.channel.bannerUrl})`,
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+          }}
+        />
+      ) : null}
+
       <Container maxWidth="xl" sx={{ pt: 2 }}>
         {stale ? (
           <Alert severity="warning" sx={{ mb: 2 }}>
             Showing cached results from your last successful load. Refresh the page
             or use Retry below to try again for the latest from YouTube.
           </Alert>
-        ) : null}
-
-        {page.channel.bannerUrl ? (
-          <Box
-            sx={{
-              minHeight: { xs: 120, sm: 180 },
-              mb: 2,
-              borderRadius: 3,
-              backgroundImage: `linear-gradient(90deg, rgba(0,0,0,0.35), rgba(0,0,0,0)), url(${page.channel.bannerUrl})`,
-              backgroundPosition: "center",
-              backgroundSize: "cover",
-            }}
-          />
         ) : null}
 
         <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>

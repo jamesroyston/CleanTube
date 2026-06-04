@@ -112,6 +112,16 @@ export function SearchOverlay({
     return () => cancelAnimationFrame(id);
   }, [focusInput, fullScreen, open]);
 
+  /** Prevent rubber-band scroll of browse content behind the sheet (iOS). */
+  useEffect(() => {
+    if (!open || !fullScreen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [fullScreen, open]);
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     onSubmit(query.trim());
@@ -138,6 +148,7 @@ export function SearchOverlay({
             border: fullScreen ? 0 : 1,
             borderColor: "divider",
             borderRadius: fullScreen ? 0 : 2,
+            overflow: "hidden",
             ...(mobileExperience
               ? {
                   pt: "env(safe-area-inset-top, 0px)",
@@ -248,9 +259,10 @@ export function SearchOverlay({
         dense
         sx={{
           py: 0,
-          overflow: "auto",
-          flex: 1,
+          flex: recentList.length > 0 ? 1 : "0 0 auto",
           minHeight: 0,
+          overflowY: recentList.length > 0 ? "auto" : "hidden",
+          overscrollBehavior: "contain",
           pb: mobileExperience
             ? "env(safe-area-inset-bottom, 0px)"
             : undefined,

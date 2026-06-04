@@ -1,30 +1,23 @@
 import Box from "@mui/material/Box";
 import Container from "@mui/material/Container";
-import Typography from "@mui/material/Typography";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { ForYouHome } from "@/components/ForYouHome";
+import { HomeSearchResultsClient } from "@/components/HomeSearchResultsClient";
 import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchScrollRestore } from "@/components/SearchScrollRestore";
-import { pickBestGuessChannels } from "@/lib/channelSearchRelevance";
-import { SearchResultsGrid } from "@/components/SearchResultsGrid";
-import { SearchSortBar } from "@/components/SearchSortBar";
-import { SaveSearchButton } from "@/components/SaveSearchButton";
 import {
   channelPageHrefFromToken,
   extractChannelRouteTokenFromUrl,
   extractVideoIdFromUrl,
   isLikelyYouTubeUrl,
 } from "@/lib/youtube";
-import { searchMixedResultsCached } from "@/lib/youtubeSearchCache";
 import { extractStartSecondsFromYoutubeInput } from "@/lib/youtubeTime";
 import {
   normalizeResultSortParam,
   normalizeSearchSortParam,
-  sortVideoSummariesByUploadDate,
 } from "@/lib/uploadedAtSort";
-import { toVideoSummaries } from "@/lib/serializeVideo";
 
 type PageProps = {
   searchParams: Promise<{
@@ -63,25 +56,6 @@ export default async function Home({ searchParams }: PageProps) {
     }
   }
 
-  let errorMessage: string | null = null;
-  let channels: Awaited<
-    ReturnType<typeof searchMixedResultsCached>
-  >["channels"] = [];
-  let videos = toVideoSummaries([]);
-
-  if (query) {
-    try {
-      const results = await searchMixedResultsCached(query, 24, searchSortMode);
-      channels = pickBestGuessChannels(query, results.channels);
-      videos = sortVideoSummariesByUploadDate(
-        toVideoSummaries(results.videos),
-        resultSortMode,
-      );
-    } catch {
-      errorMessage = "Search could not be completed. Please try again.";
-    }
-  }
-
   return (
     <Box component="main" sx={{ pb: 6 }}>
       <Suspense fallback={null}>
@@ -91,45 +65,12 @@ export default async function Home({ searchParams }: PageProps) {
       <Container maxWidth="xl" sx={{ pt: 2 }}>
         {!query ? (
           <ForYouHome />
-        ) : errorMessage ? (
-          <Typography color="error" sx={{ py: 4 }}>
-            {errorMessage}
-          </Typography>
         ) : (
-          <>
-            <Box
-              sx={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 2,
-                mb: 2,
-                flexWrap: "wrap",
-              }}
-            >
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ flex: "1 1 200px", minWidth: 0, pt: 0.5 }}
-              >
-                About {channels.length + videos.length} result
-                {channels.length + videos.length === 1 ? "" : "s"}{" "}
-                for <strong>{query}</strong>
-              </Typography>
-              <SaveSearchButton query={query} />
-              <SearchSortBar
-                query={query}
-                searchSort={searchSortMode}
-                resultSort={resultSortMode}
-              />
-            </Box>
-            {channels.length === 0 && videos.length === 0 ? (
-              <Typography color="text.secondary" sx={{ py: 4 }}>
-                No videos found for &ldquo;{query}&rdquo;.
-              </Typography>
-            ) : (
-              <SearchResultsGrid channels={channels} videos={videos} />
-            )}
-          </>
+          <HomeSearchResultsClient
+            query={query}
+            searchSort={searchSortMode}
+            resultSort={resultSortMode}
+          />
         )}
       </Container>
     </Box>

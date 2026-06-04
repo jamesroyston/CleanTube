@@ -4,8 +4,8 @@
   "description": "Search and watch YouTube videos with a clean, lightweight player",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#1A1B1E",
-  "theme_color": "#8A88F0",
+  "background_color": "#141816",
+  "theme_color": "#5DD4CB",
   "scope": "/",
   "icons": [
     {

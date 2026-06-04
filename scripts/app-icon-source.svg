@@ -1,15 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CleanTube">
   <defs>
     <linearGradient id="ct-bg" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#24262B"/>
-      <stop offset="100%" stop-color="#1A1B1E"/>
+      <stop offset="0%" stop-color="#1F2422"/>
+      <stop offset="100%" stop-color="#141816"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#ct-bg)"/>
   <path
     d="M 6 42 C 14 36, 22 48, 30 42 S 46 36, 54 42"
     fill="none"
-    stroke="#8A88F0"
+    stroke="#5DD4CB"
     stroke-width="2.4"
     stroke-linecap="round"
     opacity="0.45"
@@ -17,15 +17,15 @@
   <path
     d="M 8 48 C 16 44, 24 52, 32 48 S 48 44, 56 48"
     fill="none"
-    stroke="#8A88F0"
+    stroke="#5DD4CB"
     stroke-width="2"
     stroke-linecap="round"
     opacity="0.3"
   />
   <path
     d="M 24 14 L 24 38 L 42 26 Z"
-    fill="#8A88F0"
-    stroke="#8A88F0"
+    fill="#5DD4CB"
+    stroke="#5DD4CB"
     stroke-width="1.5"
     stroke-linejoin="round"
   />
