@@ -54,7 +54,7 @@ export async function POST(request: Request) {
     userDisplayName: user.email,
     excludeCredentials,
     authenticatorSelection: {
-      residentKey: "preferred",
+      residentKey: "required",
       userVerification: "required",
     },
   });

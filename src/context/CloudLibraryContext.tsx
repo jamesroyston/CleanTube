@@ -53,7 +53,9 @@ import {
   type PasskeyRegistrationStep,
   registerPasskeyWithApi,
   signInWithPasskeyApi,
+  signInWithPasskeyConditionalApi,
   type PasskeyRow,
+  type PasskeySignInResult,
 } from "@/lib/cloudLibrary/webauthnClient";
 import {
   deriveResumeSeconds,
@@ -155,7 +157,9 @@ type CloudLibraryContextValue = {
     friendlyName: string,
     onStep?: (step: PasskeyRegistrationStep) => void,
   ) => Promise<{ error: string | null }>;
-  signInWithPasskey: (email: string) => Promise<{ error: string | null }>;
+  signInWithPasskey: (email: string) => Promise<PasskeySignInResult>;
+  /** Conditional UI passkey sheet (no email required). */
+  signInWithPasskeyConditional: () => Promise<PasskeySignInResult>;
   deletePasskey: (id: string) => Promise<{ error: string | null }>;
   listPasskeys: () => Promise<{
     factors: PasskeyRow[];
@@ -643,11 +647,10 @@ export function CloudLibraryProvider({
     [supabase],
   );
 
-  const signInWithPasskey = useCallback(
-    async (email: string) => {
-      if (!supabase) return { error: "Supabase is not configured." };
-      const result = await signInWithPasskeyApi(email);
-      if (result.error) return result;
+  const finalizePasskeySignIn = useCallback(
+    async (result: PasskeySignInResult): Promise<PasskeySignInResult> => {
+      if (!supabase) return { error: "Supabase is not configured.", dismissed: false };
+      if (result.error || result.dismissed) return result;
 
       await supabase.auth.refreshSession();
       const {
@@ -656,15 +659,25 @@ export function CloudLibraryProvider({
       } = await supabase.auth.getSession();
       if (sessionError || !session?.user) {
         return {
-          error:
-            "Signed in, but your session could not be loaded. Please try again.",
+          error: "Signed in, but your session could not be loaded. Please try again.",
+          dismissed: false,
         };
       }
 
       applyAuthenticatedState(session);
-      return { error: null };
+      return { error: null, dismissed: false };
     },
     [applyAuthenticatedState, supabase],
+  );
+
+  const signInWithPasskey = useCallback(
+    async (email: string) => finalizePasskeySignIn(await signInWithPasskeyApi(email)),
+    [finalizePasskeySignIn],
+  );
+
+  const signInWithPasskeyConditional = useCallback(
+    async () => finalizePasskeySignIn(await signInWithPasskeyConditionalApi()),
+    [finalizePasskeySignIn],
   );
 
   const deletePasskey = useCallback(
@@ -1167,6 +1180,7 @@ export function CloudLibraryProvider({
       passkeysSupported,
       registerPasskey,
       signInWithPasskey,
+      signInWithPasskeyConditional,
       deletePasskey,
       listPasskeys,
       getPendingSupabaseMfa: getPendingSupabaseMfaCb,
@@ -1208,6 +1222,7 @@ export function CloudLibraryProvider({
       session,
       signIn,
       signInWithPasskey,
+      signInWithPasskeyConditional,
       signOutUser,
       signUp,
       updateSavedChannel,
