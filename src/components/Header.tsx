@@ -8,7 +8,6 @@ import Toolbar from "@mui/material/Toolbar";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
@@ -25,7 +24,12 @@ import { AccountMenu } from "@/components/AccountMenu";
 import { RetroTvLogo } from "@/components/RetroTvLogo";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
-import { useSearchChrome } from "@/context/SearchChromeContext";
+import { useHeaderScroll } from "@/context/HeaderScrollContext";
+import { useSearchOverlay } from "@/context/SearchOverlayContext";
+import {
+  useCompactViewport,
+  useScrollRevealHeader,
+} from "@/hooks/useCompactViewport";
 import { useNavigationProgress } from "@/context/NavigationProgressContext";
 import {
   getLastSearchSort,
@@ -55,18 +59,18 @@ export type BrowseHeaderLayout =
 export type HeaderProps = {
   leading?: ReactNode;
   browseLayout?: BrowseHeaderLayout;
+  /** Touch/PWA bottom nav: logo-only top bar (search/account/library in bottom bar). */
+  showBottomNav?: boolean;
 };
 
 export const Header = forwardRef<HTMLDivElement, HeaderProps>(
   function Header(
-    { leading, browseLayout = { mode: "mobile" } },
+    { leading, browseLayout = { mode: "mobile" }, showBottomNav = false },
     ref,
   ) {
     const theme = useTheme();
-    const compactSearch = useMediaQuery("(max-width:899.95px)");
-    const headerScrollsAway = useMediaQuery(
-      "(max-width:599.95px), (max-width:899.95px) and (orientation: landscape)",
-    );
+    const compactSearch = useCompactViewport();
+    const scrollRevealHeader = useScrollRevealHeader();
     const router = useRouter();
     const pathname = usePathname();
     const searchParams = useSearchParams();
@@ -74,10 +78,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const { addRecentSearch, getRecentSearches } = useCloudLibrary();
     const {
       registerOpenSearchOverlay,
-      mobileHeaderRevealProgress,
-      mobileHeaderOverlayMode,
-      mobileHeaderScrollSettled,
-    } = useSearchChrome();
+    } = useSearchOverlay();
+    const { headerRevealProgress, headerOverlayActive } = useHeaderScroll();
     const [isPending, startTransition] = useTransition();
     const hadPendingRef = useRef(false);
     const qParam = searchParams.get("q") ?? "";
@@ -251,17 +253,15 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       browseLayout.mode === "desktopRailMini" ? browseLayout.railWidthPx : null;
 
     const displayQuery = query.trim() || "";
-    const mobileScrollReveal =
-      compactSearch && desktopRail == null && headerScrollsAway;
-    const showOverlayChrome =
-      mobileScrollReveal && mobileHeaderOverlayMode;
-    const revealProgress = showOverlayChrome ? mobileHeaderRevealProgress : 0;
+    const showScrollRevealHeader =
+      scrollRevealHeader && desktopRail == null && headerOverlayActive;
+    const revealProgress = showScrollRevealHeader ? headerRevealProgress : 0;
 
     const appBar = (
         <AppBar
           ref={ref}
           position={
-            showOverlayChrome
+            showScrollRevealHeader
               ? "fixed"
               : desktopRail != null
                 ? "fixed"
@@ -273,11 +273,11 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
             {
               pt: "env(safe-area-inset-top, 0px)",
               boxSizing: "border-box",
-              zIndex: showOverlayChrome
+              zIndex: showScrollRevealHeader
                 ? (t) => t.zIndex.modal - 1
                 : (t) => t.zIndex.drawer + 1,
             },
-            showOverlayChrome
+            showScrollRevealHeader
               ? {
                   top: 0,
                   left: 0,
@@ -285,9 +285,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                   transform: `translate3d(0, calc((1 - ${revealProgress}) * -100%), 0)`,
                   pointerEvents: revealProgress > 0.2 ? "auto" : "none",
                   willChange: "transform",
-                  transition: mobileHeaderScrollSettled
-                    ? "transform 220ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 220ms cubic-bezier(0.4, 0, 0.2, 1)"
-                    : "none",
+                  /** JS rAF drives transform — CSS transition here fights it and flickers on idle hide. */
+                  transition: "none",
                 }
               : desktopRail != null
               ? {
@@ -316,18 +315,19 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
               py: { xs: 0.75, sm: 1 },
               px: { xs: 1, sm: 2 },
               minHeight: { xs: 56, sm: 64 },
+              ...(showBottomNav ? { justifyContent: "center" } : undefined),
             }}
           >
             <Box
               sx={{
-                display: "flex",
+                display: showBottomNav ? "contents" : "flex",
                 alignItems: "center",
                 gap: compactSearch ? 0.5 : 1,
                 flexShrink: 0,
                 minWidth: 0,
               }}
             >
-              {leading}
+              {!showBottomNav ? leading : null}
               <Box
                 component={Link}
                 href="/"
@@ -355,53 +355,57 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
               </Box>
             </Box>
 
-            <Box
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                display: "flex",
-                justifyContent: "center",
-                mx: compactSearch ? 0.25 : 1,
-              }}
-            >
-              <TextField
-                size="small"
-                fullWidth
-                variant="outlined"
-                placeholder="Search or paste a YouTube URL"
-                value={displayQuery}
-                onClick={openSearchOverlay}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openSearchOverlay();
-                  }
-                }}
-                slotProps={{
-                  input: {
-                    readOnly: true,
-                    "aria-label": "Open search",
-                    "aria-haspopup": "dialog",
-                    "aria-expanded": searchOverlayOpen,
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon color="action" fontSize="small" />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-                sx={{
-                  minWidth: 0,
-                  maxWidth: compactSearch ? "100%" : 680,
-                  cursor: "pointer",
-                  "& .MuiInputBase-input": { cursor: "pointer" },
-                }}
-              />
-            </Box>
+            {!showBottomNav ? (
+              <>
+                <Box
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    justifyContent: "center",
+                    mx: compactSearch ? 0.25 : 1,
+                  }}
+                >
+                  <TextField
+                    size="small"
+                    fullWidth
+                    variant="outlined"
+                    placeholder="Search or paste a YouTube URL"
+                    value={displayQuery}
+                    onClick={openSearchOverlay}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        openSearchOverlay();
+                      }
+                    }}
+                    slotProps={{
+                      input: {
+                        readOnly: true,
+                        "aria-label": "Open search",
+                        "aria-haspopup": "dialog",
+                        "aria-expanded": searchOverlayOpen,
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <SearchIcon color="action" fontSize="small" />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                    sx={{
+                      minWidth: 0,
+                      maxWidth: compactSearch ? "100%" : 680,
+                      cursor: "pointer",
+                      "& .MuiInputBase-input": { cursor: "pointer" },
+                    }}
+                  />
+                </Box>
 
-            <Box sx={{ flexShrink: 0 }}>
-              <AccountMenu />
-            </Box>
+                <Box sx={{ flexShrink: 0 }}>
+                  <AccountMenu />
+                </Box>
+              </>
+            ) : null}
           </Toolbar>
         </AppBar>
     );

@@ -42,4 +42,10 @@ const apple = await sharp(svg, { density: 144 })
   .toBuffer();
 writeFileSync(path.join(root, "src/app/apple-icon.png"), apple);
 
-console.log("Generated src/app/favicon.ico, icon.png, apple-icon.png");
+const [b192, b512] = await Promise.all([rasterSquare(192), rasterSquare(512)]);
+writeFileSync(path.join(root, "public/icon-192.png"), b192);
+writeFileSync(path.join(root, "public/icon-512.png"), b512);
+
+console.log(
+  "Generated src/app/favicon.ico, icon.png, apple-icon.png, public/icon-192.png, public/icon-512.png",
+);

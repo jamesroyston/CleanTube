@@ -23,11 +23,17 @@ import {
   ChannelsRailContent,
   drawerRailTransition,
 } from "@/components/ChannelsSidebar";
+import { CompactLayoutChrome } from "@/components/CompactLayoutChrome";
 import { Header } from "@/components/Header";
-import { MobileSearchChrome } from "@/components/MobileSearchChrome";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SavedChannelMigration } from "@/components/SavedChannelMigration";
 import { WatchReturnTracker } from "@/components/WatchReturnTracker";
 import { ScrollContainerProvider } from "@/context/ScrollContainerContext";
+import { useHeaderScroll } from "@/context/HeaderScrollContext";
+import {
+  compactMainPaddingBottom,
+  useShowBottomNav,
+} from "@/hooks/useCompactViewport";
 import { registerScrollElementGetter } from "@/lib/watchReturnNavigation";
 
 function HeaderFallback() {
@@ -44,6 +50,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const pathname = usePathname();
   const mdUp = useMediaQuery(theme.breakpoints.up("md"));
+  const { headerOverlayActive } = useHeaderScroll();
   const [mobileOpen, setMobileOpen] = useState(false);
   const drawerHistoryPushedRef = useRef(false);
   const { collapsed: railCollapsed, setLibrarySidebarCollapsed } =
@@ -157,6 +164,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   );
 
   const railTransition = drawerRailTransition(theme);
+  const showBottomNav = useShowBottomNav();
+  const mobileMainPaddingBottom = compactMainPaddingBottom(showBottomNav);
 
   /**
    * Desktop: single inner scroll region (sidebar + split layout).
@@ -178,7 +187,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       {children}
     </Box>
   ) : (
-    <Box sx={{ flex: 1, minHeight: 0 }}>
+    <Box
+      sx={{
+        flex: 1,
+        minHeight: 0,
+        pb: mobileMainPaddingBottom,
+      }}
+    >
       <SavedChannelMigration />
       {children}
     </Box>
@@ -204,13 +219,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             }),
       }}
     >
-      {mdUp ? (
+      {mdUp || (!mdUp && headerOverlayActive) ? (
         <Box
           aria-hidden
           sx={{
             flexShrink: 0,
             height: `${headerInsetPx}px`,
-            /** Reserves viewport space for browse `Header` (`position="fixed"`). */
+            /** Reserves space when browse `Header` is `position="fixed"` (desktop or mobile overlay). */
           }}
         />
       ) : null}
@@ -219,6 +234,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         <Header
           ref={appBarRef}
           leading={headerLeading}
+          showBottomNav={showBottomNav}
           browseLayout={
             desktopRailPx != null
               ? { mode: "desktopRailMini", railWidthPx: desktopRailPx }
@@ -226,7 +242,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           }
         />
       </Suspense>
-      <MobileSearchChrome />
+      <CompactLayoutChrome
+        showBottomNav={showBottomNav}
+        bottomNav={<MobileBottomNav onOpenLibrary={openMobileDrawer} />}
+      />
 
       {desktopRailPx != null ? (
         <Box

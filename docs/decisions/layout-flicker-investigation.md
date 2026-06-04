@@ -42,7 +42,7 @@ Users report occasional **sizing flicker** on browse pages, especially `/watch/[
 
 **Mechanism:** Desktop (`md+`) renders a spacer `Box` with `height: headerInsetPx` before the fixed `Header`. State defaults to **72px**; `useLayoutEffect` + `ResizeObserver` measure `AppBar` bottom and update (often ~80px: Toolbar `minHeight` 64 + `py: 1` × 2).
 
-**Severity:** **Medium** on desktop first paint — main content jumps ~8px when measure runs. **None** on mobile (`md` down spacer is not rendered).
+**Severity:** **Medium** on desktop first paint — main content jumps ~8px when measure runs. On compact viewports, a spacer is rendered only while scroll-reveal overlay is active (see [compact-layout.md](./compact-layout.md)); touch/PWA layouts use a bottom nav instead.
 
 **Fix warranted?** **Yes — low risk.**
 
