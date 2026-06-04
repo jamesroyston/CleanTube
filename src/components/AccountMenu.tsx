@@ -2,44 +2,31 @@
 
 import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
 import CloudDoneOutlinedIcon from "@mui/icons-material/CloudDoneOutlined";
-import DarkModeIcon from "@mui/icons-material/DarkMode";
 import FingerprintOutlinedIcon from "@mui/icons-material/FingerprintOutlined";
 import HistoryOutlinedIcon from "@mui/icons-material/HistoryOutlined";
-import LightModeIcon from "@mui/icons-material/LightMode";
 import LoginOutlinedIcon from "@mui/icons-material/LoginOutlined";
 import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
-import ClearAllOutlinedIcon from "@mui/icons-material/ClearAllOutlined";
 import CloudOffOutlinedIcon from "@mui/icons-material/CloudOffOutlined";
 import WatchLaterOutlinedIcon from "@mui/icons-material/WatchLaterOutlined";
 import ViewColumnIcon from "@mui/icons-material/ViewColumn";
-import Box from "@mui/material/Box";
+import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
-import FormControlLabel from "@mui/material/FormControlLabel";
 import IconButton from "@mui/material/IconButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
-import ListSubheader from "@mui/material/ListSubheader";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import Switch from "@mui/material/Switch";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 
 import { buildAuthPageHref } from "@/lib/authReturnNavigation";
-import { clearChannelPageSessionBackups } from "@/lib/channelPageClientCache";
 
-import {
-  useThemeMode,
-  useWatchCommentsVisible,
-  useWatchNarrowPlayerLayout,
-  useWatchUpNextVisible,
-} from "@/app/providers";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
 function emailLocalPart(email: string | undefined): string {
@@ -73,14 +60,6 @@ export function AccountMenu({
   const theme = useTheme();
   const compactAccount = useMediaQuery(theme.breakpoints.down("md"));
   const { user, isCloudConfigured, canPersistLibrary, signOutUser, authStatus } = useCloudLibrary();
-  const { mode, toggleMode } = useThemeMode();
-  const { visible: commentsVisible, setWatchCommentsVisible } =
-    useWatchCommentsVisible();
-  const { visible: upNextVisible, setWatchUpNextVisible } =
-    useWatchUpNextVisible();
-  const { enabled: narrowPlayerLayout, setWatchNarrowPlayerLayout } =
-    useWatchNarrowPlayerLayout();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const authHref = useMemo(() => {
@@ -168,7 +147,7 @@ export function AccountMenu({
           </ListItemIcon>
           <ListItemText>Watch Later</ListItemText>
         </MenuItem>
-        <MenuItem component={Link} href="/library" onClick={closeMenu}>
+        <MenuItem component={Link} href="/library/manage" onClick={closeMenu}>
           <ListItemIcon>
             <ViewColumnIcon fontSize="small" />
           </ListItemIcon>
@@ -178,159 +157,13 @@ export function AccountMenu({
           />
         </MenuItem>
         <Divider />
-        <MenuItem
-          onClick={() => {
-            toggleMode();
-            closeMenu();
-          }}
-        >
+        <MenuItem component={Link} href="/settings" onClick={closeMenu}>
           <ListItemIcon>
-            {mode === "dark" ? (
-              <LightModeIcon fontSize="small" />
-            ) : (
-              <DarkModeIcon fontSize="small" />
-            )}
-          </ListItemIcon>
-          <ListItemText>
-            {mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          </ListItemText>
-        </MenuItem>
-        <ListSubheader
-          disableSticky
-          sx={{
-            px: 2,
-            py: 0.5,
-            lineHeight: 1.5,
-            typography: "caption",
-            color: "text.secondary",
-          }}
-        >
-          Watch page
-        </ListSubheader>
-        <Box
-          sx={{ px: 2, py: 1, maxWidth: 320 }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <FormControlLabel
-            sx={{
-              m: 0,
-              width: "100%",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: 1,
-            }}
-            label={
-              <Box sx={{ pr: 1, pt: 0.25 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Related videos column
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Up next rail (loads only when on)
-                </Typography>
-              </Box>
-            }
-            labelPlacement="start"
-            control={
-              <Switch
-                size="small"
-                checked={upNextVisible}
-                onChange={(_, v) => setWatchUpNextVisible(v)}
-                inputProps={{ "aria-label": "Show related videos column" }}
-              />
-            }
-          />
-        </Box>
-        <Box
-          sx={{ px: 2, py: 1, maxWidth: 320 }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <FormControlLabel
-            sx={{
-              m: 0,
-              width: "100%",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: 1,
-            }}
-            label={
-              <Box sx={{ pr: 1, pt: 0.25 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Narrow player layout
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Keeps a narrower video on large screens when Up next is off
-                </Typography>
-              </Box>
-            }
-            labelPlacement="start"
-            control={
-              <Switch
-                size="small"
-                checked={narrowPlayerLayout}
-                onChange={(_, v) => setWatchNarrowPlayerLayout(v)}
-                inputProps={{ "aria-label": "Narrow player layout on watch" }}
-              />
-            }
-          />
-        </Box>
-        <Box
-          sx={{ px: 2, py: 1, maxWidth: 320 }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <FormControlLabel
-            sx={{
-              m: 0,
-              width: "100%",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: 1,
-            }}
-            label={
-              <Box sx={{ pr: 1, pt: 0.25 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Comments
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Loads only when on (faster watch page when off)
-                </Typography>
-              </Box>
-            }
-            labelPlacement="start"
-            control={
-              <Switch
-                size="small"
-                checked={commentsVisible}
-                onChange={(_, v) => setWatchCommentsVisible(v)}
-                inputProps={{ "aria-label": "Show comments on watch" }}
-              />
-            }
-          />
-        </Box>
-        <MenuItem
-          onClick={() => {
-            closeMenu();
-            clearChannelPageSessionBackups();
-            router.refresh();
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 36 }}>
-            <ClearAllOutlinedIcon fontSize="small" />
+            <SettingsOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText
-            sx={{ minWidth: 0, flex: 1 }}
-            primary="Clear channel page backups"
-            secondary="Clears session-only channel grid cache here if the grid looks stuck."
-            secondaryTypographyProps={
-              compactAccount
-                ? {
-                    noWrap: false,
-                    sx: {
-                      whiteSpace: "normal",
-                      wordBreak: "break-word",
-                    },
-                  }
-                : undefined
-            }
+            primary="Settings"
+            secondary="Theme, watch page, and app preferences"
           />
         </MenuItem>
         <Divider />

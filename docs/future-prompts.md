@@ -8,13 +8,17 @@
 
 > On first land of users, add a tip prompt that only shows once. It should provide instructions on how to setup an extension like chrome store's redirector so that users can click on external links to youtube and be directed to cleantube. Redirector uses regex and $1, $2 param passing to handle youtube detection, redirection, and param forwarding. This tip needs to be accessible from somewhere so users can see it again if they clicked out too quickly the first time. This would make it actually usuable for users trying to avoid real youtube for whatever reason.
 
-## Sidebar toggle + settings menu (not yet implemented)
+## Sidebar toggle + settings menu — partially implemented
 
 > Make the sidebar toggleable and stuff the color palette chooser into a settings menu.
 
-## Mobile header improvements (not yet implemented)
+**Shipped:** `/settings` page with theme toggle and watch-page preferences. Desktop sidebar remains toggleable via the header menu on `md+`. Color palette chooser beyond light/dark is still not implemented.
+
+## Mobile header improvements — implemented
 
 > Make the header more functional on mobile. Maybe replace the logo name with just the logo? and stuff the toggle theme button functionality into the new menu when mobile.
+
+**Shipped:** Logo-only top bar on touch/PWA; theme and watch preferences moved to `/settings`; Account tab routes to `/account`; Library tab routes to `/library` hub.
 
 ## Search loading state (not yet implemented)
 

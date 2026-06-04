@@ -18,9 +18,14 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
+import { MobilePageHeader } from "@/components/MobilePageHeader";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
+import {
+  compactMainPaddingBottom,
+  useShowBottomNav,
+} from "@/hooks/useCompactViewport";
 import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
 import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 
@@ -40,6 +45,7 @@ function formatStartLabel(seconds: number): string {
 }
 
 export function WatchLaterPageClient() {
+  const showBottomNav = useShowBottomNav();
   const { entries, removeByVideoId, clearEntries } = useWatchLater();
   const { canPersistLibrary, getResumeSeconds } = useCloudLibrary();
   const [sortMode, setSortMode] = useState<SortMode>("newest");
@@ -59,47 +65,85 @@ export function WatchLaterPageClient() {
   }
 
   return (
-    <Box component="main" sx={{ pb: 6 }}>
-      <Container maxWidth="lg" sx={{ pt: 2 }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={2}
-          sx={{ mb: 3 }}
-          alignItems={{ xs: "stretch", sm: "flex-start" }}
-        >
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 700 }}>
-              Watch Later
-            </Typography>
+    <Box
+      component="main"
+      sx={{ pb: compactMainPaddingBottom(showBottomNav, 24) ?? 6 }}
+    >
+      <Container maxWidth="lg" sx={{ pt: 2, px: { xs: 2, sm: 3 } }}>
+        {showBottomNav ? (
+          <MobilePageHeader title="Watch Later" backHref="/library" />
+        ) : (
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ mb: 3 }}
+            alignItems={{ xs: "stretch", sm: "flex-start" }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 700 }}>
+                Watch Later
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Sort your queued videos by added date and remove anything you no longer need.
+              </Typography>
+            </Box>
+            {canPersistLibrary ? (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                  <InputLabel id="watch-later-sort-label">Sort by</InputLabel>
+                  <Select
+                    labelId="watch-later-sort-label"
+                    value={sortMode}
+                    label="Sort by"
+                    onChange={handleSortChange}
+                  >
+                    <MenuItem value="newest">Newest added</MenuItem>
+                    <MenuItem value="oldest">Oldest added</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  disabled={entries.length === 0}
+                  onClick={clearEntries}
+                >
+                  Clear all
+                </Button>
+              </Stack>
+            ) : null}
+          </Stack>
+        )}
+        {showBottomNav ? (
+          <Stack spacing={2} sx={{ mb: 3 }}>
             <Typography variant="body2" color="text.secondary">
               Sort your queued videos by added date and remove anything you no longer need.
             </Typography>
-          </Box>
-          {canPersistLibrary ? (
-            <Stack direction="row" spacing={1} alignItems="center">
-              <FormControl size="small" sx={{ minWidth: 180 }}>
-                <InputLabel id="watch-later-sort-label">Sort by</InputLabel>
-                <Select
-                  labelId="watch-later-sort-label"
-                  value={sortMode}
-                  label="Sort by"
-                  onChange={handleSortChange}
+            {canPersistLibrary ? (
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <FormControl size="small" sx={{ minWidth: 180 }}>
+                  <InputLabel id="watch-later-sort-label-mobile">Sort by</InputLabel>
+                  <Select
+                    labelId="watch-later-sort-label-mobile"
+                    value={sortMode}
+                    label="Sort by"
+                    onChange={handleSortChange}
+                  >
+                    <MenuItem value="newest">Newest added</MenuItem>
+                    <MenuItem value="oldest">Oldest added</MenuItem>
+                  </Select>
+                </FormControl>
+                <Button
+                  variant="outlined"
+                  color="error"
+                  disabled={entries.length === 0}
+                  onClick={clearEntries}
                 >
-                  <MenuItem value="newest">Newest added</MenuItem>
-                  <MenuItem value="oldest">Oldest added</MenuItem>
-                </Select>
-              </FormControl>
-              <Button
-                variant="outlined"
-                color="error"
-                disabled={entries.length === 0}
-                onClick={clearEntries}
-              >
-                Clear all
-              </Button>
-            </Stack>
-          ) : null}
-        </Stack>
+                  Clear all
+                </Button>
+              </Stack>
+            ) : null}
+          </Stack>
+        ) : null}
 
         {!canPersistLibrary ? (
           <LibrarySignInPrompt
