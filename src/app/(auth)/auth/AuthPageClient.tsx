@@ -17,9 +17,10 @@ import Link from "@mui/material/Link";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useSearchParams } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ListedFactor } from "@/lib/cloudLibrary/mfaClient";
+import { browserSupportsPasskeyAutofill } from "@/lib/cloudLibrary/webauthnClient";
 import { completeAuthRedirect } from "@/lib/authReturnNavigation";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 
@@ -51,6 +52,7 @@ export function AuthPageClient() {
     passkeysSupported,
     registerPasskey,
     signInWithPasskey,
+    signInWithPasskeyConditional,
     deletePasskey,
     listPasskeys,
     getPendingSupabaseMfa,
@@ -97,8 +99,10 @@ export function AuthPageClient() {
     if (mode === "reset") {
       return "Send a password reset email for your Supabase account.";
     }
-    return "Sign in to save watch history, Watch Later, saved channels, and pinned searches to your account.";
-  }, [mode]);
+    return passkeysSupported
+      ? "Sign in to save watch history, Watch Later, saved channels, and pinned searches. Your device may offer a passkey when this page opens."
+      : "Sign in to save watch history, Watch Later, saved channels, and pinned searches to your account.";
+  }, [mode, passkeysSupported]);
 
   const passkeyRegistrationCopy = useMemo(() => {
     if (passkeyRegistrationStatus === "preparing") {
@@ -113,7 +117,7 @@ export function AuthPageClient() {
     return null;
   }, [passkeyRegistrationStatus]);
 
-  async function finishSignIn() {
+  const finishSignIn = useCallback(async () => {
     const mfa = await getPendingSupabaseMfa();
     if (mfa.error) {
       setError(mfa.error);
@@ -144,7 +148,7 @@ export function AuthPageClient() {
     setError(
       "Your account requires a second sign-in step, but no authenticator app or SMS factor is enrolled. Add MFA in the Supabase dashboard or contact support.",
     );
-  }
+  }, [getPendingSupabaseMfa, nextParam]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -233,8 +237,58 @@ export function AuthPageClient() {
       setError(res.error);
       return;
     }
+    if (res.dismissed) return;
     await finishSignIn();
   }
+
+  const showCredentialForm = mode === "sign-in" && mfaPanel.kind === "none";
+
+  /** eBay-style conditional passkey sheet when the sign-in form is shown. */
+  useEffect(() => {
+    if (
+      !isCloudConfigured ||
+      !passkeysSupported ||
+      !showCredentialForm ||
+      user
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const autofillSupported = await browserSupportsPasskeyAutofill();
+      if (!autofillSupported || cancelled) return;
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      if (cancelled || !document.getElementById("cleantube-signin-email")) return;
+
+      setPasskeyBusy(true);
+      setError(null);
+      const res = await signInWithPasskeyConditional();
+      if (!cancelled) setPasskeyBusy(false);
+      if (cancelled) return;
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      if (res.dismissed) return;
+      await finishSignIn();
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    finishSignIn,
+    isCloudConfigured,
+    passkeysSupported,
+    showCredentialForm,
+    signInWithPasskeyConditional,
+    user,
+  ]);
 
   async function onRegisterPasskey() {
     setPasskeyBusy(true);
@@ -256,8 +310,6 @@ export function AuthPageClient() {
       if (!r.error) setRegisteredPasskeys(r.factors);
     });
   }
-
-  const showCredentialForm = mode === "sign-in" && mfaPanel.kind === "none";
 
   return (
     <Box component="main" sx={{ width: "100%", maxWidth: 560, pb: 2 }}>
@@ -592,13 +644,13 @@ export function AuthPageClient() {
                         <Button
                           variant="outlined"
                           startIcon={<FingerprintIcon />}
-                          disabled={passkeyBusy || !email.trim()}
+                          disabled={passkeyBusy}
                           onClick={() => void onPasskeySignIn()}
                         >
                           Sign in with passkey
                         </Button>
                         <Typography variant="caption" color="text.secondary">
-                          Uses a passkey you registered while signed in. Enter your email above first.
+                          Use the passkey prompt above, or tap here after entering your email.
                         </Typography>
                       </Stack>
                     ) : null}

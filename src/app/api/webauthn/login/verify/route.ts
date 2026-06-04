@@ -11,7 +11,8 @@ import { createSupabaseRouteHandlerClient } from "@/utils/supabase/route";
 type Body = {
   challengeId: string;
   credential: AuthenticationResponseJSON;
-  email: string;
+  /** Omitted for conditional UI; resolved from the passkey credential. */
+  email?: string;
 };
 
 export async function POST(request: Request) {
@@ -28,9 +29,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
-  const email = (body.email ?? "").trim().toLowerCase();
-  if (!body.challengeId || !body.credential || !email) {
-    return NextResponse.json({ error: "Missing challengeId, credential, or email." }, { status: 400 });
+  let email = (body.email ?? "").trim().toLowerCase();
+  if (!body.challengeId || !body.credential) {
+    return NextResponse.json({ error: "Missing challengeId or credential." }, { status: 400 });
   }
 
   const { data: challengeRow, error: chErr } = await service
@@ -41,9 +42,6 @@ export async function POST(request: Request) {
 
   if (chErr || !challengeRow || challengeRow.kind !== "authentication") {
     return NextResponse.json({ error: "Unknown or expired sign-in challenge." }, { status: 400 });
-  }
-  if ((challengeRow.login_email ?? "").toLowerCase() !== email) {
-    return NextResponse.json({ error: "Email does not match this sign-in attempt." }, { status: 403 });
   }
   if (new Date(challengeRow.expires_at).getTime() < Date.now()) {
     await service.from("webauthn_challenges").delete().eq("id", body.challengeId);
@@ -60,6 +58,26 @@ export async function POST(request: Request) {
 
   if (rowErr || !row) {
     return NextResponse.json({ error: "Credential not found for this account." }, { status: 400 });
+  }
+
+  if (challengeRow.user_id && challengeRow.user_id !== row.user_id) {
+    return NextResponse.json({ error: "Credential does not match this sign-in attempt." }, { status: 403 });
+  }
+
+  if (!email) {
+    const { data: userData, error: userErr } = await service.auth.admin.getUserById(row.user_id);
+    const resolved = userData?.user?.email?.trim().toLowerCase();
+    if (userErr || !resolved) {
+      return NextResponse.json({ error: "Could not resolve account for this passkey." }, { status: 400 });
+    }
+    email = resolved;
+  } else if (
+    challengeRow.login_email &&
+    challengeRow.login_email.toLowerCase() !== email
+  ) {
+    return NextResponse.json({ error: "Email does not match this sign-in attempt." }, { status: 403 });
+  } else if (challengeRow.user_id && row.user_id !== challengeRow.user_id) {
+    return NextResponse.json({ error: "Credential does not match this sign-in attempt." }, { status: 403 });
   }
 
   const pkBytes = byteaToUint8Array(row.public_key);
