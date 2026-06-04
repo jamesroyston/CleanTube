@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Roboto } from "next/font/google";
 import { cookies } from "next/headers";
@@ -33,6 +33,12 @@ const roboto = Roboto({
 export const metadata: Metadata = {
   title: "CleanTube",
   description: "Search and watch YouTube videos with a clean, lightweight player",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "CleanTube",
+    statusBarStyle: "black-translucent",
+  },
   /** ICO + PNG first so Safari (poor SVG favicon support) picks a raster icon. */
   icons: {
     icon: [
@@ -43,6 +49,17 @@ export const metadata: Metadata = {
       { url: "/apple-icon.png", sizes: "180x180", type: "image/png" },
     ],
   },
+};
+
+/** Dark/light theme colors from semanticTokens (base100 / primary). */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#1d232a" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+  ],
 };
 
 export default async function RootLayout({

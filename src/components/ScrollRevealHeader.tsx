@@ -1,12 +1,9 @@
 "use client";
 
-import SearchIcon from "@mui/icons-material/Search";
-import Fab from "@mui/material/Fab";
-import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 import { useEffect, useRef } from "react";
 
-import { useSearchChrome } from "@/context/SearchChromeContext";
+import { useHeaderScroll } from "@/context/HeaderScrollContext";
+import { useScrollRevealHeader } from "@/hooks/useCompactViewport";
 
 /** Below this scroll offset, the in-flow header is the primary chrome. */
 const SCROLL_UP_THRESHOLD_PX = 80;
@@ -14,13 +11,13 @@ const SCROLL_UP_THRESHOLD_PX = 80;
 const SCROLL_DOWN_DEACTIVATE_PX = 40;
 /** Scroll-up distance (px) for a fully revealed header overlay. */
 const REVEAL_DISTANCE_PX = 88;
-const FAB_SCROLL_THRESHOLD_PX = 320;
 /** Hide the revealed header after idle scroll time when not at top. */
 const AUTO_HIDE_MS = 3_000;
 const IDLE_HIDE_MS = 300;
 /** Lerp factor per frame for display progress toward target. */
 const DISPLAY_LERP = 0.16;
-const SCROLL_SETTLE_MS = 120;
+/** Min progress delta before syncing React state (reduces Header re-renders). */
+const PROGRESS_STATE_EPSILON = 0.01;
 
 function clampProgress(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -30,37 +27,29 @@ function easeInOut(t: number): number {
   return (1 - Math.cos(t * Math.PI)) / 2;
 }
 
-export function MobileSearchChrome() {
-  const theme = useTheme();
-  const mobile = useMediaQuery("(max-width:899.95px)");
-  /** Match Header `static` breakpoints — skip when the bar is already sticky. */
-  const headerScrollsAway = useMediaQuery(
-    "(max-width:599.95px), (max-width:899.95px) and (orientation: landscape)",
-  );
-  const {
-    openSearchOverlay,
-    setMobileHeaderRevealProgress,
-    setMobileHeaderOverlayMode,
-    setMobileHeaderScrollSettled,
-  } = useSearchChrome();
+/**
+ * Scroll-driven hide/reveal for the top header on compact viewports without the
+ * bottom app bar (e.g. narrow desktop browser windows).
+ */
+export function ScrollRevealHeader() {
+  const scrollRevealEnabled = useScrollRevealHeader();
+  const { setHeaderRevealProgress, setHeaderOverlayActive } = useHeaderScroll();
   const lastScrollYRef = useRef(0);
   const targetProgressRef = useRef(0);
   const displayProgressRef = useRef(0);
+  const publishedProgressRef = useRef(0);
   const overlayModeActiveRef = useRef(false);
   const hideTimerRef = useRef<number | null>(null);
   const idleHideFrameRef = useRef<number | null>(null);
   const smoothFrameRef = useRef<number | null>(null);
-  const scrollSettleTimerRef = useRef<number | null>(null);
-  const showFabRef = useRef(false);
-  const fabRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (!mobile || !headerScrollsAway) {
+    if (!scrollRevealEnabled) {
       targetProgressRef.current = 0;
       displayProgressRef.current = 0;
-      setMobileHeaderRevealProgress(0);
-      setMobileHeaderOverlayMode(false);
-      setMobileHeaderScrollSettled(true);
+      publishedProgressRef.current = 0;
+      setHeaderRevealProgress(0);
+      setHeaderOverlayActive(false);
       return;
     }
 
@@ -87,27 +76,24 @@ export function MobileSearchChrome() {
       }
     }
 
-    function clearScrollSettleTimer() {
-      if (scrollSettleTimerRef.current != null) {
-        window.clearTimeout(scrollSettleTimerRef.current);
-        scrollSettleTimerRef.current = null;
-      }
-    }
-
-    function markScrolling() {
-      setMobileHeaderScrollSettled(false);
-      clearScrollSettleTimer();
-      scrollSettleTimerRef.current = window.setTimeout(() => {
-        scrollSettleTimerRef.current = null;
-        setMobileHeaderScrollSettled(true);
-      }, SCROLL_SETTLE_MS);
-    }
-
     function publishDisplayProgress(next: number) {
       const clamped = clampProgress(next);
-      if (Math.abs(clamped - displayProgressRef.current) < 0.002) return;
       displayProgressRef.current = clamped;
-      setMobileHeaderRevealProgress(clamped);
+      if (
+        Math.abs(clamped - publishedProgressRef.current) <
+        PROGRESS_STATE_EPSILON
+      ) {
+        return;
+      }
+      publishedProgressRef.current = clamped;
+      setHeaderRevealProgress(clamped);
+    }
+
+    function flushPublishedProgress() {
+      const clamped = displayProgressRef.current;
+      if (publishedProgressRef.current === clamped) return;
+      publishedProgressRef.current = clamped;
+      setHeaderRevealProgress(clamped);
     }
 
     function setTargetProgress(next: number) {
@@ -127,6 +113,7 @@ export function MobileSearchChrome() {
           Math.abs(target - displayProgressRef.current) < 0.002 &&
           idleHideFrameRef.current == null;
         if (settled && Math.abs(target) < 0.002) {
+          flushPublishedProgress();
           smoothFrameRef.current = null;
           return;
         }
@@ -139,19 +126,24 @@ export function MobileSearchChrome() {
 
     function idleHideHeader() {
       cancelIdleHide();
-      const start = targetProgressRef.current;
+      cancelSmoothLoop();
+      const start = displayProgressRef.current;
       if (start <= 0) return;
       const startTime = performance.now();
 
       const step = (now: number) => {
         const t = Math.min(1, (now - startTime) / IDLE_HIDE_MS);
-        setTargetProgress(start * (1 - easeInOut(t)));
-        ensureSmoothLoop();
+        const next = start * (1 - easeInOut(t));
+        targetProgressRef.current = next;
+        publishDisplayProgress(next);
         if (t < 1) {
           idleHideFrameRef.current = requestAnimationFrame(step);
         } else {
           idleHideFrameRef.current = null;
-          setTargetProgress(0);
+          targetProgressRef.current = 0;
+          displayProgressRef.current = 0;
+          publishedProgressRef.current = 0;
+          setHeaderRevealProgress(0);
         }
       };
 
@@ -168,24 +160,13 @@ export function MobileSearchChrome() {
       }, AUTO_HIDE_MS);
     }
 
-    function setFabVisible(visible: boolean) {
-      if (showFabRef.current === visible) return;
-      showFabRef.current = visible;
-      const fab = fabRef.current;
-      if (!fab) return;
-      fab.style.display = visible ? "flex" : "none";
-    }
-
     function onScroll() {
       if (ticking) return;
       ticking = true;
       requestAnimationFrame(() => {
         cancelIdleHide();
-        markScrolling();
         const y = window.scrollY;
         const delta = y - lastScrollYRef.current;
-
-        setFabVisible(y > FAB_SCROLL_THRESHOLD_PX);
 
         const shouldActivateOverlayMode =
           y > SCROLL_UP_THRESHOLD_PX ||
@@ -194,16 +175,18 @@ export function MobileSearchChrome() {
         if (!shouldActivateOverlayMode) {
           overlayModeActiveRef.current = false;
           clearHideTimer();
-          setMobileHeaderOverlayMode(false);
+          setHeaderOverlayActive(false);
           setTargetProgress(0);
         } else {
           overlayModeActiveRef.current = true;
-          setMobileHeaderOverlayMode(true);
+          setHeaderOverlayActive(true);
 
           if (delta < 0) {
-            setTargetProgress(
+            const nextTarget = clampProgress(
               targetProgressRef.current + -delta / REVEAL_DISTANCE_PX,
             );
+            setTargetProgress(nextTarget);
+            publishDisplayProgress(nextTarget);
             scheduleHide();
           } else if (delta > 0) {
             setTargetProgress(
@@ -233,41 +216,14 @@ export function MobileSearchChrome() {
       clearHideTimer();
       cancelIdleHide();
       cancelSmoothLoop();
-      clearScrollSettleTimer();
       overlayModeActiveRef.current = false;
       targetProgressRef.current = 0;
       displayProgressRef.current = 0;
-      setMobileHeaderRevealProgress(0);
-      setMobileHeaderOverlayMode(false);
-      setMobileHeaderScrollSettled(true);
+      publishedProgressRef.current = 0;
+      setHeaderRevealProgress(0);
+      setHeaderOverlayActive(false);
     };
-  }, [
-    mobile,
-    headerScrollsAway,
-    setMobileHeaderRevealProgress,
-    setMobileHeaderOverlayMode,
-    setMobileHeaderScrollSettled,
-  ]);
+  }, [scrollRevealEnabled, setHeaderRevealProgress, setHeaderOverlayActive]);
 
-  if (!mobile) return null;
-
-  const chromeZ = theme.zIndex.modal - 1;
-
-  return (
-    <Fab
-      ref={fabRef}
-      color="primary"
-      aria-label="Open search"
-      onClick={openSearchOverlay}
-      sx={{
-        position: "fixed",
-        right: 16,
-        bottom: "calc(16px + env(safe-area-inset-bottom, 0px))",
-        zIndex: chromeZ,
-        display: "none",
-      }}
-    >
-      <SearchIcon />
-    </Fab>
-  );
+  return null;
 }

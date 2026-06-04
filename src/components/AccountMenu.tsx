@@ -48,7 +48,28 @@ function emailLocalPart(email: string | undefined): string {
   return at > 0 ? email.slice(0, at) : email.trim();
 }
 
-export function AccountMenu() {
+export type AccountMenuProps = {
+  /** Controlled anchor; when set, menu open state follows this element. */
+  anchorEl?: HTMLElement | null;
+  onAnchorClose?: () => void;
+  hideTrigger?: boolean;
+  menuAnchorOrigin?: {
+    vertical: "top" | "bottom" | "center";
+    horizontal: "left" | "right" | "center";
+  };
+  menuTransformOrigin?: {
+    vertical: "top" | "bottom" | "center";
+    horizontal: "left" | "right" | "center";
+  };
+};
+
+export function AccountMenu({
+  anchorEl: externalAnchorEl,
+  onAnchorClose,
+  hideTrigger = false,
+  menuAnchorOrigin = { vertical: "bottom", horizontal: "right" },
+  menuTransformOrigin = { vertical: "top", horizontal: "right" },
+}: AccountMenuProps = {}) {
   const theme = useTheme();
   const compactAccount = useMediaQuery(theme.breakpoints.down("md"));
   const { user, isCloudConfigured, canPersistLibrary, signOutUser, authStatus } = useCloudLibrary();
@@ -66,77 +87,88 @@ export function AccountMenu() {
     const search = searchParams.toString();
     return buildAuthPageHref(pathname, search ? `?${search}` : undefined);
   }, [pathname, searchParams]);
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [internalAnchorEl, setInternalAnchorEl] = useState<HTMLElement | null>(
+    null,
+  );
+  const isControlled = externalAnchorEl !== undefined;
+  const anchorEl = isControlled ? externalAnchorEl : internalAnchorEl;
   const open = Boolean(anchorEl);
+
+  function closeMenu() {
+    if (onAnchorClose) onAnchorClose();
+    else setInternalAnchorEl(null);
+  }
   const signedInColor = user ? "success" : "inherit";
   const accountLabel = user ? emailLocalPart(user.email ?? undefined) : "";
   const accountTooltip = user?.email?.trim() ?? "Account";
 
   return (
     <>
-      <Tooltip title={accountTooltip}>
-        <span>
-          {user ? (
-            compactAccount ? (
+      {!hideTrigger ? (
+        <Tooltip title={accountTooltip}>
+          <span>
+            {user ? (
+              compactAccount ? (
+                <IconButton
+                  aria-label="Account"
+                  color={signedInColor}
+                  onClick={(event) => setInternalAnchorEl(event.currentTarget)}
+                >
+                  <AccountCircleOutlinedIcon />
+                </IconButton>
+              ) : (
+                <Button
+                  aria-label="Account"
+                  color="inherit"
+                  onClick={(event) => setInternalAnchorEl(event.currentTarget)}
+                  startIcon={
+                    <AccountCircleOutlinedIcon sx={{ color: "success.main" }} />
+                  }
+                  sx={{
+                    minWidth: 0,
+                    maxWidth: 220,
+                    textTransform: "none",
+                    color: "text.primary",
+                    px: 1,
+                  }}
+                >
+                  <Typography variant="body2" component="span" noWrap sx={{ minWidth: 0 }}>
+                    {accountLabel || "Account"}
+                  </Typography>
+                </Button>
+              )
+            ) : (
               <IconButton
                 aria-label="Account"
                 color={signedInColor}
-                onClick={(event) => setAnchorEl(event.currentTarget)}
+                onClick={(event) => setInternalAnchorEl(event.currentTarget)}
               >
                 <AccountCircleOutlinedIcon />
               </IconButton>
-            ) : (
-              <Button
-                aria-label="Account"
-                color="inherit"
-                onClick={(event) => setAnchorEl(event.currentTarget)}
-                startIcon={
-                  <AccountCircleOutlinedIcon sx={{ color: "success.main" }} />
-                }
-                sx={{
-                  minWidth: 0,
-                  maxWidth: 220,
-                  textTransform: "none",
-                  color: "text.primary",
-                  px: 1,
-                }}
-              >
-                <Typography variant="body2" component="span" noWrap sx={{ minWidth: 0 }}>
-                  {accountLabel || "Account"}
-                </Typography>
-              </Button>
-            )
-          ) : (
-            <IconButton
-              aria-label="Account"
-              color={signedInColor}
-              onClick={(event) => setAnchorEl(event.currentTarget)}
-            >
-              <AccountCircleOutlinedIcon />
-            </IconButton>
-          )}
-        </span>
-      </Tooltip>
+            )}
+          </span>
+        </Tooltip>
+      ) : null}
       <Menu
         anchorEl={anchorEl}
         open={open}
-        onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        onClose={closeMenu}
+        anchorOrigin={menuAnchorOrigin}
+        transformOrigin={menuTransformOrigin}
       >
-        <MenuItem component={Link} href="/history" onClick={() => setAnchorEl(null)}>
+        <MenuItem component={Link} href="/history" onClick={closeMenu}>
           <ListItemIcon>
             <HistoryOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>History</ListItemText>
         </MenuItem>
-        <MenuItem component={Link} href="/watch-later" onClick={() => setAnchorEl(null)}>
+        <MenuItem component={Link} href="/watch-later" onClick={closeMenu}>
           <ListItemIcon>
             <WatchLaterOutlinedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText>Watch Later</ListItemText>
         </MenuItem>
-        <MenuItem component={Link} href="/library" onClick={() => setAnchorEl(null)}>
+        <MenuItem component={Link} href="/library" onClick={closeMenu}>
           <ListItemIcon>
             <ViewColumnIcon fontSize="small" />
           </ListItemIcon>
@@ -149,7 +181,7 @@ export function AccountMenu() {
         <MenuItem
           onClick={() => {
             toggleMode();
-            setAnchorEl(null);
+            closeMenu();
           }}
         >
           <ListItemIcon>
@@ -276,7 +308,7 @@ export function AccountMenu() {
         </Box>
         <MenuItem
           onClick={() => {
-            setAnchorEl(null);
+            closeMenu();
             clearChannelPageSessionBackups();
             router.refresh();
           }}
@@ -327,7 +359,7 @@ export function AccountMenu() {
               key="passkeys"
               component={Link}
               href={authHref}
-              onClick={() => setAnchorEl(null)}
+              onClick={closeMenu}
             >
               <ListItemIcon>
                 <FingerprintOutlinedIcon fontSize="small" />
@@ -341,7 +373,7 @@ export function AccountMenu() {
               key="sign-out"
               onClick={() => {
                 void signOutUser();
-                setAnchorEl(null);
+                closeMenu();
               }}
             >
               <ListItemIcon>
@@ -354,7 +386,7 @@ export function AccountMenu() {
           <MenuItem
             component={Link}
             href={authHref}
-            onClick={() => setAnchorEl(null)}
+            onClick={closeMenu}
             disabled={authStatus === "loading"}
           >
             <ListItemIcon>

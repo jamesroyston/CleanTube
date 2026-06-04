@@ -17,7 +17,7 @@ import { setWatchCommentsVisibleAction } from "@/app/actions/watchCommentsVisibi
 import { setWatchNarrowPlayerLayoutAction } from "@/app/actions/watchNarrowPlayerLayout";
 import { setWatchUpNextVisibleAction } from "@/app/actions/watchUpNextVisibility";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
-import { SearchChromeProvider } from "@/context/SearchChromeContext";
+import { BrowseLayoutProvider } from "@/context/BrowseLayoutContext";
 import { SWRConfig } from "swr";
 import {
   type InitialThemeSettings,
@@ -426,7 +426,7 @@ export function AppProviders({
                       errorRetryCount: 2,
                     }}
                   >
-                    <SearchChromeProvider>{children}</SearchChromeProvider>
+                    <BrowseLayoutProvider>{children}</BrowseLayoutProvider>
                   </SWRConfig>
                 </NavigationProgressProvider>
               </ThemeProvider>
