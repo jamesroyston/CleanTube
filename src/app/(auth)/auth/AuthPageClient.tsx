@@ -529,20 +529,25 @@ export function AuthPageClient() {
 
                 {showCredentialForm ? (
                   <>
-                    <Box component="form" onSubmit={onSubmit}>
+                    <Box component="form" onSubmit={onSubmit} method="post">
                       <Stack spacing={2}>
                         <TextField
                           type="email"
+                          name="username"
                           label="Email"
                           value={email}
                           onChange={(event) => setEmail(event.target.value)}
+                          autoComplete={passkeysSupported ? "username webauthn" : "username"}
+                          inputProps={{ inputMode: "email", autoCapitalize: "none" }}
                           required
                         />
                         <TextField
                           type="password"
+                          name="password"
                           label="Password"
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
+                          autoComplete="current-password"
                           required
                         />
                         <Button type="submit" variant="contained" disabled={submitting}>
@@ -570,21 +575,26 @@ export function AuthPageClient() {
                     ) : null}
                   </>
                 ) : mode !== "sign-in" ? (
-                  <Box component="form" onSubmit={onSubmit}>
+                  <Box component="form" onSubmit={onSubmit} method="post">
                     <Stack spacing={2}>
                       <TextField
                         type="email"
+                        name="email"
                         label="Email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
+                        autoComplete="email"
+                        inputProps={{ inputMode: "email", autoCapitalize: "none" }}
                         required
                       />
                       {mode !== "reset" ? (
                         <TextField
                           type="password"
+                          name={mode === "sign-up" ? "new-password" : "password"}
                           label="Password"
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
+                          autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
                           required
                         />
                       ) : null}
