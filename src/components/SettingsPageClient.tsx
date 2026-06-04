@@ -17,6 +17,7 @@ import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
 import { useRouter } from "next/navigation";
 
+import { LogoConceptsPreview } from "@/components/LogoConceptsPreview";
 import { MobilePageHeader } from "@/components/MobilePageHeader";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
 import {
@@ -170,6 +171,8 @@ export function SettingsPageClient() {
           </ListItem>
         </List>
       </Paper>
+
+      <LogoConceptsPreview />
 
       <List component={Paper} variant="outlined" disablePadding sx={{ mb: 3 }}>
         <ListSubheader disableSticky>Maintenance</ListSubheader>
