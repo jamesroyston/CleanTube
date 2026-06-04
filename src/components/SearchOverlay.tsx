@@ -25,7 +25,13 @@ import type { SearchSortMode } from "@/lib/uploadedAtSort";
 
 export type SearchOverlayProps = {
   open: boolean;
+  /** Narrow viewport: full-screen sheet (desktop mouse windows included). */
   compact: boolean;
+  /**
+   * Touch/PWA bottom-nav surface: self-contained sheet (no browse app bar underneath),
+   * safe-area padding, and a prominent close control.
+   */
+  mobileExperience: boolean;
   query: string;
   searchSortDraft: SearchSortMode;
   recentList: string[];
@@ -62,9 +68,21 @@ function SearchFieldClearButton({
   );
 }
 
+const MOBILE_CLOSE_BUTTON_SX = {
+  minWidth: 48,
+  minHeight: 48,
+  flexShrink: 0,
+} as const;
+
+const MOBILE_FULL_HEIGHT_SX = {
+  minHeight: ["100vh", "-webkit-fill-available", "100dvh"],
+  height: "-webkit-fill-available",
+} as const;
+
 export function SearchOverlay({
   open,
   compact,
+  mobileExperience,
   query,
   searchSortDraft,
   recentList,
@@ -77,6 +95,7 @@ export function SearchOverlay({
   const { clearRecentSearches, getRecentSearches, removeRecentSearch } =
     useCloudLibrary();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const fullScreen = compact || mobileExperience;
 
   const focusInput = useCallback(() => {
     const el = inputRef.current;
@@ -88,10 +107,10 @@ export function SearchOverlay({
 
   // Mobile: focus soon after open (user-gesture window); onEntered is backup after transition.
   useEffect(() => {
-    if (!open || !compact) return;
+    if (!open || !fullScreen) return;
     const id = requestAnimationFrame(() => focusInput());
     return () => cancelAnimationFrame(id);
-  }, [compact, focusInput, open]);
+  }, [focusInput, fullScreen, open]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -100,11 +119,11 @@ export function SearchOverlay({
 
   return (
     <Dialog
-      fullScreen={compact}
+      fullScreen={fullScreen}
       open={open}
       onClose={onClose}
-      maxWidth={compact ? false : "sm"}
-      fullWidth={!compact}
+      maxWidth={fullScreen ? false : "sm"}
+      fullWidth={!fullScreen}
       disableAutoFocus
       slotProps={{
         transition: {
@@ -115,12 +134,18 @@ export function SearchOverlay({
             bgcolor: "background.default",
             display: "flex",
             flexDirection: "column",
-            ...(compact
-              ? { minHeight: "100dvh" }
-              : {
-                  mt: { xs: 8, sm: 10 },
-                  maxHeight: "min(560px, calc(100vh - 96px))",
-                }),
+            boxSizing: "border-box",
+            ...(mobileExperience
+              ? {
+                  pt: "env(safe-area-inset-top, 0px)",
+                  ...MOBILE_FULL_HEIGHT_SX,
+                }
+              : compact
+                ? MOBILE_FULL_HEIGHT_SX
+                : {
+                    mt: { xs: 8, sm: 10 },
+                    maxHeight: "min(560px, calc(100vh - 96px))",
+                  }),
           },
         },
       }}
@@ -137,12 +162,30 @@ export function SearchOverlay({
           display: "flex",
           flexDirection: "column",
           gap: 1.5,
+          flexShrink: 0,
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-          <IconButton aria-label="Close search" onClick={onClose} edge="start">
-            <ArrowBackIcon />
-          </IconButton>
+          {mobileExperience ? (
+            <IconButton
+              aria-label="Close search"
+              onClick={onClose}
+              edge="start"
+              size="large"
+              sx={MOBILE_CLOSE_BUTTON_SX}
+            >
+              <CloseIcon />
+            </IconButton>
+          ) : (
+            <IconButton
+              aria-label="Close search"
+              onClick={onClose}
+              edge="start"
+              sx={compact ? MOBILE_CLOSE_BUTTON_SX : undefined}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+          )}
           <TextField
             fullWidth
             size="small"
@@ -172,6 +215,15 @@ export function SearchOverlay({
               },
             }}
           />
+          {mobileExperience ? (
+            <Button
+              type="button"
+              onClick={onClose}
+              sx={{ flexShrink: 0, minHeight: 48, px: 1 }}
+            >
+              Cancel
+            </Button>
+          ) : null}
         </Box>
         <FormControlLabel
           sx={{ m: 0, mx: 0.5, alignSelf: "flex-start" }}
@@ -189,7 +241,18 @@ export function SearchOverlay({
           }
         />
       </Box>
-      <List dense sx={{ py: 0, overflow: "auto", flex: 1, minHeight: 0 }}>
+      <List
+        dense
+        sx={{
+          py: 0,
+          overflow: "auto",
+          flex: 1,
+          minHeight: 0,
+          pb: mobileExperience
+            ? "env(safe-area-inset-bottom, 0px)"
+            : undefined,
+        }}
+      >
         <ListSubheader
           component="div"
           disableSticky

@@ -1,5 +1,6 @@
 "use client";
 
+import Box from "@mui/material/Box";
 import type { ReactNode } from "react";
 
 import { ScrollRevealHeader } from "@/components/ScrollRevealHeader";
@@ -17,7 +18,11 @@ export function CompactLayoutChrome({
   return (
     <>
       <ScrollRevealHeader />
-      {showBottomNav ? bottomNav : null}
+      {showBottomNav ? (
+        <Box component="span" data-mobile-chrome sx={{ display: "contents" }}>
+          {bottomNav}
+        </Box>
+      ) : null}
     </>
   );
 }

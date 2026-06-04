@@ -6,10 +6,13 @@ import {
   useContext,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 
 type SearchOverlayContextValue = {
+  searchOverlayOpen: boolean;
+  setSearchOverlayOpen: (open: boolean) => void;
   openSearchOverlay: () => void;
   registerOpenSearchOverlay: (fn: (() => void) | null) => void;
 };
@@ -20,6 +23,7 @@ const SearchOverlayContext = createContext<SearchOverlayContextValue | null>(
 
 export function SearchOverlayProvider({ children }: { children: ReactNode }) {
   const openRef = useRef<(() => void) | null>(null);
+  const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
 
   const registerOpenSearchOverlay = useCallback((fn: (() => void) | null) => {
     openRef.current = fn;
@@ -30,8 +34,13 @@ export function SearchOverlayProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ openSearchOverlay, registerOpenSearchOverlay }),
-    [openSearchOverlay, registerOpenSearchOverlay],
+    () => ({
+      searchOverlayOpen,
+      setSearchOverlayOpen,
+      openSearchOverlay,
+      registerOpenSearchOverlay,
+    }),
+    [openSearchOverlay, registerOpenSearchOverlay, searchOverlayOpen],
   );
 
   return (

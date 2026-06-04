@@ -11,12 +11,29 @@
  *
  * Touch phones in landscape often exceed 900px (e.g. iPhone 15 Pro Max ≈932px), so touch
  * devices keep compact layout up to 1024px.
+ *
+ * SSR/first paint uses `CompactLayoutProvider` hints (cookie + UA) as `useMediaQuery`
+ * `defaultMatches` to avoid a desktop-layout flash before hydration.
  */
 
 import { useState } from "react";
 import useMediaQuery from "@mui/material/useMediaQuery";
 
+import { useCompactLayoutHint } from "@/context/CompactLayoutContext";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/lib/compactLayout";
+import {
+  mergeCompactLayoutHints,
+  readCompactLayoutBootstrapFromDom,
+} from "@/lib/compactLayoutBootstrap";
+import type { CompactLayoutHint } from "@/lib/compactLayoutHint";
+
+function useEffectiveCompactLayoutHint(): CompactLayoutHint {
+  const serverHint = useCompactLayoutHint();
+  return mergeCompactLayoutHints(
+    serverHint,
+    readCompactLayoutBootstrapFromDom(),
+  );
+}
 
 /** Below MUI `md` (900px): document scroll, compact header layout. */
 export const COMPACT_VIEWPORT_QUERY = "(max-width:899.95px)";
@@ -44,21 +61,32 @@ function readTouchInputFallback(): boolean {
   return navigator.maxTouchPoints > 0;
 }
 
-function useTouchPrimaryDevice(): boolean {
-  const mediaMatch = useMediaQuery(TOUCH_OR_PWA_QUERY);
+export function useTouchPrimaryDevice(): boolean {
+  const hint = useEffectiveCompactLayoutHint();
+  const mediaMatch = useMediaQuery(TOUCH_OR_PWA_QUERY, {
+    defaultMatches: hint.touchPrimary,
+  });
   const [touchInputFallback] = useState(readTouchInputFallback);
   return mediaMatch || touchInputFallback;
 }
 
 export function useCompactViewport(): boolean {
-  const defaultCompact = useMediaQuery(COMPACT_VIEWPORT_QUERY);
-  const touchWideCompact = useMediaQuery(TOUCH_COMPACT_VIEWPORT_QUERY);
+  const hint = useEffectiveCompactLayoutHint();
+  const defaultCompact = useMediaQuery(COMPACT_VIEWPORT_QUERY, {
+    defaultMatches: hint.compactViewport,
+  });
+  const touchWideCompact = useMediaQuery(TOUCH_COMPACT_VIEWPORT_QUERY, {
+    defaultMatches: hint.compactViewport,
+  });
   const touchPrimary = useTouchPrimaryDevice();
   return defaultCompact || (touchPrimary && touchWideCompact);
 }
 
 export function useHeaderScrollsAway(): boolean {
-  return useMediaQuery(HEADER_SCROLLS_AWAY_QUERY);
+  const hint = useEffectiveCompactLayoutHint();
+  return useMediaQuery(HEADER_SCROLLS_AWAY_QUERY, {
+    defaultMatches: hint.compactViewport,
+  });
 }
 
 /**
