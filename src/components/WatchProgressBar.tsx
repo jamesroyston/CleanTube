@@ -1,6 +1,7 @@
 "use client";
 
 import Box from "@mui/material/Box";
+import { alpha, useTheme } from "@mui/material/styles";
 
 export function WatchProgressBar({
   positionSeconds,
@@ -15,6 +16,7 @@ export function WatchProgressBar({
   /** When true, render a full-width bar (e.g. completed videos). */
   forceFull?: boolean;
 }) {
+  const theme = useTheme();
   const percent = forceFull
     ? 100
     : durationSeconds && durationSeconds > 0
@@ -29,7 +31,11 @@ export function WatchProgressBar({
     <Box
       sx={{
         ...(isOverlay
-          ? { height: 3, borderRadius: 0, bgcolor: "rgba(255,255,255,0.35)" }
+          ? {
+              height: 3,
+              borderRadius: 0,
+              bgcolor: alpha(theme.palette.common.white, 0.35),
+            }
           : { mt: 0.5, height: 4, borderRadius: 999, bgcolor: "action.hover" }),
         overflow: "hidden",
       }}

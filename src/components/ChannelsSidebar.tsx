@@ -21,11 +21,11 @@ import Link from "next/link";
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { savedChannelBrowseHref } from "@/lib/savedChannelNavigation";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
-import type { SavedChannel } from "@/types/savedChannel";
 
-export const CHANNELS_DRAWER_WIDTH = 276;
-/** Mini rail outer width aligned with fixed AppBar `left` / main `marginLeft`. */
-export const CHANNELS_COLLAPSED_DRAWER_WIDTH = 77;
+export {
+  CHANNELS_COLLAPSED_DRAWER_WIDTH,
+  CHANNELS_DRAWER_WIDTH,
+} from "@/theme/layout";
 
 /** Shared transition easing with MUI mini-variant drawer demos. */
 export function drawerRailTransition(theme: Theme) {

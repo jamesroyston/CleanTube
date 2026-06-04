@@ -10,7 +10,6 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useMemo } from "react";
 
-import { HomeHeroEmpty } from "@/components/HomeHeroEmpty";
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import type { VideoSummary } from "@/components/VideoSummary";
 import {
@@ -113,16 +112,11 @@ export function ForYouFeedView({
       (canPersistLibrary && libraryCloudSyncState === "syncing"));
 
   const showSignInPrompt = authStatus === "ready" && !canPersistLibrary;
-  const showSignedOutLanding = !effectiveSignedIn && showSignInPrompt;
   const resolvedFeedError = feedError ?? initialError ?? null;
 
   return (
     <>
-      {showSignedOutLanding ? (
-        <HomeHeroEmpty />
-      ) : null}
-
-      <Stack spacing={1} sx={{ mb: 3, mt: showSignedOutLanding ? 4 : 0 }}>
+      <Stack spacing={1} sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <DynamicFeedOutlinedIcon color="primary" />
           <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>

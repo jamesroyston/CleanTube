@@ -131,10 +131,13 @@ export function SearchOverlay({
         },
         paper: {
           sx: {
-            bgcolor: "background.default",
+            bgcolor: "background.paper",
             display: "flex",
             flexDirection: "column",
             boxSizing: "border-box",
+            border: fullScreen ? 0 : 1,
+            borderColor: "divider",
+            borderRadius: fullScreen ? 0 : 2,
             ...(mobileExperience
               ? {
                   pt: "env(safe-area-inset-top, 0px)",
