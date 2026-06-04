@@ -68,6 +68,8 @@ export type WatchExperienceClientProps = {
    * When the Up next cookie was on at SSR time, server-fetched related list; otherwise [].
    */
   watchNextInitial: VideoSummary[];
+  /** Load comments once visible when the user keeps comments enabled in settings. */
+  commentsFetchOnMount?: boolean;
 };
 
 export function WatchExperienceClient({
@@ -79,6 +81,7 @@ export function WatchExperienceClient({
   channelPageHref,
   commentsInitial,
   watchNextInitial,
+  commentsFetchOnMount = false,
 }: WatchExperienceClientProps) {
   const searchParams = useSearchParams();
   const {
@@ -281,7 +284,9 @@ export function WatchExperienceClient({
                 <WatchComments
                   videoId={videoId}
                   initialComments={commentsInitial}
-                  fetchInitialIfNeeded={commentsInitial === null}
+                  fetchInitialIfNeeded={
+                    commentsFetchOnMount || commentsInitial === null
+                  }
                   isVisible={commentsVisible}
                 />
               </Box>
