@@ -93,7 +93,7 @@ export function useChannelPage({
     swrKey,
     fetchChannelPage,
     {
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
       keepPreviousData: true,
       fallbackData: sessionFallback
         ? ({ page: sessionFallback } satisfies ChannelPageApiResponse)

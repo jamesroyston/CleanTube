@@ -12,7 +12,13 @@ import {
   type CleanTubeLogoVariant,
 } from "@/components/logo/CleanTubeLogoMark";
 
-const VARIANTS: CleanTubeLogoVariant[] = ["wave", "ring", "minimal", "lanes"];
+const VARIANTS: CleanTubeLogoVariant[] = [
+  "wave",
+  "dawn",
+  "leaf",
+  "ripple",
+  "horizon",
+];
 
 export function LogoConceptsPreview() {
   const theme = useTheme();
@@ -23,8 +29,8 @@ export function LogoConceptsPreview() {
         Logo concepts
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
-        The header still uses Wave. Compare alternatives below — say which you prefer
-        if you want to switch.
+        The header still uses Wave. New concepts lean nature, calm, and abstract —
+        say which you prefer if you want to switch.
       </Typography>
       <Stack spacing={1.5}>
         {VARIANTS.map((variant) => {

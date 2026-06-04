@@ -74,9 +74,18 @@ const MOBILE_CLOSE_BUTTON_SX = {
   flexShrink: 0,
 } as const;
 
+/** Fixed viewport sheet — do not inherit document scroll height from the page below. */
 const MOBILE_FULL_HEIGHT_SX = {
-  minHeight: ["100vh", "-webkit-fill-available", "100dvh"],
-  height: "-webkit-fill-available",
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  width: "100%",
+  height: "100dvh",
+  maxHeight: "100dvh",
+  minHeight: 0,
+  margin: 0,
 } as const;
 
 export function SearchOverlay({
@@ -135,6 +144,7 @@ export function SearchOverlay({
       maxWidth={fullScreen ? false : "sm"}
       fullWidth={!fullScreen}
       disableAutoFocus
+      disableScrollLock={false}
       slotProps={{
         transition: {
           onEntered: focusInput,
@@ -165,6 +175,16 @@ export function SearchOverlay({
       }}
     >
       <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
+          height: "100%",
+          overflow: "hidden",
+        }}
+      >
+      <Box
         component="form"
         onSubmit={handleSubmit}
         autoComplete="off"
@@ -177,6 +197,10 @@ export function SearchOverlay({
           flexDirection: "column",
           gap: 1.5,
           flexShrink: 0,
+          position: "sticky",
+          top: 0,
+          zIndex: 2,
+          bgcolor: "background.paper",
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
@@ -203,7 +227,7 @@ export function SearchOverlay({
           <TextField
             fullWidth
             size="small"
-            autoComplete="off"
+            name="cleantube-search"
             placeholder="Search or paste a YouTube URL"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
@@ -211,6 +235,10 @@ export function SearchOverlay({
             inputRef={inputRef}
             autoFocus
             slotProps={{
+              htmlInput: {
+                autoComplete: "off",
+                enterKeyHint: "search",
+              },
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
@@ -337,6 +365,7 @@ export function SearchOverlay({
           ))
         )}
       </List>
+      </Box>
     </Dialog>
   );
 }

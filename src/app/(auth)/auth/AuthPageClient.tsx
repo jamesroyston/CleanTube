@@ -461,9 +461,15 @@ export function AuthPageClient() {
                     </Typography>
                     <TextField
                       label="6-digit code"
+                      name="totp"
                       value={totpCode}
                       onChange={(e) => setTotpCode(e.target.value)}
-                      inputProps={{ inputMode: "numeric", autoComplete: "one-time-code" }}
+                      slotProps={{
+                        htmlInput: {
+                          inputMode: "numeric",
+                          autoComplete: "one-time-code",
+                        },
+                      }}
                     />
                     <Button variant="contained" disabled={submitting} onClick={() => void onTotpSubmit()}>
                       Verify and continue
@@ -501,9 +507,15 @@ export function AuthPageClient() {
                       <>
                         <TextField
                           label="SMS code"
+                          name="sms"
                           value={phoneCode}
                           onChange={(e) => setPhoneCode(e.target.value)}
-                          inputProps={{ inputMode: "numeric", autoComplete: "one-time-code" }}
+                          slotProps={{
+                            htmlInput: {
+                              inputMode: "numeric",
+                              autoComplete: "one-time-code",
+                            },
+                          }}
                         />
                         <Button
                           variant="contained"
@@ -529,26 +541,43 @@ export function AuthPageClient() {
 
                 {showCredentialForm ? (
                   <>
-                    <Box component="form" onSubmit={onSubmit} method="post">
+                    <Box
+                      component="form"
+                      id="cleantube-signin"
+                      onSubmit={onSubmit}
+                      method="post"
+                      autoComplete="on"
+                    >
                       <Stack spacing={2}>
                         <TextField
                           type="email"
                           name="username"
+                          id="cleantube-signin-email"
                           label="Email"
                           value={email}
                           onChange={(event) => setEmail(event.target.value)}
-                          autoComplete={passkeysSupported ? "username webauthn" : "username"}
-                          inputProps={{ inputMode: "email", autoCapitalize: "none" }}
                           required
+                          slotProps={{
+                            htmlInput: {
+                              autoComplete: passkeysSupported
+                                ? "username webauthn"
+                                : "username",
+                              inputMode: "email",
+                              autoCapitalize: "none",
+                            },
+                          }}
                         />
                         <TextField
                           type="password"
                           name="password"
+                          id="cleantube-signin-password"
                           label="Password"
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
-                          autoComplete="current-password"
                           required
+                          slotProps={{
+                            htmlInput: { autoComplete: "current-password" },
+                          }}
                         />
                         <Button type="submit" variant="contained" disabled={submitting}>
                           Sign in
@@ -575,27 +604,46 @@ export function AuthPageClient() {
                     ) : null}
                   </>
                 ) : mode !== "sign-in" ? (
-                  <Box component="form" onSubmit={onSubmit} method="post">
+                  <Box
+                    component="form"
+                    id={mode === "sign-up" ? "cleantube-signup" : "cleantube-reset"}
+                    onSubmit={onSubmit}
+                    method="post"
+                    autoComplete="on"
+                  >
                     <Stack spacing={2}>
                       <TextField
                         type="email"
                         name="email"
+                        id={
+                          mode === "sign-up"
+                            ? "cleantube-signup-email"
+                            : "cleantube-reset-email"
+                        }
                         label="Email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
-                        autoComplete="email"
-                        inputProps={{ inputMode: "email", autoCapitalize: "none" }}
                         required
+                        slotProps={{
+                          htmlInput: {
+                            autoComplete: "email",
+                            inputMode: "email",
+                            autoCapitalize: "none",
+                          },
+                        }}
                       />
                       {mode !== "reset" ? (
                         <TextField
                           type="password"
-                          name={mode === "sign-up" ? "new-password" : "password"}
+                          name="new-password"
+                          id="cleantube-signup-password"
                           label="Password"
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
-                          autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
                           required
+                          slotProps={{
+                            htmlInput: { autoComplete: "new-password" },
+                          }}
                         />
                       ) : null}
                       <Button type="submit" variant="contained" disabled={submitting}>
