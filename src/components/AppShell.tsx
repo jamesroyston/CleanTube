@@ -34,6 +34,7 @@ import {
   useCompactViewport,
   useShowBottomNav,
 } from "@/hooks/useCompactViewport";
+import { useMobileExperience } from "@/hooks/useMobileExperience";
 import { registerScrollElementGetter } from "@/lib/watchReturnNavigation";
 
 function HeaderFallback() {
@@ -50,6 +51,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const pathname = usePathname();
   const compact = useCompactViewport();
+  const mobileExperience = useMobileExperience();
   const desktopLayout = !compact;
   const { headerOverlayActive } = useHeaderScroll();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -141,7 +143,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   /** Desktop rail only when not in compact (mobile/touch) layout. */
   const temporaryOpen = desktopLayout ? false : mobileOpen;
 
-  const headerLeading = (
+  const headerLeading = mobileExperience ? null : (
     <IconButton
       color="inherit"
       edge="start"
@@ -245,7 +247,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       </Suspense>
       <CompactLayoutChrome
         showBottomNav={showBottomNav}
-        bottomNav={<MobileBottomNav onOpenLibrary={openMobileDrawer} />}
+        bottomNav={<MobileBottomNav />}
       />
 
       {desktopRailPx != null ? (
@@ -321,6 +323,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             flexDirection: "column",
           }}
         >
+          {!mobileExperience ? (
           <Drawer
             variant="temporary"
             open={temporaryOpen}
@@ -352,6 +355,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               onNavigate={dismissMobileDrawerForNavigation}
             />
           </Drawer>
+          ) : null}
 
           <Box component="main" sx={{ flex: 1, minHeight: 0 }}>
             {mainScroll}
