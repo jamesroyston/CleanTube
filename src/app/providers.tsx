@@ -1,7 +1,7 @@
 "use client";
 
 import CssBaseline from "@mui/material/CssBaseline";
-import { ThemeProvider } from "@mui/material/styles";
+import { ThemeProvider, useColorScheme } from "@mui/material/styles";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import {
   createContext,
@@ -42,8 +42,8 @@ import {
   parseWatchNarrowPlayerLayoutCookie,
   watchNarrowPlayerLayoutToStorageValue,
 } from "@/lib/watchNarrowPlayerLayoutPersistence";
-import { applySemanticCssVariables, semanticTokensForMode } from "@/theme/semanticTokens";
 import { createSsrMatchMedia } from "@/lib/compactLayoutSsr";
+import { themeStorageManager } from "@/lib/themeStorageManager";
 import { createAppTheme } from "@/theme/theme";
 
 type ThemeContextValue = {
@@ -233,6 +233,61 @@ export function useLibrarySidebarCollapsed() {
   return ctx;
 }
 
+function resolveThemeMode(
+  mode: ReturnType<typeof useColorScheme>["mode"],
+  fallback: ThemeMode,
+): ThemeMode {
+  return mode === "light" || mode === "dark" ? mode : fallback;
+}
+
+function ThemeModeBridge({
+  children,
+  initialTheme,
+}: {
+  children: React.ReactNode;
+  initialTheme: InitialThemeSettings;
+}) {
+  const { mode: colorSchemeMode, setMode: setColorSchemeMode } =
+    useColorScheme();
+  const mode = resolveThemeMode(colorSchemeMode, initialTheme.mode);
+
+  useEffect(() => {
+    clearLegacyThemeStorage();
+  }, []);
+
+  useEffect(() => {
+    if (initialTheme.hasStoredCookie) return;
+    const stored = readStoredThemeMode() ?? systemThemeMode();
+    setColorSchemeMode(stored);
+    writeThemeCookie(THEME_MODE_COOKIE, stored);
+    writeThemeStorage(THEME_MODE_STORAGE_KEY, stored);
+  }, [initialTheme.hasStoredCookie, setColorSchemeMode]);
+
+  const setMode = useCallback(
+    (next: ThemeMode) => {
+      setColorSchemeMode(next);
+    },
+    [setColorSchemeMode],
+  );
+
+  const toggleMode = useCallback(() => {
+    setMode(mode === "dark" ? "light" : "dark");
+  }, [mode, setMode]);
+
+  const value = useMemo(
+    () => ({
+      mode,
+      toggleMode,
+      setMode,
+    }),
+    [mode, toggleMode, setMode],
+  );
+
+  return (
+    <ThemeModeContext.Provider value={value}>{children}</ThemeModeContext.Provider>
+  );
+}
+
 export function AppProviders({
   children,
   initialTheme,
@@ -254,7 +309,6 @@ export function AppProviders({
   librarySidebarHasCookie: boolean;
   watchNarrowPlayerLayoutHasCookie: boolean;
 }) {
-  const [mode, setModeState] = useState<ThemeMode>(initialTheme.mode);
   const [watchCommentsVisible, setWatchCommentsVisibleState] = useState(
     initialWatchCommentsVisible,
   );
@@ -267,17 +321,6 @@ export function AppProviders({
   const [librarySidebarCollapsed, setLibrarySidebarCollapsedState] = useState(
     initialLibrarySidebarCollapsed,
   );
-
-  useEffect(() => {
-    applySemanticCssVariables(
-      document.documentElement,
-      semanticTokensForMode(mode),
-    );
-  }, [mode]);
-
-  useEffect(() => {
-    clearLegacyThemeStorage();
-  }, []);
 
   useEffect(() => {
     if (librarySidebarHasCookie) return;
@@ -298,29 +341,6 @@ export function AppProviders({
   }, [watchNarrowPlayerLayoutHasCookie]);
 
   useEffect(() => {
-    if (initialTheme.hasStoredCookie) return;
-    const stored = readStoredThemeMode() ?? systemThemeMode();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time migration from legacy localStorage-only theme settings
-    setModeState(stored);
-    writeThemeCookie(THEME_MODE_COOKIE, stored);
-    writeThemeStorage(THEME_MODE_STORAGE_KEY, stored);
-  }, [initialTheme.hasStoredCookie]);
-
-  useEffect(() => {
-    function onStorage(e: StorageEvent) {
-      if (e.key === THEME_MODE_STORAGE_KEY && e.newValue) {
-        const next = normalizeThemeMode(e.newValue);
-        if (next) {
-          setModeState(next);
-          writeThemeCookie(THEME_MODE_COOKIE, next);
-        }
-      }
-    }
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  useEffect(() => {
     function onStorage(e: StorageEvent) {
       if (e.key !== LIBRARY_SIDEBAR_COLLAPSED_STORAGE_KEY || e.newValue == null) {
         return;
@@ -332,16 +352,6 @@ export function AppProviders({
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
-
-  const setMode = useCallback((m: ThemeMode) => {
-    setModeState(m);
-    writeThemeStorage(THEME_MODE_STORAGE_KEY, m);
-    writeThemeCookie(THEME_MODE_COOKIE, m);
-  }, []);
-
-  const toggleMode = useCallback(() => {
-    setMode(mode === "dark" ? "light" : "dark");
-  }, [mode, setMode]);
 
   const setWatchCommentsVisible = useCallback((next: boolean) => {
     setWatchCommentsVisibleState(next);
@@ -371,17 +381,8 @@ export function AppProviders({
   );
 
   const theme = useMemo(
-    () => createAppTheme(mode, { ssrMatchMedia }),
-    [mode, ssrMatchMedia],
-  );
-
-  const value = useMemo(
-    () => ({
-      mode,
-      toggleMode,
-      setMode,
-    }),
-    [mode, toggleMode, setMode],
+    () => createAppTheme({ ssrMatchMedia }),
+    [ssrMatchMedia],
   );
 
   const watchCommentsVisibleValue = useMemo(
@@ -418,38 +419,44 @@ export function AppProviders({
 
   return (
     <AppRouterCacheProvider options={{ key: "mui" }}>
-      <ThemeModeContext.Provider value={value}>
-        <LibrarySidebarCollapsedContext.Provider
-          value={librarySidebarCollapsedValue}
-        >
-          <WatchUpNextVisibleContext.Provider value={watchUpNextVisibleValue}>
-            <WatchNarrowPlayerLayoutContext.Provider
-              value={watchNarrowPlayerLayoutValue}
-            >
-              <WatchCommentsVisibleContext.Provider
-                value={watchCommentsVisibleValue}
+      <ThemeProvider
+        theme={theme}
+        defaultMode={initialTheme.mode}
+        modeStorageKey={THEME_MODE_STORAGE_KEY}
+        storageManager={themeStorageManager}
+        disableTransitionOnChange
+      >
+        <ThemeModeBridge initialTheme={initialTheme}>
+          <LibrarySidebarCollapsedContext.Provider
+            value={librarySidebarCollapsedValue}
+          >
+            <WatchUpNextVisibleContext.Provider value={watchUpNextVisibleValue}>
+              <WatchNarrowPlayerLayoutContext.Provider
+                value={watchNarrowPlayerLayoutValue}
               >
-              <ThemeProvider theme={theme}>
-                <CssBaseline enableColorScheme />
-                <NavigationProgressProvider>
-                  <SWRConfig
-                    value={{
-                      revalidateOnFocus: true,
-                      shouldRetryOnError: true,
-                      errorRetryCount: 2,
-                    }}
-                  >
-                    <CompactLayoutProvider initialHint={initialCompactLayoutHint}>
-                      <BrowseLayoutProvider>{children}</BrowseLayoutProvider>
-                    </CompactLayoutProvider>
-                  </SWRConfig>
-                </NavigationProgressProvider>
-              </ThemeProvider>
-              </WatchCommentsVisibleContext.Provider>
-            </WatchNarrowPlayerLayoutContext.Provider>
-          </WatchUpNextVisibleContext.Provider>
-        </LibrarySidebarCollapsedContext.Provider>
-      </ThemeModeContext.Provider>
+                <WatchCommentsVisibleContext.Provider
+                  value={watchCommentsVisibleValue}
+                >
+                  <CssBaseline enableColorScheme />
+                  <NavigationProgressProvider>
+                    <SWRConfig
+                      value={{
+                        revalidateOnFocus: true,
+                        shouldRetryOnError: true,
+                        errorRetryCount: 2,
+                      }}
+                    >
+                      <CompactLayoutProvider initialHint={initialCompactLayoutHint}>
+                        <BrowseLayoutProvider>{children}</BrowseLayoutProvider>
+                      </CompactLayoutProvider>
+                    </SWRConfig>
+                  </NavigationProgressProvider>
+                </WatchCommentsVisibleContext.Provider>
+              </WatchNarrowPlayerLayoutContext.Provider>
+            </WatchUpNextVisibleContext.Provider>
+          </LibrarySidebarCollapsedContext.Provider>
+        </ThemeModeBridge>
+      </ThemeProvider>
     </AppRouterCacheProvider>
   );
 }

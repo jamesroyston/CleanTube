@@ -26,6 +26,10 @@ import {
   readCompactLayoutBootstrapFromDom,
 } from "@/lib/compactLayoutBootstrap";
 import type { CompactLayoutHint } from "@/lib/compactLayoutHint";
+import {
+  COMPACT_VIEWPORT_MQ,
+  TOUCH_COMPACT_VIEWPORT_MQ,
+} from "@/theme/breakpoints";
 
 function useEffectiveCompactLayoutHint(): CompactLayoutHint {
   const serverHint = useCompactLayoutHint();
@@ -36,10 +40,10 @@ function useEffectiveCompactLayoutHint(): CompactLayoutHint {
 }
 
 /** Below MUI `md` (900px): document scroll, compact header layout. */
-export const COMPACT_VIEWPORT_QUERY = "(max-width:899.95px)";
+export const COMPACT_VIEWPORT_QUERY = COMPACT_VIEWPORT_MQ;
 
 /** Touch/PWA compact layout through phone landscape widths (below `lg`). */
-export const TOUCH_COMPACT_VIEWPORT_QUERY = "(max-width:1023.95px)";
+export const TOUCH_COMPACT_VIEWPORT_QUERY = TOUCH_COMPACT_VIEWPORT_MQ;
 
 /**
  * Header uses in-flow layout on xs portrait and mobile landscape (scroll-reveal applies).

@@ -3,6 +3,7 @@
 import ReplayIcon from "@mui/icons-material/Replay";
 import Box from "@mui/material/Box";
 import Chip from "@mui/material/Chip";
+import { alpha } from "@mui/material/styles";
 import type { ReactNode } from "react";
 
 import { WatchProgressBar } from "@/components/WatchProgressBar";
@@ -53,8 +54,8 @@ export function VideoCardThumbnailWithProgress({
             fontSize: "0.65rem",
             fontWeight: 600,
             pointerEvents: "none",
-            bgcolor: "rgba(0,0,0,0.72)",
-            color: "#fff",
+            bgcolor: (theme) => alpha(theme.palette.overlay, 0.72),
+            color: "common.white",
             "& .MuiChip-icon": { color: "inherit", ml: 0.5 },
             "& .MuiChip-label": { px: 0.75 },
           }}
@@ -66,7 +67,7 @@ export function VideoCardThumbnailWithProgress({
           sx={{
             position: "absolute",
             inset: 0,
-            bgcolor: "rgba(0,0,0,0.35)",
+            bgcolor: (theme) => alpha(theme.palette.scrim, 0.35),
             pointerEvents: "none",
             zIndex: 1,
           }}

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { Roboto } from "next/font/google";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { cookies, headers } from "next/headers";
 import { AppProviders } from "@/app/providers";
 import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
@@ -28,14 +29,16 @@ import {
 import {
   createInitialThemeSettings,
   THEME_MODE_COOKIE,
+  THEME_MODE_STORAGE_KEY,
 } from "@/lib/themePersistence";
+import { getThemeMetaColors } from "@/theme/tokens";
 import "./globals.css";
 
-const roboto = Roboto({
-  weight: ["300", "400", "500", "700"],
+const plusJakarta = Plus_Jakarta_Sans({
+  weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-roboto",
+  variable: "--font-plus-jakarta",
 });
 
 export const metadata: Metadata = {
@@ -59,14 +62,16 @@ export const metadata: Metadata = {
   },
 };
 
-/** Dark/light theme colors from semanticTokens (base100 / primary). */
+const lightMeta = getThemeMetaColors("light");
+const darkMeta = getThemeMetaColors("dark");
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: dark)", color: "#1d232a" },
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: darkMeta.themeColor },
+    { media: "(prefers-color-scheme: light)", color: lightMeta.themeColor },
   ],
 };
 
@@ -114,7 +119,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={roboto.variable}
+      className={plusJakarta.variable}
       data-theme={initialTheme.mode}
       {...compactLayoutHtmlAttrs}
       suppressHydrationWarning
@@ -125,6 +130,11 @@ export default async function RootLayout({
         />
       </head>
       <body style={{ margin: 0 }}>
+        <InitColorSchemeScript
+          attribute="data-theme"
+          defaultMode={initialTheme.mode}
+          modeStorageKey={THEME_MODE_STORAGE_KEY}
+        />
         <AppProviders
           initialTheme={initialTheme}
           initialWatchCommentsVisible={initialWatchCommentsVisible}

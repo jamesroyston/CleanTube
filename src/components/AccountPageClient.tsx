@@ -78,7 +78,7 @@ export function AccountPageClient() {
             <AccountCircleOutlinedIcon fontSize="large" />
           </Avatar>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }} noWrap>
+            <Typography variant="h6" noWrap>
               {displayName}
             </Typography>
             {user?.email ? (

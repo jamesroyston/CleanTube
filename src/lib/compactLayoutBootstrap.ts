@@ -9,6 +9,10 @@
  */
 
 import type { CompactLayoutHint } from "@/lib/compactLayoutHint";
+import {
+  COMPACT_VIEWPORT_MQ,
+  TOUCH_COMPACT_VIEWPORT_MQ,
+} from "@/theme/breakpoints";
 
 export const COMPACT_LAYOUT_DATA_ATTRS = {
   pwaStandalone: "data-pwa-standalone",
@@ -18,7 +22,7 @@ export const COMPACT_LAYOUT_DATA_ATTRS = {
 } as const;
 
 /** Minified IIFE — no external deps; runs synchronously in `<head>`. */
-export const COMPACT_LAYOUT_BOOTSTRAP_SCRIPT = `(function(){var d=document.documentElement,m=window.matchMedia;if(!d||!m)return;var standalone=m("(display-mode: standalone)").matches||m("(display-mode: fullscreen)").matches||m("(display-mode: minimal-ui)").matches||(typeof navigator!=="undefined"&&navigator.standalone===true);var touchMq=m("(hover: none) and (pointer: coarse), (pointer: coarse), (display-mode: standalone)").matches;var touchFallback=typeof navigator!=="undefined"&&navigator.maxTouchPoints>0;var touchPrimary=touchMq||touchFallback||standalone;var compactMq=m("(max-width:899.95px)").matches;var touchWideMq=m("(max-width:1023.95px)").matches;var compact=compactMq||(touchPrimary&&touchWideMq);var mobile=compact&&touchPrimary;function set(a,v){if(v)d.setAttribute(a,"1");else d.removeAttribute(a);}set("data-pwa-standalone",standalone);set("data-touch-primary",touchPrimary);set("data-compact-viewport",compact);set("data-mobile-experience",mobile);})();`;
+export const COMPACT_LAYOUT_BOOTSTRAP_SCRIPT = `(function(){var d=document.documentElement,m=window.matchMedia;if(!d||!m)return;var standalone=m("(display-mode: standalone)").matches||m("(display-mode: fullscreen)").matches||m("(display-mode: minimal-ui)").matches||(typeof navigator!=="undefined"&&navigator.standalone===true);var touchMq=m("(hover: none) and (pointer: coarse), (pointer: coarse), (display-mode: standalone)").matches;var touchFallback=typeof navigator!=="undefined"&&navigator.maxTouchPoints>0;var touchPrimary=touchMq||touchFallback||standalone;var compactMq=m("${COMPACT_VIEWPORT_MQ}").matches;var touchWideMq=m("${TOUCH_COMPACT_VIEWPORT_MQ}").matches;var compact=compactMq||(touchPrimary&&touchWideMq);var mobile=compact&&touchPrimary;function set(a,v){if(v)d.setAttribute(a,"1");else d.removeAttribute(a);}set("data-pwa-standalone",standalone);set("data-touch-primary",touchPrimary);set("data-compact-viewport",compact);set("data-mobile-experience",mobile);})();`;
 
 export function readCompactLayoutBootstrapFromDom(): CompactLayoutHint | null {
   if (typeof document === "undefined") return null;

@@ -58,7 +58,7 @@ function SectionHeader({
       justifyContent="space-between"
       sx={{ mb: 1.5 }}
     >
-      <Typography variant="h6" component="h2" sx={{ fontWeight: 700 }}>
+      <Typography variant="h6" component="h2">
         {title}
       </Typography>
       <Button
@@ -238,7 +238,7 @@ export function LibraryHubMobile() {
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
           <SubscriptionsIcon color="action" fontSize="small" />
-          <Typography variant="h6" component="h2" sx={{ fontWeight: 700 }}>
+          <Typography variant="h6" component="h2">
             Saved channels
           </Typography>
         </Stack>
@@ -284,7 +284,7 @@ export function LibraryHubMobile() {
 
       {savedSearches.length > 0 ? (
         <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" component="h2" sx={{ fontWeight: 700, mb: 1.5 }}>
+          <Typography variant="h6" component="h2" sx={{ mb: 1.5 }}>
             Pinned searches
           </Typography>
           <Stack direction="row" flexWrap="wrap" gap={1}>

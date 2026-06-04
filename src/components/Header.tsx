@@ -21,7 +21,7 @@ import {
 } from "react";
 
 import { AccountMenu } from "@/components/AccountMenu";
-import { RetroTvLogo } from "@/components/RetroTvLogo";
+import { CleanTubeLogo } from "@/components/CleanTubeLogo";
 import { SearchOverlay } from "@/components/SearchOverlay";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useHeaderScroll } from "@/context/HeaderScrollContext";
@@ -338,6 +338,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
               <Box
                 component={Link}
                 href="/"
+                aria-label="CleanTube home"
                 sx={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -347,12 +348,12 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                   flexShrink: 0,
                 }}
               >
-                <RetroTvLogo size={30} />
+                <CleanTubeLogo size={30} />
                 <Typography
                   variant="h6"
                   sx={{
                     display: compactSearch ? "none" : "block",
-                    fontWeight: 700,
+                    fontWeight: 600,
                     letterSpacing: "-0.02em",
                     whiteSpace: "nowrap",
                   }}

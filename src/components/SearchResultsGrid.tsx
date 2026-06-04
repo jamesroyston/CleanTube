@@ -13,10 +13,11 @@ import Typography from "@mui/material/Typography";
 import Link from "next/link";
 
 import { SaveChannelButton } from "@/components/SaveChannelButton";
-import { VideoCard } from "@/components/VideoResultsGrid";
+import { VideoCard } from "@/components/VideoCard";
 import type { VideoSummary } from "@/components/VideoSummary";
 import { channelPageHrefFromToken } from "@/lib/youtubeUrl";
 import type { ChannelSearchResult } from "@/lib/youtubeTypes";
+import { cardShadowDark, cardShadowLight } from "@/theme/theme";
 
 type SearchResultsGridProps = {
   channels: ChannelSearchResult[];
@@ -31,18 +32,16 @@ function ChannelCard({ channel }: { channel: ChannelSearchResult }) {
   return (
     <Card
       variant="outlined"
-      sx={{
+      sx={(theme) => ({
         height: "100%",
         position: "relative",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
         "&:hover": {
           transform: "translateY(-2px)",
-          boxShadow: (t) =>
-            t.palette.mode === "dark"
-              ? "0 8px 24px rgba(0,0,0,0.45)"
-              : "0 8px 24px rgba(0,0,0,0.12)",
+          ...theme.applyStyles("dark", { boxShadow: cardShadowDark }),
+          ...theme.applyStyles("light", { boxShadow: cardShadowLight }),
         },
-      }}
+      })}
     >
       <CardActionArea
         component={Link}

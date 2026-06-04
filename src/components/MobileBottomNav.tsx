@@ -8,9 +8,7 @@ import AppBar from "@mui/material/AppBar";
 import BottomNavigation from "@mui/material/BottomNavigation";
 import BottomNavigationAction from "@mui/material/BottomNavigationAction";
 import { useTheme } from "@mui/material/styles";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
 
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useCompactViewport } from "@/hooks/useCompactViewport";
@@ -23,15 +21,7 @@ export function MobileBottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { openSearchOverlay, searchOverlayOpen } = useSearchOverlay();
-  const [value, setValue] = useState<string | false>(() =>
-    bottomNavValueFromPathname(pathname),
-  );
-  const [syncedPathname, setSyncedPathname] = useState(pathname);
-
-  if (syncedPathname !== pathname) {
-    setSyncedPathname(pathname);
-    setValue(bottomNavValueFromPathname(pathname));
-  }
+  const value = bottomNavValueFromPathname(pathname);
 
   if (!compact || searchOverlayOpen) return null;
 
@@ -55,37 +45,32 @@ export function MobileBottomNav() {
         showLabels
         sx={{
           height: BOTTOM_NAV_HEIGHT_PX,
-          bgcolor: "var(--color-base-200)",
-          borderTop: (t) => `1px solid ${t.palette.divider}`,
+          bgcolor: "background.paper",
+          borderTop: (t) => `1px solid ${t.vars.palette.divider}`,
+          backdropFilter: "blur(12px)",
         }}
         onChange={(_, next) => {
+          if (next === "home") {
+            router.push("/");
+            return;
+          }
           if (next === "library") {
-            setValue(bottomNavValueFromPathname(pathname));
             router.push("/library");
             return;
           }
           if (next === "search") {
-            setValue(bottomNavValueFromPathname(pathname));
             openSearchOverlay();
             return;
           }
-          if (next === "account") {
-            setValue(bottomNavValueFromPathname(pathname));
-            if (!pathname.startsWith("/auth")) {
-              router.push("/account");
-            }
-            return;
+          if (next === "account" && !pathname.startsWith("/auth")) {
+            router.push("/account");
           }
-          setValue(next);
         }}
       >
         <BottomNavigationAction
           label="Home"
           value="home"
           icon={<HomeOutlinedIcon />}
-          component={Link}
-          href="/"
-          onClick={() => setValue("home")}
         />
         <BottomNavigationAction
           label="Library"

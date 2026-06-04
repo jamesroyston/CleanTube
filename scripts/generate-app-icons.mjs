@@ -10,7 +10,7 @@ const svgPath = path.join(__dirname, "app-icon-source.svg");
 const svg = readFileSync(svgPath);
 
 /** Letterbox non-square art (matches SVG corners). */
-const BG = { r: 15, g: 23, b: 42, alpha: 1 };
+const BG = { r: 26, g: 27, b: 30, alpha: 1 };
 
 async function rasterSquare(size) {
   return sharp(svg, { density: 144 })
