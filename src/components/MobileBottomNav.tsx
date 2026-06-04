@@ -22,7 +22,7 @@ export function MobileBottomNav() {
   const compact = useCompactViewport();
   const pathname = usePathname();
   const router = useRouter();
-  const { openSearchOverlay } = useSearchOverlay();
+  const { openSearchOverlay, searchOverlayOpen } = useSearchOverlay();
   const [value, setValue] = useState<string | false>(() =>
     bottomNavValueFromPathname(pathname),
   );
@@ -33,7 +33,7 @@ export function MobileBottomNav() {
     setValue(bottomNavValueFromPathname(pathname));
   }
 
-  if (!compact) return null;
+  if (!compact || searchOverlayOpen) return null;
 
   return (
     <AppBar

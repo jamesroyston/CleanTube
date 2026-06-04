@@ -2,26 +2,31 @@
 
 import { useEffect, useState } from "react";
 
+import { isIosSafariInstallable, isStandalonePwa } from "@/lib/pwaPlatform";
+
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 };
 
+export type PwaInstallMode = "native" | "ios";
+
 export function usePwaInstallPrompt() {
   const [installEvent, setInstallEvent] =
     useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
+  const [iosInstallable, setIosInstallable] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const standalone =
-      window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone ===
-        true;
-    if (standalone) {
+    if (isStandalonePwa()) {
       setInstalled(true);
       return;
+    }
+
+    if (isIosSafariInstallable()) {
+      setIosInstallable(true);
     }
 
     function onBeforeInstallPrompt(event: Event) {
@@ -32,6 +37,7 @@ export function usePwaInstallPrompt() {
     function onAppInstalled() {
       setInstalled(true);
       setInstallEvent(null);
+      setIosInstallable(false);
     }
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
@@ -53,9 +59,14 @@ export function usePwaInstallPrompt() {
     return false;
   }
 
+  const installMode: PwaInstallMode =
+    iosInstallable && !installEvent ? "ios" : "native";
+
   return {
-    canInstall: Boolean(installEvent) && !installed,
+    canInstall: (Boolean(installEvent) || iosInstallable) && !installed,
+    installMode,
     installed,
+    iosInstallable,
     promptInstall,
   };
 }

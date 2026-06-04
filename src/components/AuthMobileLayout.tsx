@@ -21,7 +21,7 @@ export function AuthMobileLayout({ children }: { children: React.ReactNode }) {
   return (
     <Box
       sx={{
-        minHeight: "100dvh",
+        minHeight: ["100vh", "-webkit-fill-available", "100dvh"],
         display: "flex",
         flexDirection: "column",
         boxSizing: "border-box",

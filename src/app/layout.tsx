@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { Roboto } from "next/font/google";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { AppProviders } from "@/app/providers";
 import { CloudLibraryProvider } from "@/context/CloudLibraryContext";
 import {
@@ -17,6 +17,14 @@ import {
   parseWatchNarrowPlayerLayoutCookie,
 } from "@/lib/watchNarrowPlayerLayoutPersistence";
 import { readWatchUpNextVisibleFromCookieStore } from "@/lib/watchUpNextVisibilityPersistence";
+import {
+  COMPACT_LAYOUT_HINT_COOKIE,
+  resolveCompactLayoutHint,
+} from "@/lib/compactLayoutHint";
+import {
+  COMPACT_LAYOUT_BOOTSTRAP_SCRIPT,
+  compactLayoutHintToHtmlDataAttributes,
+} from "@/lib/compactLayoutBootstrap";
 import {
   createInitialThemeSettings,
   THEME_MODE_COOKIE,
@@ -93,13 +101,29 @@ export default async function RootLayout({
     hasStoredCookie: Boolean(mode),
   });
 
+  const headerList = await headers();
+  const userAgent = headerList.get("user-agent");
+  const initialCompactLayoutHint = resolveCompactLayoutHint(
+    cookieStore.get(COMPACT_LAYOUT_HINT_COOKIE)?.value,
+    userAgent,
+  );
+  const compactLayoutHtmlAttrs = compactLayoutHintToHtmlDataAttributes(
+    initialCompactLayoutHint,
+  );
+
   return (
     <html
       lang="en"
       className={roboto.variable}
       data-theme={initialTheme.mode}
+      {...compactLayoutHtmlAttrs}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: COMPACT_LAYOUT_BOOTSTRAP_SCRIPT }}
+        />
+      </head>
       <body style={{ margin: 0 }}>
         <AppProviders
           initialTheme={initialTheme}
@@ -107,6 +131,7 @@ export default async function RootLayout({
           initialWatchUpNextVisible={initialWatchUpNextVisible}
           initialWatchNarrowPlayerLayout={initialWatchNarrowPlayerLayout}
           initialLibrarySidebarCollapsed={initialLibrarySidebarCollapsed}
+          initialCompactLayoutHint={initialCompactLayoutHint}
           librarySidebarHasCookie={librarySidebarHasCookie}
           watchNarrowPlayerLayoutHasCookie={watchNarrowPlayerLayoutHasCookie}
         >

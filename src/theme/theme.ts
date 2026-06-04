@@ -2,12 +2,27 @@ import { alpha, createTheme } from "@mui/material/styles";
 
 import { muiHexPaletteForMode } from "@/theme/semanticTokens";
 
+type SsrMatchMedia = (query: string) => {
+  matches: boolean;
+  addEventListener?: () => void;
+  removeEventListener?: () => void;
+};
+
+export type CreateAppThemeOptions = {
+  /** SSR width/hint-aware matchMedia for `useMediaQuery` (MUI official pattern). */
+  ssrMatchMedia?: SsrMatchMedia;
+};
+
 /**
  * MUI theme from DaisyUI-style semantic tokens.
  * CSS uses oklch via globals.css; MUI palette uses hex (MUI cannot parse oklch/var).
  */
-export function createAppTheme(mode: "light" | "dark") {
+export function createAppTheme(
+  mode: "light" | "dark",
+  options: CreateAppThemeOptions = {},
+) {
   const c = muiHexPaletteForMode(mode);
+  const { ssrMatchMedia } = options;
 
   return createTheme({
     palette: {
@@ -37,6 +52,13 @@ export function createAppTheme(mode: "light" | "dark") {
         'var(--font-roboto), "Roboto", "Helvetica Neue", Arial, sans-serif',
     },
     components: {
+      ...(ssrMatchMedia
+        ? {
+            MuiUseMediaQuery: {
+              defaultProps: { ssrMatchMedia },
+            },
+          }
+        : {}),
       MuiCssBaseline: {
         styleOverrides: {
           body: {

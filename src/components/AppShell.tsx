@@ -218,13 +218,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               overflow: "hidden",
             }
           : {
-              minHeight: "100dvh",
+              minHeight: ["100vh", "-webkit-fill-available", "100dvh"],
             }),
       }}
     >
       {desktopLayout || (!desktopLayout && headerOverlayActive) ? (
         <Box
           aria-hidden
+          data-desktop-header-spacer
           sx={{
             flexShrink: 0,
             height: `${headerInsetPx}px`,
@@ -252,6 +253,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
       {desktopRailPx != null ? (
         <Box
+          data-desktop-shell
           sx={{
             display: "flex",
             flex: 1,

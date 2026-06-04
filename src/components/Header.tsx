@@ -78,6 +78,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const { addRecentSearch, getRecentSearches } = useCloudLibrary();
     const {
       registerOpenSearchOverlay,
+      searchOverlayOpen,
+      setSearchOverlayOpen,
     } = useSearchOverlay();
     const { headerRevealProgress, headerOverlayActive } = useHeaderScroll();
     const [isPending, startTransition] = useTransition();
@@ -86,7 +88,6 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const [query, setQuery] = useState(qParam);
     const [searchSortDraft, setSearchSortDraft] =
       useState<SearchSortMode>("relevance");
-    const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
     const searchOverlayHistoryPushedRef = useRef(false);
     const [overlayQuery, setOverlayQuery] = useState("");
     const [recentList, setRecentList] = useState<string[]>([]);
@@ -260,6 +261,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const appBar = (
         <AppBar
           ref={ref}
+          data-browse-header
+          {...(desktopRail != null ? { "data-desktop-header-rail-inset": "" } : {})}
           position={
             showScrollRevealHeader
               ? "fixed"
@@ -327,7 +330,11 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                 minWidth: 0,
               }}
             >
-              {!showBottomNav ? leading : null}
+              {!showBottomNav && leading ? (
+                <Box data-desktop-header-chrome sx={{ display: "contents" }}>
+                  {leading}
+                </Box>
+              ) : null}
               <Box
                 component={Link}
                 href="/"
@@ -356,7 +363,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
             </Box>
 
             {!showBottomNav ? (
-              <>
+              <Box data-desktop-header-chrome sx={{ display: "contents" }}>
                 <Box
                   sx={{
                     flex: 1,
@@ -404,19 +411,28 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                 <Box sx={{ flexShrink: 0 }}>
                   <AccountMenu />
                 </Box>
-              </>
+              </Box>
             ) : null}
           </Toolbar>
         </AppBar>
     );
 
+    /**
+     * Mobile experience (`showBottomNav`): search is a full-screen sheet with its own
+     * header (close + field + cancel). Hide the logo-only browse bar while open so we
+     * do not stack two top chrome rows or fight the safe area.
+     */
+    const hideBrowseHeaderForSearch =
+      showBottomNav && searchOverlayOpen;
+
     return (
       <>
-        {appBar}
+        {hideBrowseHeaderForSearch ? null : appBar}
 
         <SearchOverlay
           open={searchOverlayOpen}
           compact={compactSearch}
+          mobileExperience={showBottomNav}
           query={overlayQuery}
           searchSortDraft={searchSortDraft}
           recentList={recentList}

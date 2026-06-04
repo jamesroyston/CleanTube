@@ -18,6 +18,8 @@ import { setWatchNarrowPlayerLayoutAction } from "@/app/actions/watchNarrowPlaye
 import { setWatchUpNextVisibleAction } from "@/app/actions/watchUpNextVisibility";
 import { NavigationProgressProvider } from "@/context/NavigationProgressContext";
 import { BrowseLayoutProvider } from "@/context/BrowseLayoutContext";
+import { CompactLayoutProvider } from "@/context/CompactLayoutContext";
+import type { CompactLayoutHint } from "@/lib/compactLayoutHint";
 import { SWRConfig } from "swr";
 import {
   type InitialThemeSettings,
@@ -41,6 +43,7 @@ import {
   watchNarrowPlayerLayoutToStorageValue,
 } from "@/lib/watchNarrowPlayerLayoutPersistence";
 import { applySemanticCssVariables, semanticTokensForMode } from "@/theme/semanticTokens";
+import { createSsrMatchMedia } from "@/lib/compactLayoutSsr";
 import { createAppTheme } from "@/theme/theme";
 
 type ThemeContextValue = {
@@ -237,6 +240,7 @@ export function AppProviders({
   initialWatchUpNextVisible,
   initialWatchNarrowPlayerLayout,
   initialLibrarySidebarCollapsed,
+  initialCompactLayoutHint,
   librarySidebarHasCookie,
   watchNarrowPlayerLayoutHasCookie,
 }: {
@@ -246,6 +250,7 @@ export function AppProviders({
   initialWatchUpNextVisible: boolean;
   initialWatchNarrowPlayerLayout: boolean;
   initialLibrarySidebarCollapsed: boolean;
+  initialCompactLayoutHint: CompactLayoutHint;
   librarySidebarHasCookie: boolean;
   watchNarrowPlayerLayoutHasCookie: boolean;
 }) {
@@ -360,7 +365,15 @@ export function AppProviders({
     void setLibrarySidebarCollapsedAction(next);
   }, []);
 
-  const theme = useMemo(() => createAppTheme(mode), [mode]);
+  const ssrMatchMedia = useMemo(
+    () => createSsrMatchMedia(initialCompactLayoutHint),
+    [initialCompactLayoutHint],
+  );
+
+  const theme = useMemo(
+    () => createAppTheme(mode, { ssrMatchMedia }),
+    [mode, ssrMatchMedia],
+  );
 
   const value = useMemo(
     () => ({
@@ -426,7 +439,9 @@ export function AppProviders({
                       errorRetryCount: 2,
                     }}
                   >
-                    <BrowseLayoutProvider>{children}</BrowseLayoutProvider>
+                    <CompactLayoutProvider initialHint={initialCompactLayoutHint}>
+                      <BrowseLayoutProvider>{children}</BrowseLayoutProvider>
+                    </CompactLayoutProvider>
                   </SWRConfig>
                 </NavigationProgressProvider>
               </ThemeProvider>
