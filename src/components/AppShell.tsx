@@ -5,7 +5,6 @@ import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
 import { usePathname } from "next/navigation";
 import {
   Suspense,
@@ -32,6 +31,7 @@ import { ScrollContainerProvider } from "@/context/ScrollContainerContext";
 import { useHeaderScroll } from "@/context/HeaderScrollContext";
 import {
   compactMainPaddingBottom,
+  useCompactViewport,
   useShowBottomNav,
 } from "@/hooks/useCompactViewport";
 import { registerScrollElementGetter } from "@/lib/watchReturnNavigation";
@@ -49,7 +49,8 @@ const DESKTOP_HEADER_INSET_FALLBACK_PX = 80;
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const pathname = usePathname();
-  const mdUp = useMediaQuery(theme.breakpoints.up("md"));
+  const compact = useCompactViewport();
+  const desktopLayout = !compact;
   const { headerOverlayActive } = useHeaderScroll();
   const [mobileOpen, setMobileOpen] = useState(false);
   const drawerHistoryPushedRef = useRef(false);
@@ -100,7 +101,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [closeMobileDrawer]);
-  const desktopRailPx = mdUp
+  const desktopRailPx = desktopLayout
     ? railCollapsed
       ? CHANNELS_COLLAPSED_DRAWER_WIDTH
       : CHANNELS_DRAWER_WIDTH
@@ -114,10 +115,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     registerScrollElementGetter(() =>
-      mdUp ? mainScrollRef.current : window,
+      desktopLayout ? mainScrollRef.current : window,
     );
     return () => registerScrollElementGetter(null);
-  }, [mdUp]);
+  }, [desktopLayout]);
 
   useLayoutEffect(() => {
     const el = appBarRef.current;
@@ -137,15 +138,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  /** When `mdUp`, treat the rail as desktop-only (`open` gated so we never show the mobile Drawer on `md`). */
-  const temporaryOpen = mdUp ? false : mobileOpen;
+  /** Desktop rail only when not in compact (mobile/touch) layout. */
+  const temporaryOpen = desktopLayout ? false : mobileOpen;
 
   const headerLeading = (
     <IconButton
       color="inherit"
       edge="start"
       aria-label={
-        mdUp
+        desktopLayout
           ? railCollapsed
             ? "Expand library sidebar"
             : "Collapse library sidebar"
@@ -154,7 +155,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             : "Open library drawer"
       }
       onClick={() => {
-        if (mdUp) setLibrarySidebarCollapsed(!railCollapsed);
+        if (desktopLayout) setLibrarySidebarCollapsed(!railCollapsed);
         else if (mobileOpen) closeMobileDrawer();
         else openMobileDrawer();
       }}
@@ -172,7 +173,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
    * Mobile (esp. iOS Safari): nested `overflow: auto` under `overflow: hidden` + `100dvh`
    * often breaks momentum/touch scrolling — use native document scrolling instead.
    */
-  const mainScroll = mdUp ? (
+  const mainScroll = desktopLayout ? (
     <Box
       ref={mainScrollRef}
       sx={{
@@ -202,13 +203,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   return (
     <ScrollContainerProvider
       scrollRef={mainScrollRef}
-      mobileDocumentScroll={!mdUp}
+      mobileDocumentScroll={!desktopLayout}
     >
     <Box
       sx={{
         display: "flex",
         flexDirection: "column",
-        ...(mdUp
+        ...(desktopLayout
           ? {
               height: "100dvh",
               minHeight: 0,
@@ -219,7 +220,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             }),
       }}
     >
-      {mdUp || (!mdUp && headerOverlayActive) ? (
+      {desktopLayout || (!desktopLayout && headerOverlayActive) ? (
         <Box
           aria-hidden
           sx={{
