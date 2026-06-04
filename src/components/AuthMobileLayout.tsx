@@ -1,7 +1,6 @@
 "use client";
 
 import Box from "@mui/material/Box";
-import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 
 import { CompactLayoutChrome } from "@/components/CompactLayoutChrome";
@@ -17,7 +16,6 @@ function HeaderFallback() {
 }
 
 export function AuthMobileLayout({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const showBottomNav = useShowBottomNav();
 
   return (
@@ -34,7 +32,7 @@ export function AuthMobileLayout({ children }: { children: React.ReactNode }) {
       </Suspense>
       <CompactLayoutChrome
         showBottomNav={showBottomNav}
-        bottomNav={<MobileBottomNav onOpenLibrary={() => router.push("/library")} />}
+        bottomNav={<MobileBottomNav />}
       />
       <Box
         component="main"
