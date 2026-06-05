@@ -4,8 +4,6 @@ import { toVideoSummaries } from "@/lib/serializeVideo";
 import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
-export const runtime = "nodejs";
-
 type RouteContext = {
   params: Promise<{ id: string }>;
 };

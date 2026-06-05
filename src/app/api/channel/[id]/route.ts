@@ -6,7 +6,6 @@ import { getChannelVideosPageCached } from "@/lib/youtubeChannel";
 import { isValidYoutubeChannelId } from "@/lib/youtubeUrl";
 import type { ChannelSortMode, ChannelVideosPage } from "@/lib/youtubeTypes";
 
-export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type RouteContext = {

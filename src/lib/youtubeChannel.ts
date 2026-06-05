@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 import { cache } from "react";
 import { YTNodes } from "youtubei.js";
 
@@ -646,12 +646,34 @@ const CHANNEL_VIDEOS_CACHE_SECONDS = (() => {
 /** Bump when channel grid mapping or fetch semantics change (invalidates Data Cache). */
 const CHANNEL_VIDEOS_CACHE_VERSION = "v4-memo-gettype-this";
 
+async function getChannelVideosPageCachedInner(input: {
+  channelId: string;
+  sort: ChannelSortMode;
+  pageToken: string;
+  limit: number;
+}): Promise<ChannelVideosPage> {
+  "use cache";
+  cacheTag(
+    "cleantube-channel-videos",
+    CHANNEL_VIDEOS_CACHE_VERSION,
+    input.channelId,
+    input.sort,
+    input.pageToken,
+    String(input.limit),
+  );
+  cacheLife({ revalidate: CHANNEL_VIDEOS_CACHE_SECONDS });
+
+  const page = await getChannelVideosPage(input);
+  if (!page) throw new Error("channel_videos_miss");
+  if (page.videos.length === 0 && page.gridSourceLostItems) {
+    throw new Error("channel_videos_skip_cache_mapping_loss");
+  }
+  return page;
+}
+
 /**
- * Cached channel grid for Data Cache (`unstable_cache`; superseded by `use cache` when
- * `cacheComponents` is enabled project-wide — see Next.js 16 Cache Components docs).
+ * Cached channel grid for Data Cache (`use cache`).
  * Failures are not stored: empty InnerTube responses fall through to a live retry.
- * Intentionally omit cache when InnerTube returned items we failed to map, so a bad empty
- * snapshot is not stuck until revalidate.
  */
 export async function getChannelVideosPageCached(input: {
   channelId: string;
@@ -662,31 +684,14 @@ export async function getChannelVideosPageCached(input: {
   const sort = input.sort ?? "latest";
   const limit = input.limit ?? DEFAULT_PAGE_SIZE;
   const pageKey = input.pageToken ?? "";
-  const cacheTags = [
-    "cleantube-channel-videos",
-    CHANNEL_VIDEOS_CACHE_VERSION,
-    input.channelId,
-    sort,
-    pageKey,
-    String(limit),
-  ];
 
   try {
-    return await unstable_cache(
-      async () => {
-        const page = await getChannelVideosPage(input);
-        if (!page) throw new Error("channel_videos_miss");
-        if (
-          page.videos.length === 0 &&
-          page.gridSourceLostItems
-        ) {
-          throw new Error("channel_videos_skip_cache_mapping_loss");
-        }
-        return page;
-      },
-      cacheTags,
-      { revalidate: CHANNEL_VIDEOS_CACHE_SECONDS },
-    )();
+    return await getChannelVideosPageCachedInner({
+      channelId: input.channelId,
+      sort,
+      pageToken: pageKey,
+      limit,
+    });
   } catch {
     return getChannelVideosPage(input);
   }

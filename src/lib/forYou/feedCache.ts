@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 
 import { buildForYouFeed } from "./buildFeed";
 import type { ForYouLibrarySignals } from "./loadLibrarySignals";
@@ -31,15 +31,23 @@ export function libraryFeedRevision(signals: ForYouLibrarySignals): string {
   ].join(":");
 }
 
+async function buildForYouFeedCachedInner(
+  userId: string,
+  revision: string,
+  signals: ForYouLibrarySignals,
+): Promise<ForYouFeedResult> {
+  "use cache";
+  cacheTag("cleantube-for-you-feed", userId, revision);
+  cacheLife({ revalidate: FOR_YOU_FEED_CACHE_SECONDS });
+  void userId;
+  void revision;
+  return buildForYouFeed(signals);
+}
+
 export async function buildForYouFeedCached(
   userId: string,
   signals: ForYouLibrarySignals,
 ): Promise<ForYouFeedResult> {
   const revision = libraryFeedRevision(signals);
-
-  return unstable_cache(
-    () => buildForYouFeed(signals),
-    ["cleantube-for-you-feed", userId, revision],
-    { revalidate: FOR_YOU_FEED_CACHE_SECONDS },
-  )();
+  return buildForYouFeedCachedInner(userId, revision, signals);
 }

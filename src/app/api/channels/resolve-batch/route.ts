@@ -4,8 +4,6 @@ import { CHANNEL_RESOLVE_CACHE_CONTROL, getChannelDetailsCached } from "@/lib/yo
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 import type { ChannelDetails } from "@/lib/youtubeTypes";
 
-export const runtime = "nodejs";
-
 const MAX_BATCH = 40;
 
 /**

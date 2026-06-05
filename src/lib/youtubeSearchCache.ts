@@ -1,4 +1,4 @@
-import { unstable_cache } from "next/cache";
+import { cacheLife, cacheTag } from "next/cache";
 
 import type { SearchSortMode } from "@/lib/uploadedAtSort";
 import type { MixedSearchResults } from "@/lib/youtubeTypes";
@@ -20,6 +20,17 @@ export function normalizeSearchQueryMixed(raw: string): string {
   return raw.trim().replace(/\s+/g, " ").slice(0, 4096);
 }
 
+async function searchMixedResultsCachedInner(
+  query: string,
+  limit: number,
+  sortMode: SearchSortMode,
+): Promise<MixedSearchResults> {
+  "use cache";
+  cacheTag("cleantube-search-mixed", query, String(limit), sortMode);
+  cacheLife({ revalidate: SEARCH_MIXED_CACHE_SECONDS });
+  return searchMixedResults(query, limit, sortMode);
+}
+
 /**
  * Dedupes repeated identical searches across requests via the Next Data Cache (stale-after `revalidate` semantics).
  *
@@ -34,19 +45,5 @@ export async function searchMixedResultsCached(
   if (!q) return { channels: [], videos: [] };
   const lim = Math.min(Math.max(limit, 1), 50);
 
-  const cacheKey = [
-    "cleantube-search-mixed",
-    q,
-    String(lim),
-    sortMode,
-  ];
-
-  return unstable_cache(
-    async () => searchMixedResults(q, lim, sortMode),
-    cacheKey,
-    {
-      revalidate: SEARCH_MIXED_CACHE_SECONDS,
-      tags: ["cleantube-search-mixed"],
-    },
-  )();
+  return searchMixedResultsCachedInner(q, lim, sortMode);
 }

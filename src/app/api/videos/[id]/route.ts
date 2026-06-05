@@ -4,7 +4,6 @@ import { getWatchVideoDetails } from "@/lib/watchVideo";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 import type { WatchVideoDetails } from "@/lib/youtubeTypes";
 
-export const runtime = "nodejs";
 export const maxDuration = 60;
 
 type RouteContext = {

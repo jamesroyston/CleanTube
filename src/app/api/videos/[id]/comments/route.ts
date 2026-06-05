@@ -11,8 +11,6 @@ import {
 } from "@/lib/youtubeComments";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
-export const runtime = "nodejs";
-
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
