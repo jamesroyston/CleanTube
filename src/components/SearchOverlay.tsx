@@ -18,7 +18,7 @@ import ListItemText from "@mui/material/ListItemText";
 import ListSubheader from "@mui/material/ListSubheader";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
-import { FormEvent, useCallback, useEffect, useRef } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import type { SearchSortMode } from "@/lib/uploadedAtSort";
@@ -74,19 +74,49 @@ const MOBILE_CLOSE_BUTTON_SX = {
   flexShrink: 0,
 } as const;
 
-/** Fixed viewport sheet — do not inherit document scroll height from the page below. */
-const MOBILE_FULL_HEIGHT_SX = {
+/** Full-screen sheet anchored to the visible viewport (keyboard-aware on iOS). */
+const MOBILE_SHEET_BASE_SX = {
   position: "fixed",
-  top: 0,
   left: 0,
   right: 0,
-  bottom: 0,
   width: "100%",
-  height: "100dvh",
-  maxHeight: "100dvh",
   minHeight: 0,
   margin: 0,
 } as const;
+
+function useVisualViewportSheet(enabled: boolean) {
+  const [sheet, setSheet] = useState<{ top: number; height: number } | null>(
+    null,
+  );
+
+  useEffect(() => {
+    if (!enabled || typeof window === "undefined") {
+      setSheet(null);
+      return;
+    }
+
+    const vv = window.visualViewport;
+    if (!vv) {
+      setSheet(null);
+      return;
+    }
+
+    const sync = () => {
+      setSheet({ top: vv.offsetTop, height: vv.height });
+    };
+
+    sync();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+      setSheet(null);
+    };
+  }, [enabled]);
+
+  return sheet;
+}
 
 export function SearchOverlay({
   open,
@@ -105,6 +135,7 @@ export function SearchOverlay({
     useCloudLibrary();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const fullScreen = compact || mobileExperience;
+  const viewportSheet = useVisualViewportSheet(open && fullScreen);
 
   const focusInput = useCallback(() => {
     const el = inputRef.current;
@@ -121,15 +152,10 @@ export function SearchOverlay({
     return () => cancelAnimationFrame(id);
   }, [focusInput, fullScreen, open]);
 
-  /** Prevent rubber-band scroll of browse content behind the sheet (iOS). */
   useEffect(() => {
-    if (!open || !fullScreen) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [fullScreen, open]);
+    if (open) return;
+    inputRef.current?.blur();
+  }, [open]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -144,7 +170,8 @@ export function SearchOverlay({
       maxWidth={fullScreen ? false : "sm"}
       fullWidth={!fullScreen}
       disableAutoFocus
-      disableScrollLock={false}
+      /** Full-screen sheet covers the page; MUI body scroll lock breaks iOS document scroll after close. */
+      disableScrollLock={fullScreen}
       slotProps={{
         transition: {
           onEntered: focusInput,
@@ -159,17 +186,24 @@ export function SearchOverlay({
             borderColor: "divider",
             borderRadius: fullScreen ? 0 : 2,
             overflow: "hidden",
-            ...(mobileExperience
+            ...(fullScreen
               ? {
-                  pt: "env(safe-area-inset-top, 0px)",
-                  ...MOBILE_FULL_HEIGHT_SX,
+                  ...MOBILE_SHEET_BASE_SX,
+                  top: viewportSheet ? `${viewportSheet.top}px` : 0,
+                  height: viewportSheet
+                    ? `${viewportSheet.height}px`
+                    : "100dvh",
+                  maxHeight: viewportSheet
+                    ? `${viewportSheet.height}px`
+                    : "100dvh",
+                  ...(mobileExperience
+                    ? { pt: "env(safe-area-inset-top, 0px)" }
+                    : {}),
                 }
-              : compact
-                ? MOBILE_FULL_HEIGHT_SX
-                : {
-                    mt: { xs: 8, sm: 10 },
-                    maxHeight: "min(560px, calc(100vh - 96px))",
-                  }),
+              : {
+                  mt: { xs: 8, sm: 10 },
+                  maxHeight: "min(560px, calc(100vh - 96px))",
+                }),
           },
         },
       }}
@@ -287,10 +321,11 @@ export function SearchOverlay({
         dense
         sx={{
           py: 0,
-          flex: recentList.length > 0 ? 1 : "0 0 auto",
+          flex: 1,
           minHeight: 0,
-          overflowY: recentList.length > 0 ? "auto" : "hidden",
+          overflowY: "auto",
           overscrollBehavior: "contain",
+          WebkitOverflowScrolling: "touch",
           pb: mobileExperience
             ? "env(safe-area-inset-bottom, 0px)"
             : undefined,
@@ -355,6 +390,7 @@ export function SearchOverlay({
             >
               <ListItemButton
                 onClick={() => {
+                  inputRef.current?.blur();
                   onQueryChange(item);
                   onSubmit(item);
                 }}
