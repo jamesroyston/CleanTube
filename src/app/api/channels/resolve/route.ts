@@ -3,8 +3,6 @@ import { NextResponse } from "next/server";
 import { CHANNEL_RESOLVE_CACHE_CONTROL, getChannelDetailsCached } from "@/lib/youtubeChannelResolveCache";
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 
-export const runtime = "nodejs";
-
 export async function POST(request: Request) {
   let body: { value?: unknown };
   try {

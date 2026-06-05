@@ -5,14 +5,15 @@ import {
   normalizeResultSortParam,
   normalizeSearchSortParam,
   sortVideoSummariesByUploadDate,
-  type SearchSortMode,
 } from "@/lib/uploadedAtSort";
 import { toVideoSummaries } from "@/lib/serializeVideo";
-import { searchMixedResultsCached } from "@/lib/youtubeSearchCache";
+import {
+  SEARCH_MIXED_CACHE_CONTROL,
+  searchMixedResultsCached,
+} from "@/lib/youtubeSearchCache";
 import type { VideoSummary } from "@/components/VideoSummary";
 import type { ChannelSearchResult } from "@/lib/youtubeTypes";
 
-export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export type SearchApiResponse = {
@@ -46,11 +47,18 @@ export async function GET(request: Request) {
       toVideoSummaries(results.videos),
       resultSort,
     );
-    return NextResponse.json({
-      query,
-      channels,
-      videos,
-    } satisfies SearchApiResponse);
+    return NextResponse.json(
+      {
+        query,
+        channels,
+        videos,
+      } satisfies SearchApiResponse,
+      {
+        headers: {
+          "Cache-Control": SEARCH_MIXED_CACHE_CONTROL,
+        },
+      },
+    );
   } catch (err) {
     console.error("[api/search]", err);
     const message =

@@ -3,7 +3,6 @@ import { NextResponse } from "next/server";
 import { buildForYouFeedCached } from "@/lib/forYou/feedCache";
 import { loadForYouLibrarySignals } from "@/lib/forYou/loadLibrarySignals";
 
-export const runtime = "nodejs";
 /** Allow time for bounded InnerTube fetches when refreshing the feed. */
 export const maxDuration = 30;
 
