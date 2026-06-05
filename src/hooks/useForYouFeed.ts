@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
 
 import { readFetchJson } from "@/lib/fetchJson";
+import { clearSwrIdbCache } from "@/lib/swrIdbProvider";
 import type { ForYouFeedResult } from "@/lib/forYou/types";
 
 type ForYouApiResponse = ForYouFeedResult & {
@@ -38,21 +40,27 @@ type UseForYouFeedOptions = {
 };
 
 export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
-  const swrKey: ForYouFeedKey | null = userId
-    ? (["for-you-feed", userId] as const)
-    : null;
+  const swrKey: ForYouFeedKey | null =
+    userId && enabled ? (["for-you-feed", userId] as const) : null;
 
   const { data, error, isLoading, isValidating, mutate } = useSWR(
     swrKey,
     fetchForYouFeed,
     {
-      isPaused: () => !enabled,
       keepPreviousData: true,
       revalidateOnFocus: false,
       revalidateOnReconnect: true,
       dedupingInterval: 30_000,
     },
   );
+
+  const wasEnabledRef = useRef(false);
+  useEffect(() => {
+    if (enabled && userId && !wasEnabledRef.current) {
+      void mutate();
+    }
+    wasEnabledRef.current = Boolean(enabled && userId);
+  }, [enabled, userId, mutate]);
 
   return {
     sections: data?.sections ?? [],
@@ -73,4 +81,5 @@ export function clearForYouFeedCache(): void {
     undefined,
     { revalidate: false },
   );
+  void clearSwrIdbCache();
 }

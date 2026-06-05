@@ -11,6 +11,15 @@ export function supabaseProjectRefFromUrl(url: string): string | null {
   }
 }
 
+function cookieNameMayCarrySession(name: string, prefix: string): boolean {
+  if (!name.startsWith(prefix)) return false;
+  return (
+    name.includes("auth-token") ||
+    name.includes("auth-code-verifier") ||
+    name.includes("auth-code")
+  );
+}
+
 /** True when the request may carry a Supabase session (skip getUser when false). */
 export function hasSupabaseAuthCookies(
   request: NextRequest,
@@ -19,13 +28,19 @@ export function hasSupabaseAuthCookies(
   const ref = supabaseProjectRefFromUrl(supabaseUrl);
   const prefix = ref ? `sb-${ref}-` : "sb-";
 
-  return request.cookies.getAll().some((cookie) => {
-    const name = cookie.name;
-    if (!name.startsWith(prefix)) return false;
-    return (
-      name.includes("auth-token") ||
-      name.includes("auth-code-verifier") ||
-      name.includes("auth-code")
-    );
-  });
+  return request.cookies.getAll().some((cookie) =>
+    cookieNameMayCarrySession(cookie.name, prefix),
+  );
+}
+
+/** Server Route Handlers / RSC: detect auth cookies from `cookies().getAll()`. */
+export function hasSupabaseAuthCookiesFromList(
+  cookies: { name: string }[],
+  supabaseUrl: string,
+): boolean {
+  const ref = supabaseProjectRefFromUrl(supabaseUrl);
+  const prefix = ref ? `sb-${ref}-` : "sb-";
+  return cookies.some((cookie) =>
+    cookieNameMayCarrySession(cookie.name, prefix),
+  );
 }
