@@ -103,7 +103,7 @@ export function ForYouFeedView({
     getRecentSearches(),
   );
 
-  const showSyncSpinner =
+  const showLibrarySyncSkeleton =
     effectiveSignedIn &&
     !hasCachedFeed &&
     !hasLibraryInMemory &&
@@ -113,6 +113,8 @@ export function ForYouFeedView({
 
   const showSignInPrompt = authStatus === "ready" && !canPersistLibrary;
   const resolvedFeedError = feedError ?? initialError ?? null;
+  const showContinueWatchingInSkeleton =
+    showLibrarySyncSkeleton && continueWatchingVideos.length > 0;
 
   return (
     <>
@@ -140,7 +142,7 @@ export function ForYouFeedView({
         />
       ) : (
         <>
-          {continueWatchingVideos.length > 0 ? (
+          {!showLibrarySyncSkeleton && continueWatchingVideos.length > 0 ? (
             <Box sx={{ mb: 4 }}>
               <Typography
                 variant="h6"
@@ -156,13 +158,11 @@ export function ForYouFeedView({
             </Box>
           ) : null}
 
-          {showSyncSpinner ? (
-            <Stack spacing={2} alignItems="center" sx={{ py: 6 }}>
-              <CircularProgress size={32} />
-              <Typography variant="body2" color="text.secondary">
-                Loading your library…
-              </Typography>
-            </Stack>
+          {showLibrarySyncSkeleton ? (
+            <FeedSectionsSkeleton
+              sectionCount={3}
+              showContinueWatching={showContinueWatchingInSkeleton}
+            />
           ) : libraryCloudSyncState === "error" && !hasCachedFeed ? (
             <Alert severity="error" sx={{ mb: 2 }}>
               Your library could not be synced. Recommendations may be
@@ -171,7 +171,7 @@ export function ForYouFeedView({
             </Alert>
           ) : null}
 
-          {!showSyncSpinner ? (
+          {!showLibrarySyncSkeleton ? (
             <>
               {resolvedFeedError && !hasCachedFeed ? (
                 <Stack spacing={2} sx={{ mb: 3 }}>
@@ -194,7 +194,7 @@ export function ForYouFeedView({
               ) : null}
 
               {isInitialLoad ? (
-                <FeedSectionsSkeleton />
+                <FeedSectionsSkeleton sectionCount={3} />
               ) : !hasSignals && !hasCachedFeed ? (
                 <Typography color="text.secondary" sx={{ py: 2 }}>
                   Save channels from a channel page, watch a few videos, or pin a
@@ -245,10 +245,28 @@ export function ForYouFeedView({
   );
 }
 
-function FeedSectionsSkeleton() {
+const FOR_YOU_SKELETON_SECTION_COUNT = 3;
+
+function FeedSectionsSkeleton({
+  sectionCount = FOR_YOU_SKELETON_SECTION_COUNT,
+  showContinueWatching = false,
+}: {
+  sectionCount?: number;
+  showContinueWatching?: boolean;
+}) {
   return (
     <Stack spacing={4}>
-      {Array.from({ length: 2 }, (_, sectionIndex) => (
+      {showContinueWatching ? (
+        <Box>
+          <Skeleton
+            variant="text"
+            height={32}
+            sx={{ mb: 2, width: { xs: 180, sm: 220 } }}
+          />
+          <VideoCarouselRowSkeleton cardCount={4} />
+        </Box>
+      ) : null}
+      {Array.from({ length: sectionCount }, (_, sectionIndex) => (
         <Box key={sectionIndex}>
           <Skeleton
             variant="text"
