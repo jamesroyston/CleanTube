@@ -4,69 +4,24 @@ import type { MutableRefObject, RefObject } from "react";
 import { useEffect } from "react";
 
 import {
-  getAttachedLiteYoutubePlayer,
-  isYoutubePlayerAttached,
-  readPlayerCurrentTime,
-  readPlayerDuration,
-} from "@/lib/youtubePlayer";
-
-const SEEK_STEP_SEC = 10;
-const VOLUME_STEP = 5;
-const YT_PLAYING = 1;
-
-/** IFrame API caption / module helpers not on base `YT.Player` typings. */
-type PlayerExtended = YT.Player & {
-  getOption?: (module: string, option: string) => unknown;
-  setOption?: (module: string, option: string, value: unknown) => void;
-  loadModule?: (module: string) => void;
-};
+  adjustVolume,
+  resolveLiteYoutubePlayer,
+  SEEK_STEP_SEC,
+  seekRelative,
+  seekToTimelineFraction,
+  toggleCaptions,
+  toggleFullscreen,
+  toggleMute,
+  togglePlayPause,
+  VOLUME_STEP,
+} from "@/lib/youtubePlayerControls";
+import { isYoutubePlayerAttached } from "@/lib/youtubePlayer";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
   return target.isContentEditable;
-}
-
-async function toggleFullscreen(player: YT.Player) {
-  if (!isYoutubePlayerAttached(player)) return;
-  const iframe = player.getIframe?.();
-  if (!iframe) return;
-  try {
-    if (document.fullscreenElement === iframe) {
-      await document.exitFullscreen();
-    } else {
-      await iframe.requestFullscreen();
-    }
-  } catch {
-    /* ignore */
-  }
-}
-
-async function seekToTimelineFraction(player: YT.Player, digit0to9: number) {
-  if (!isYoutubePlayerAttached(player)) return;
-  const d = readPlayerDuration(player);
-  if (!d || d <= 0) return;
-  const frac = digit0to9 === 0 ? 0 : digit0to9 / 10;
-  try {
-    player.seekTo(Math.floor(frac * d), true);
-  } catch {
-    /* not ready */
-  }
-}
-
-function adjustVolume(player: YT.Player, delta: number) {
-  if (!isYoutubePlayerAttached(player)) return;
-  try {
-    if (delta > 0 && player.isMuted()) player.unMute();
-    const current = player.getVolume?.();
-    const v = current == null || !Number.isFinite(current) ? 100 : current;
-    const next = Math.min(100, Math.max(0, Math.round(v + delta)));
-    player.setVolume(next);
-    if (next === 0) player.mute();
-  } catch {
-    /* not ready */
-  }
 }
 
 /**
@@ -90,72 +45,10 @@ export function useGlobalYoutubeShortcuts(
         return playerCache;
       }
       playerCache = null;
-      const p = await getAttachedLiteYoutubePlayer(containerRef.current);
+      const p = await resolveLiteYoutubePlayer(containerRef.current);
       if (cancelled || !p) return null;
       playerCache = p;
       return p;
-    }
-
-    async function togglePlayPause(player: YT.Player) {
-      if (!isYoutubePlayerAttached(player)) return;
-      try {
-        const s = player.getPlayerState();
-        if (s === YT_PLAYING) player.pauseVideo();
-        else player.playVideo();
-      } catch {
-        /* not ready */
-      }
-    }
-
-    async function seekRelative(player: YT.Player, deltaSec: number) {
-      if (!isYoutubePlayerAttached(player)) return;
-      const t = readPlayerCurrentTime(player) ?? 0;
-      const d = readPlayerDuration(player);
-      const max = d && d > 0 ? d : t + Math.abs(deltaSec);
-      const next = Math.min(Math.max(0, t + deltaSec), max);
-      try {
-        player.seekTo(next, true);
-      } catch {
-        /* not ready */
-      }
-    }
-
-    async function toggleMute(player: YT.Player) {
-      if (!isYoutubePlayerAttached(player)) return;
-      try {
-        if (player.isMuted()) {
-          player.unMute();
-          if ((player.getVolume?.() ?? 0) === 0) player.setVolume(100);
-        } else {
-          player.mute();
-        }
-      } catch {
-        /* not ready */
-      }
-    }
-
-    async function toggleCaptions(player: YT.Player) {
-      if (!isYoutubePlayerAttached(player)) return;
-      const p = player as PlayerExtended;
-      try {
-        const cur = p.getOption?.("captions", "track") as
-          | { languageCode?: string }
-          | null
-          | undefined;
-        if (cur && typeof cur === "object" && cur.languageCode) {
-          p.setOption?.("captions", "track", {});
-          return;
-        }
-        p.loadModule?.("captions");
-        const list = p.getOption?.("captions", "tracklist") as
-          | { languageCode: string }[]
-          | undefined;
-        const lang =
-          (Array.isArray(list) && list[0]?.languageCode) || "en";
-        p.setOption?.("captions", "track", { languageCode: lang });
-      } catch {
-        /* ignore */
-      }
     }
 
     function onKeyDown(e: KeyboardEvent) {

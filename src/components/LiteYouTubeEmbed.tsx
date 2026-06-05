@@ -1,7 +1,13 @@
 "use client";
 
 import Box from "@mui/material/Box";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from "react";
 
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { isNearlyCompleteWatch } from "@/lib/cloudLibrary/sync";
@@ -53,6 +59,9 @@ type LiteYouTubeEmbedProps = {
   startSeconds?: number;
   enableGlobalShortcuts?: boolean;
   theatreMaximize?: boolean;
+  /** Shared shell ref for watch toolbar / external controls. */
+  playerShellRef?: RefObject<HTMLDivElement | null>;
+  onPlayerApiReady?: (ready: boolean) => void;
 };
 
 /** Lock iframe `start` for this video so progress saves do not remount the player. */
@@ -83,11 +92,26 @@ export function LiteYouTubeEmbed({
   startSeconds,
   enableGlobalShortcuts = true,
   theatreMaximize = false,
+  playerShellRef,
+  onPlayerApiReady,
 }: LiteYouTubeEmbedProps) {
   const { upsertWatchProgress, canPersistLibrary } = useCloudLibrary();
   const [ready, setReady] = useState(liteYtModuleReady);
   const [playerGeneration, setPlayerGeneration] = useState(0);
   const shellRef = useRef<HTMLDivElement>(null);
+  const assignShellRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      shellRef.current = node;
+      if (playerShellRef && "current" in playerShellRef) {
+        (
+          playerShellRef as RefObject<HTMLDivElement | null> & {
+            current: HTMLDivElement | null;
+          }
+        ).current = node;
+      }
+    },
+    [playerShellRef],
+  );
   const ytPlayerRef = useRef<YT.Player | null>(null);
   const playerApiReadyRef = useRef(false);
   const lastRecordedSecondsRef = useRef(-1);
@@ -235,6 +259,7 @@ export function LiteYouTubeEmbed({
         attachedPlayer = player;
         ytPlayerRef.current = player;
         playerApiReadyRef.current = true;
+        onPlayerApiReady?.(true);
         player.addEventListener("onStateChange", onStateChange);
         return;
       }
@@ -244,6 +269,7 @@ export function LiteYouTubeEmbed({
       cancelled = true;
       ytPlayerRef.current = null;
       playerApiReadyRef.current = false;
+      onPlayerApiReady?.(false);
       playingRef.current = false;
       if (attachedPlayer && isYoutubePlayerAttached(attachedPlayer)) {
         try {
@@ -253,7 +279,7 @@ export function LiteYouTubeEmbed({
         }
       }
     };
-  }, [ready, videoId, playerGeneration]);
+  }, [ready, videoId, playerGeneration, onPlayerApiReady]);
 
   useEffect(() => {
     if (!ready) return;
@@ -261,6 +287,7 @@ export function LiteYouTubeEmbed({
     const recoverPlayer = () => {
       ytPlayerRef.current = null;
       playerApiReadyRef.current = false;
+      onPlayerApiReady?.(false);
       playingRef.current = false;
       setPlayerGeneration((g) => g + 1);
     };
@@ -273,6 +300,7 @@ export function LiteYouTubeEmbed({
         if (player && isYoutubePlayerAttached(player)) {
           ytPlayerRef.current = player;
           playerApiReadyRef.current = true;
+          onPlayerApiReady?.(true);
           return;
         }
         recoverPlayer();
@@ -414,7 +442,7 @@ export function LiteYouTubeEmbed({
   }
 
   const player = (
-    <Box ref={shellRef} sx={shellSx}>
+    <Box ref={assignShellRef} sx={shellSx}>
       <lite-youtube
         key={`${videoId}-${playerGeneration}`}
         videoid={videoId}

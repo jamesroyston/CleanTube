@@ -8,6 +8,9 @@ import Typography from "@mui/material/Typography";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { WatchPlayerToolbar } from "@/components/WatchPlayerToolbar";
+import { useShowBottomNav } from "@/hooks/useCompactViewport";
+
 import {
   useWatchCommentsVisible,
   useWatchNarrowPlayerLayout,
@@ -151,7 +154,14 @@ export function WatchExperienceClient({
   ) {
     playerMountRef.current = null;
   }
-  if (progressResolvable) {
+  const canCommitPlayerStart =
+    progressResolvable || hasUrlStart || !canPersistLibrary;
+
+  if (
+    localLibraryHydrated &&
+    authStatus === "ready" &&
+    canCommitPlayerStart
+  ) {
     const prev = playerMountRef.current;
     if (!prev || prev.videoId !== videoId) {
       playerMountRef.current = {
@@ -160,17 +170,30 @@ export function WatchExperienceClient({
       };
     }
   }
-  const showPlayer = playerMountRef.current?.videoId === videoId;
+
+  const canMountPlayer =
+    localLibraryHydrated &&
+    authStatus === "ready" &&
+    canCommitPlayerStart &&
+    playerMountRef.current?.videoId === videoId;
+
   const playerStartSeconds =
     playerMountRef.current?.startSeconds ?? effectiveStartSeconds;
 
   const [watchNextVideos, setWatchNextVideos] =
     useState<VideoSummary[]>(watchNextInitial);
   const watchNextFetchAttemptedRef = useRef(false);
+  const playerShellRef = useRef<HTMLDivElement | null>(null);
+  const [playerApiReady, setPlayerApiReady] = useState(false);
+  const showBottomNav = useShowBottomNav();
 
   useEffect(() => {
     preloadLiteYoutubeEmbed();
   }, []);
+
+  useEffect(() => {
+    setPlayerApiReady(false);
+  }, [videoId]);
 
   const fetchWatchNext = useCallback(async () => {
     const response = await fetch(
@@ -226,7 +249,7 @@ export function WatchExperienceClient({
         <Grid size={{ xs: 12, lg: reserveUpNextColumn ? 8 : 12 }}>
           <Stack spacing={1.5}>
             <Box sx={watchPlayerShellSx}>
-              {showPlayer ? (
+              {canMountPlayer ? (
                 <LiteYouTubeEmbed
                   key={videoId}
                   videoId={videoId}
@@ -234,20 +257,19 @@ export function WatchExperienceClient({
                   thumbnailUrl={thumb}
                   channelName={video.channelName}
                   startSeconds={playerStartSeconds}
+                  playerShellRef={playerShellRef}
+                  onPlayerApiReady={setPlayerApiReady}
                 />
-              ) : (
-                <Box
-                  sx={{
-                    width: "100%",
-                    aspectRatio: "16 / 9",
-                    borderRadius: 1,
-                    bgcolor: "action.hover",
-                    [MOBILE_PORTRAIT]: { borderRadius: 0 },
-                  }}
-                  aria-hidden
-                />
-              )}
+              ) : null}
             </Box>
+
+            {showBottomNav && canMountPlayer ? (
+              <WatchPlayerToolbar
+                videoId={videoId}
+                playerShellRef={playerShellRef}
+                playerApiReady={playerApiReady}
+              />
+            ) : null}
 
             <Stack spacing={1.5} sx={watchBelowPlayerPadSx}>
               <Typography variant="h5" component="h1" sx={{ fontWeight: 700 }}>
