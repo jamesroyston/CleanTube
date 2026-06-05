@@ -127,40 +127,79 @@ export async function toggleMute(player: YT.Player): Promise<void> {
   }
 }
 
+/**
+ * YouTube exposes captions under different module names depending on the player
+ * build ("captions" for the HTML5 player, "cc" for the legacy one). Try both so
+ * the toggle works regardless of which the embed is using.
+ */
+const CAPTION_MODULES = ["captions", "cc"] as const;
+
+type CaptionTrack = { languageCode?: string } | null | undefined;
+
+function readActiveCaptionModule(
+  p: PlayerExtended,
+): { moduleName: string; track: CaptionTrack } | null {
+  for (const moduleName of CAPTION_MODULES) {
+    try {
+      const track = p.getOption?.(moduleName, "track") as CaptionTrack;
+      if (track && typeof track === "object") return { moduleName, track };
+    } catch {
+      /* try next module */
+    }
+  }
+  return null;
+}
+
 export async function toggleCaptions(player: YT.Player): Promise<void> {
   if (!isYoutubePlayerAttached(player)) return;
   const p = player as PlayerExtended;
-  try {
-    const cur = p.getOption?.("captions", "track") as
-      | { languageCode?: string }
-      | null
-      | undefined;
-    if (cur && typeof cur === "object" && cur.languageCode) {
-      p.setOption?.("captions", "track", {});
-      return;
+
+  for (const moduleName of CAPTION_MODULES) {
+    try {
+      p.loadModule?.(moduleName);
+    } catch {
+      /* ignore */
     }
-    p.loadModule?.("captions");
-    const list = p.getOption?.("captions", "tracklist") as
-      | { languageCode: string }[]
-      | undefined;
-    const lang = (Array.isArray(list) && list[0]?.languageCode) || "en";
-    p.setOption?.("captions", "track", { languageCode: lang });
+  }
+
+  if (captionsEnabled(player)) {
+    for (const moduleName of CAPTION_MODULES) {
+      try {
+        p.setOption?.(moduleName, "track", {});
+      } catch {
+        /* ignore */
+      }
+    }
+    return;
+  }
+
+  let targetModule = "captions";
+  let lang = "en";
+  for (const moduleName of CAPTION_MODULES) {
+    try {
+      const list = p.getOption?.(moduleName, "tracklist") as
+        | { languageCode?: string }[]
+        | undefined;
+      if (Array.isArray(list) && list.length > 0 && list[0]?.languageCode) {
+        targetModule = moduleName;
+        lang = list[0].languageCode;
+        break;
+      }
+    } catch {
+      /* try next module */
+    }
+  }
+
+  try {
+    p.setOption?.(targetModule, "track", { languageCode: lang });
   } catch {
     /* ignore */
   }
 }
 
 export function captionsEnabled(player: YT.Player): boolean {
-  const p = player as PlayerExtended;
-  try {
-    const cur = p.getOption?.("captions", "track") as
-      | { languageCode?: string }
-      | null
-      | undefined;
-    return Boolean(cur && typeof cur === "object" && cur.languageCode);
-  } catch {
-    return false;
-  }
+  const active = readActiveCaptionModule(player as PlayerExtended);
+  return Boolean(active?.track && active.track.languageCode);
 }
 
 const QUALITY_LABELS: Record<string, string> = {

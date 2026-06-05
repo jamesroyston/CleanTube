@@ -33,7 +33,8 @@ export function VideoCarouselRow({ videos, ariaLabel }: VideoCarouselRowProps) {
         overflowY: "hidden",
         WebkitOverflowScrolling: "touch",
         overscrollBehaviorX: "contain",
-        scrollSnapType: "x mandatory",
+        /** `proximity` (not `mandatory`) so a tap right after a swipe isn't swallowed by snap. */
+        scrollSnapType: "x proximity",
         touchAction: "pan-x pan-y",
         pb: 0.5,
         mx: { xs: -2, sm: 0 },
