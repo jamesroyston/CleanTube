@@ -25,9 +25,64 @@ import type { WatchVideoComment, WatchVideoCommentSort } from "@/lib/youtubeType
  * - patch-package: patch `node_modules` and keep a versioned patch file (re-apply on upgrades).
  * - Fork: depend on `@scope/youtubei.js` or a git URL with exports for the bits we need.
  */
-const require = createRequire(join(process.cwd(), "package.json"));
-
 const pkgRoot = join(process.cwd(), "node_modules/youtubei.js");
+
+type CommentViewCtor = new (...args: unknown[]) => unknown;
+type ContinuationItemCtor = new (...args: unknown[]) => unknown;
+type NavigationEndpointCtor = new (data: unknown) => {
+  call: (actions: unknown, args?: unknown) => Promise<{ data?: unknown }>;
+};
+type GetCommentsSectionParamsType = {
+  encode: (x: unknown) => { finish: () => Uint8Array };
+};
+
+let youtubeiInternals: {
+  CommentView: CommentViewCtor;
+  ContinuationItemClass: ContinuationItemCtor;
+  NavigationEndpoint: NavigationEndpointCtor;
+  GetCommentsSectionParams: GetCommentsSectionParamsType;
+  u8ToBase64: (u: Uint8Array) => string;
+} | null = null;
+
+/**
+ * Why not `import … from "youtubei.js/dist/…"`?
+ * - The package `exports` field does not expose these files; Node throws ERR_PACKAGE_PATH_NOT_EXPORTED.
+ * - Next/Turbopack also won't resolve those subpaths as normal imports.
+ * `createRequire` + absolute paths under `node_modules` loads the same modules the library uses
+ * at runtime. Lazy init avoids webpack evaluating dynamic requires during build page-data collection.
+ */
+function getYoutubeiInternals() {
+  if (youtubeiInternals) return youtubeiInternals;
+  const nodeRequire = createRequire(import.meta.url);
+  youtubeiInternals = {
+    CommentView: (
+      nodeRequire(join(pkgRoot, "dist/src/parser/classes/comments/CommentView.js")) as {
+        default: CommentViewCtor;
+      }
+    ).default,
+    ContinuationItemClass: (
+      nodeRequire(join(pkgRoot, "dist/src/parser/classes/ContinuationItem.js")) as {
+        default: ContinuationItemCtor;
+      }
+    ).default,
+    NavigationEndpoint: (
+      nodeRequire(join(pkgRoot, "dist/src/parser/classes/NavigationEndpoint.js")) as {
+        default: NavigationEndpointCtor;
+      }
+    ).default,
+    GetCommentsSectionParams: (
+      nodeRequire(join(pkgRoot, "dist/protos/generated/misc/params.js")) as {
+        GetCommentsSectionParams: GetCommentsSectionParamsType;
+      }
+    ).GetCommentsSectionParams,
+    u8ToBase64: (
+      nodeRequire(join(pkgRoot, "dist/src/utils/Utils.js")) as {
+        u8ToBase64: (u: Uint8Array) => string;
+      }
+    ).u8ToBase64,
+  };
+  return youtubeiInternals;
+}
 
 /**
  * Why not `import … from "youtubei.js/dist/…"`?
@@ -36,37 +91,6 @@ const pkgRoot = join(process.cwd(), "node_modules/youtubei.js");
  * `createRequire` + absolute paths under `node_modules` loads the same modules the library uses
  * at runtime. No extra install step (unlike patch-package).
  */
-const CommentView = (
-  require(join(pkgRoot, "dist/src/parser/classes/comments/CommentView.js")) as {
-    default: new (...args: unknown[]) => unknown;
-  }
-).default;
-const ContinuationItemClass = (
-  require(join(pkgRoot, "dist/src/parser/classes/ContinuationItem.js")) as {
-    default: new (...args: unknown[]) => unknown;
-  }
-).default;
-const NavigationEndpoint = (
-  require(join(pkgRoot, "dist/src/parser/classes/NavigationEndpoint.js")) as {
-    default: new (data: unknown) => {
-      call: (
-        actions: unknown,
-        args?: unknown,
-      ) => Promise<{ data?: unknown }>;
-    };
-  }
-).default;
-const { GetCommentsSectionParams } = require(join(
-  pkgRoot,
-  "dist/protos/generated/misc/params.js",
-)) as {
-  GetCommentsSectionParams: { encode: (x: unknown) => { finish: () => Uint8Array } };
-};
-const { u8ToBase64 } = require(join(
-  pkgRoot,
-  "dist/src/utils/Utils.js",
-)) as { u8ToBase64: (u: Uint8Array) => string };
-
 /** Max top-level comment pages walked when locating a thread for direct reply fetch. */
 /** Hobby-friendly default; tune via env if needed. */
 const DEFAULT_MAX_COMMENT_THREAD_WALK_PAGES = 16;
@@ -84,6 +108,7 @@ function watchNextContinuation(
   actions: unknown,
   token: string,
 ): Promise<{ data?: unknown }> {
+  const { NavigationEndpoint } = getYoutubeiInternals();
   const ep = new NavigationEndpoint({
     continuationCommand: {
       request: "CONTINUATION_REQUEST_TYPE_WATCH_NEXT",
@@ -101,6 +126,7 @@ function encodeCommentsSectionContinuation(
   videoId: string,
   sort: WatchVideoCommentSort,
 ): string {
+  const { GetCommentsSectionParams, u8ToBase64 } = getYoutubeiInternals();
   const writer = GetCommentsSectionParams.encode({
     ctx: { videoId },
     unkParam: 6,
@@ -225,6 +251,7 @@ function mapTopLevelComment(c: Record<string, unknown>): WatchVideoComment | nul
  * duck-typed fallback for older parsed shapes.
  */
 function mapReplyNode(node: unknown): WatchVideoComment | null {
+  const { CommentView } = getYoutubeiInternals();
   if (node instanceof CommentView) {
     return mapCommentView(node as unknown as Record<string, unknown>);
   }
@@ -335,6 +362,7 @@ function repliesFromParsedResponse(
   }
   if (!memo) return null;
 
+  const { CommentView, ContinuationItemClass } = getYoutubeiInternals();
   const nodes = memo.getType(CommentView as never) as unknown[];
   const replies: WatchVideoComment[] = [];
   for (const n of nodes) {
@@ -406,6 +434,7 @@ export async function getWatchVideoCommentReplies(
     hitThreadWalkCap = cappedWalk;
 
     if (thread?.comment_replies_data?.contents) {
+      const { ContinuationItemClass } = getYoutubeiInternals();
       const continuationNode = thread.comment_replies_data.contents.firstOfType(
         ContinuationItemClass as never,
       ) as { endpoint?: { call: (a: unknown, o?: unknown) => Promise<unknown> } } | undefined;

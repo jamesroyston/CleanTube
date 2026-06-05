@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
-import { ChannelPageClient } from "./ChannelPageClient";
+import { ChannelPageClient, ChannelPageSkeleton } from "./ChannelPageClient";
 import { decodeRouteToken } from "@/lib/decodeRouteToken";
 import { getChannelDetailsCached } from "@/lib/youtubeChannelResolveCache";
 import type { ChannelSortMode } from "@/lib/youtubeTypes";
@@ -9,8 +10,6 @@ type PageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ sort?: string; page?: string; grid?: string }>;
 };
-
-export const runtime = "nodejs";
 
 function normalizeChannelSort(value: string | undefined): ChannelSortMode {
   return value === "popular" ? "popular" : "latest";
@@ -31,10 +30,7 @@ export async function generateMetadata({
   };
 }
 
-/**
- * Shell renders immediately; grid loads client-side via SWR + `/api/channel` (For You pattern).
- */
-export default async function ChannelPage({ params, searchParams }: PageProps) {
+async function ChannelPageContent({ params, searchParams }: PageProps) {
   const { id: rawId } = await params;
   const { sort: sortRaw, page: pageRaw, grid: gridRaw } = await searchParams;
   const id = decodeRouteToken(rawId);
@@ -48,5 +44,16 @@ export default async function ChannelPage({ params, searchParams }: PageProps) {
       pageRaw={pageRaw}
       gridQuery={gridQuery}
     />
+  );
+}
+
+/**
+ * Shell renders immediately; grid loads client-side via SWR + `/api/channel` (For You pattern).
+ */
+export default function ChannelPage(props: PageProps) {
+  return (
+    <Suspense fallback={<ChannelPageSkeleton />}>
+      <ChannelPageContent {...props} />
+    </Suspense>
   );
 }
