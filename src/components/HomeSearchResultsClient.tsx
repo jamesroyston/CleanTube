@@ -8,6 +8,7 @@ import Typography from "@mui/material/Typography";
 import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 import { SearchSortBar } from "@/components/SearchSortBar";
 import { SaveSearchButton } from "@/components/SaveSearchButton";
+import { VideoCardGridSkeleton } from "@/components/skeletons/VideoCardGridSkeleton";
 import { useSearchResults } from "@/hooks/useSearchResults";
 import type { ResultSortMode, SearchSortMode } from "@/lib/uploadedAtSort";
 
@@ -20,12 +21,22 @@ type HomeSearchResultsClientProps = {
 function SearchResultsSkeleton() {
   return (
     <Stack spacing={2}>
-      <Skeleton variant="text" width="50%" />
-      <Stack direction="row" spacing={2}>
-        <Skeleton variant="rounded" width={160} height={90} />
-        <Skeleton variant="rounded" width={160} height={90} />
-        <Skeleton variant="rounded" width={160} height={90} sx={{ display: { xs: "none", sm: "block" } }} />
-      </Stack>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 2,
+          flexWrap: "wrap",
+        }}
+      >
+        <Skeleton
+          variant="text"
+          sx={{ flex: "1 1 200px", minWidth: 0, height: 20 }}
+        />
+        <Skeleton variant="rounded" width={120} height={36} />
+        <Skeleton variant="rounded" width={200} height={36} />
+      </Box>
+      <VideoCardGridSkeleton count={8} channelCount={2} />
     </Stack>
   );
 }

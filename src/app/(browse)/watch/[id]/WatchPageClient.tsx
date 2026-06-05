@@ -3,15 +3,21 @@
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Container from "@mui/material/Container";
+import Grid from "@mui/material/Grid";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
+import {
+  useWatchNarrowPlayerLayout,
+  useWatchUpNextVisible,
+} from "@/app/providers";
 import { WatchBackLink } from "@/components/WatchBackLink";
 import { WatchExperienceClient } from "@/components/WatchExperienceClient";
 import { WatchLaterBanner } from "@/components/WatchLaterBanner";
+import { WatchNextCardSkeleton } from "@/components/WatchNextSidebar";
 import { useWatchVideo } from "@/hooks/useWatchVideo";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
 import {
@@ -39,7 +45,65 @@ function channelHrefForWatchVideo(video: {
   return token ? channelPageHrefFromToken(token) : null;
 }
 
+const MOBILE_PORTRAIT =
+  "@media (max-width: 599.95px) and (orientation: portrait)";
+
+function WatchPageSkeletonBody({
+  reserveUpNextColumn,
+}: {
+  reserveUpNextColumn: boolean;
+}) {
+  return (
+    <Grid
+      container
+      spacing={{ xs: 0, sm: 3 }}
+      sx={{
+        px: { xs: 2, sm: 0 },
+        alignItems: "flex-start",
+        [MOBILE_PORTRAIT]: { px: 0 },
+      }}
+    >
+      <Grid size={{ xs: 12, lg: reserveUpNextColumn ? 8 : 12 }}>
+        <Stack spacing={1.5}>
+          <Skeleton
+            variant="rectangular"
+            sx={{
+              width: "100%",
+              aspectRatio: "16 / 9",
+              borderRadius: { xs: 0, sm: 1 },
+              [MOBILE_PORTRAIT]: { borderRadius: 0 },
+            }}
+          />
+          <Stack spacing={1.5} sx={{ [MOBILE_PORTRAIT]: { px: 2 } }}>
+            <Skeleton variant="text" width="70%" height={25} />
+            <Skeleton variant="text" width="45%" height={20} />
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Skeleton variant="rounded" width={112} height={32} />
+              <Skeleton variant="rounded" width={120} height={32} />
+              <Skeleton variant="rounded" width={100} height={32} />
+            </Stack>
+          </Stack>
+        </Stack>
+      </Grid>
+      {reserveUpNextColumn ? (
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <Stack spacing={1.25} sx={{ [MOBILE_PORTRAIT]: { px: 2 } }}>
+            <Skeleton variant="text" width="40%" height={28} />
+            {Array.from({ length: 3 }, (_, i) => (
+              <WatchNextCardSkeleton key={i} />
+            ))}
+          </Stack>
+        </Grid>
+      ) : null}
+    </Grid>
+  );
+}
+
 export function WatchPageSkeleton({ videoId }: { videoId: string }) {
+  const { visible: upNextVisible } = useWatchUpNextVisible();
+  const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
+  const reserveUpNextColumn = narrowPlayerLayout || upNextVisible;
+
   return (
     <Box component="main" sx={{ pb: { xs: 4, sm: 6 } }}>
       <Container
@@ -57,18 +121,7 @@ export function WatchPageSkeleton({ videoId }: { videoId: string }) {
         disableGutters
         sx={{ pt: { xs: 0, sm: 2 }, px: { xs: 0, sm: 3 } }}
       >
-        <Stack spacing={2} sx={{ px: { xs: 2, sm: 0 } }}>
-          <Skeleton
-            variant="rectangular"
-            sx={{
-              width: "100%",
-              aspectRatio: "16 / 9",
-              borderRadius: { xs: 0, sm: 1 },
-            }}
-          />
-          <Skeleton variant="text" width="70%" height={36} />
-          <Skeleton variant="text" width="40%" />
-        </Stack>
+        <WatchPageSkeletonBody reserveUpNextColumn={reserveUpNextColumn} />
       </Container>
     </Box>
   );

@@ -122,7 +122,7 @@ function WatchNextCard({ video }: { video: VideoSummary }) {
 
 const WATCH_NEXT_SKELETON_COUNT = 3;
 
-function WatchNextCardSkeleton() {
+export function WatchNextCardSkeleton() {
   return (
     <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start", p: 0.5 }}>
       <Skeleton
@@ -135,9 +135,8 @@ function WatchNextCardSkeleton() {
         }}
       />
       <Box sx={{ minWidth: 0, flex: 1, pt: 0.25 }}>
-        <Skeleton variant="text" width="100%" />
-        <Skeleton variant="text" width="72%" />
-        <Skeleton variant="text" width="55%" sx={{ mt: 0.25 }} />
+        <Skeleton variant="text" width="100%" height={20} />
+        <Skeleton variant="text" width="72%" height={16} />
       </Box>
     </Box>
   );
