@@ -46,3 +46,8 @@ supabase/.temp
 
 .cursor/
 .env*.local
+
+# Serwist
+public/sw.js
+public/sw.js.map
+public/swe-worker*.js

@@ -19,8 +19,6 @@ type PageProps = {
   }>;
 };
 
-export const runtime = "nodejs";
-
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
@@ -35,10 +33,7 @@ export async function generateMetadata({
   };
 }
 
-/**
- * Shell renders immediately; video metadata loads client-side via SWR + `/api/videos/[id]`.
- */
-export default async function WatchPage({ params }: PageProps) {
+async function WatchPageContent({ params }: PageProps) {
   const { id } = await params;
 
   if (!isValidYoutubeVideoId(id)) {
@@ -50,9 +45,16 @@ export default async function WatchPage({ params }: PageProps) {
     cookieStore.get(WATCH_COMMENTS_VISIBLE_COOKIE)?.value,
   );
 
+  return <WatchPageClient videoId={id} commentsEnabled={commentsEnabled} />;
+}
+
+/**
+ * Shell renders immediately; video metadata loads client-side via SWR + `/api/videos/[id]`.
+ */
+export default function WatchPage(props: PageProps) {
   return (
-    <Suspense fallback={<WatchPageSkeleton videoId={id} />}>
-      <WatchPageClient videoId={id} commentsEnabled={commentsEnabled} />
+    <Suspense fallback={<WatchPageSkeleton videoId="" />}>
+      <WatchPageContent {...props} />
     </Suspense>
   );
 }

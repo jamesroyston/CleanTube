@@ -29,7 +29,17 @@ type PageProps = {
   }>;
 };
 
-export default async function Home({ searchParams }: PageProps) {
+function HomeFallback() {
+  return (
+    <Box component="main" sx={{ pb: 6 }}>
+      <Container maxWidth="xl" sx={{ pt: 2 }}>
+        <ForYouHome />
+      </Container>
+    </Box>
+  );
+}
+
+async function HomeContent({ searchParams }: PageProps) {
   const {
     q,
     searchSort: searchSortRaw,
@@ -74,5 +84,13 @@ export default async function Home({ searchParams }: PageProps) {
         )}
       </Container>
     </Box>
+  );
+}
+
+export default function Home(props: PageProps) {
+  return (
+    <Suspense fallback={<HomeFallback />}>
+      <HomeContent {...props} />
+    </Suspense>
   );
 }

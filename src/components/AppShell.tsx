@@ -41,6 +41,20 @@ function HeaderFallback() {
   return null;
 }
 
+function AppShellDrawerPathSync({
+  onPathChange,
+}: {
+  onPathChange: () => void;
+}) {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    onPathChange();
+  }, [pathname, onPathChange]);
+
+  return null;
+}
+
 /**
  * Desktop browse header spacer before measure: Toolbar minHeight 64 (sm+) + py 1 (8×2).
  * Safe-area is applied on the fixed AppBar and included in ResizeObserver measurement.
@@ -49,7 +63,6 @@ const DESKTOP_HEADER_INSET_FALLBACK_PX = 80;
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
-  const pathname = usePathname();
   const compact = useCompactViewport();
   const mobileExperience = useMobileExperience();
   const desktopLayout = !compact;
@@ -77,10 +90,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     drawerHistoryPushedRef.current = false;
   }, []);
 
-  useEffect(() => {
+  const resetMobileDrawerOnNavigate = useCallback(() => {
     setMobileOpen(false);
     drawerHistoryPushedRef.current = false;
-  }, [pathname]);
+  }, []);
 
   const openMobileDrawer = useCallback(() => {
     setMobileOpen(true);
@@ -186,7 +199,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         WebkitOverflowScrolling: "touch",
       }}
     >
-      <SavedChannelMigration />
+      <Suspense fallback={null}>
+        <SavedChannelMigration />
+      </Suspense>
       {children}
     </Box>
   ) : (
@@ -197,7 +212,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         pb: mobileMainPaddingBottom,
       }}
     >
-      <SavedChannelMigration />
+      <Suspense fallback={null}>
+        <SavedChannelMigration />
+      </Suspense>
       {children}
     </Box>
   );
@@ -234,6 +251,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         />
       ) : null}
       <Suspense fallback={<HeaderFallback />}>
+        <AppShellDrawerPathSync onPathChange={resetMobileDrawerOnNavigate} />
         <WatchReturnTracker />
         <Header
           ref={appBarRef}
@@ -248,7 +266,11 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       </Suspense>
       <CompactLayoutChrome
         showBottomNav={showBottomNav}
-        bottomNav={<MobileBottomNav />}
+        bottomNav={
+          <Suspense fallback={null}>
+            <MobileBottomNav />
+          </Suspense>
+        }
       />
 
       {desktopRailPx != null ? (
