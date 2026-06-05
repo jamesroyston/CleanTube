@@ -9,7 +9,7 @@ import BottomNavigation from "@mui/material/BottomNavigation";
 import BottomNavigationAction from "@mui/material/BottomNavigationAction";
 import { useTheme } from "@mui/material/styles";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useTransition } from "react";
+import { useEffect } from "react";
 
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useCompactViewport } from "@/hooks/useCompactViewport";
@@ -23,7 +23,6 @@ export function MobileBottomNav() {
   const compact = useCompactViewport();
   const pathname = usePathname();
   const router = useRouter();
-  const [, startTransition] = useTransition();
   const { openSearchOverlay, searchOverlayOpen } = useSearchOverlay();
   const value = bottomNavValueFromPathname(pathname);
 
@@ -58,25 +57,25 @@ export function MobileBottomNav() {
           bgcolor: "background.paper",
           borderTop: (t) => `1px solid ${t.vars.palette.divider}`,
           backdropFilter: "blur(12px)",
+          /** Remove the synthetic tap delay so the first tap navigates immediately. */
+          "& .MuiButtonBase-root": { touchAction: "manipulation" },
         }}
         onChange={(_, next) => {
           if (next === "search") {
             openSearchOverlay();
             return;
           }
-          startTransition(() => {
-            if (next === "home") {
-              router.push("/");
-              return;
-            }
-            if (next === "library") {
-              router.push("/library");
-              return;
-            }
-            if (next === "account" && !pathname.startsWith("/auth")) {
-              router.push("/account");
-            }
-          });
+          if (next === "home") {
+            router.push("/");
+            return;
+          }
+          if (next === "library") {
+            router.push("/library");
+            return;
+          }
+          if (next === "account" && !pathname.startsWith("/auth")) {
+            router.push("/account");
+          }
         }}
       >
         <BottomNavigationAction

@@ -3,37 +3,36 @@
 import ClosedCaptionIcon from "@mui/icons-material/ClosedCaption";
 import ClosedCaptionOffIcon from "@mui/icons-material/ClosedCaptionOff";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Forward10Icon from "@mui/icons-material/Forward10";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Replay10Icon from "@mui/icons-material/Replay10";
+import TuneIcon from "@mui/icons-material/Tune";
+import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
+import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
-import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
-import Select from "@mui/material/Select";
+import Popover from "@mui/material/Popover";
 import Slider from "@mui/material/Slider";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
+import Typography from "@mui/material/Typography";
 import type { RefObject } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   buildYoutubeWatchUrl,
   captionsEnabled,
-  formatPlaybackQuality,
   isPlayerPlaying,
-  readAvailableQualities,
-  readPlaybackQuality,
   readPlayerVolume,
   resolveLiteYoutubePlayer,
   SEEK_STEP_SEC,
-  setPlaybackQuality,
   setPlayerVolume,
   toggleCaptions,
   toggleMute,
@@ -52,6 +51,100 @@ type WatchPlayerToolbarProps = {
   playerApiReady: boolean;
 };
 
+/** Comfortable tap targets — well above the 44px iOS minimum. */
+const TOUCH_TARGET_SX = { width: 52, height: 52 } as const;
+
+type VolumeControlProps = {
+  volume: number;
+  muted: boolean;
+  onToggleMute: () => void;
+  onVolumeChange: (value: number) => void;
+  onVolumeCommit: (value: number) => void;
+  onInteractingChange: (interacting: boolean) => void;
+};
+
+function VolumeIcon({ volume, muted }: { volume: number; muted: boolean }) {
+  if (muted || volume === 0) return <VolumeOffIcon />;
+  if (volume < 50) return <VolumeDownIcon />;
+  return <VolumeUpIcon />;
+}
+
+function VolumeControl({
+  volume,
+  muted,
+  onToggleMute,
+  onVolumeChange,
+  onVolumeCommit,
+  onInteractingChange,
+}: VolumeControlProps) {
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const open = Boolean(anchorEl);
+  const displayValue = muted ? 0 : volume;
+
+  return (
+    <>
+      <Tooltip title="Volume">
+        <IconButton
+          aria-label="Adjust volume"
+          aria-haspopup="dialog"
+          onClick={(event) => setAnchorEl(event.currentTarget)}
+          sx={TOUCH_TARGET_SX}
+        >
+          <VolumeIcon volume={volume} muted={muted} />
+        </IconButton>
+      </Tooltip>
+      <Popover
+        open={open}
+        anchorEl={anchorEl}
+        onClose={() => {
+          onInteractingChange(false);
+          setAnchorEl(null);
+        }}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
+        slotProps={{ paper: { sx: { overflow: "visible", borderRadius: 2 } } }}
+      >
+        <Stack alignItems="center" spacing={1} sx={{ py: 2, px: 1.5 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontVariantNumeric: "tabular-nums" }}
+          >
+            {displayValue}
+          </Typography>
+          <Slider
+            aria-label="Volume"
+            orientation="vertical"
+            value={displayValue}
+            min={0}
+            max={100}
+            onChange={(_, value) => {
+              onInteractingChange(true);
+              const v = Array.isArray(value) ? value[0] : value;
+              onVolumeChange(v);
+            }}
+            onChangeCommitted={(_, value) => {
+              const v = Array.isArray(value) ? value[0] : value;
+              onVolumeCommit(v);
+              onInteractingChange(false);
+            }}
+            sx={{ height: 150, py: 1 }}
+          />
+          <Tooltip title={muted ? "Unmute" : "Mute"}>
+            <IconButton
+              aria-label={muted ? "Unmute" : "Mute"}
+              onClick={onToggleMute}
+              size="small"
+            >
+              <VolumeIcon volume={volume} muted={muted} />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Popover>
+    </>
+  );
+}
+
 export function WatchPlayerToolbar({
   videoId,
   playerShellRef,
@@ -62,24 +155,22 @@ export function WatchPlayerToolbar({
   const [volume, setVolume] = useState(100);
   const [muted, setMuted] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(false);
-  const [qualities, setQualities] = useState<string[]>([]);
-  const [quality, setQuality] = useState("auto");
   const [copySnackbar, setCopySnackbar] = useState(false);
+  const volumeInteractingRef = useRef(false);
 
   const syncFromPlayer = useCallback(async () => {
     const player = await resolveLiteYoutubePlayer(playerShellRef.current);
     if (!player) return;
     setPlaying(isPlayerPlaying(player));
-    setVolume(readPlayerVolume(player));
-    try {
-      setMuted(player.isMuted());
-    } catch {
-      setMuted(false);
+    if (!volumeInteractingRef.current) {
+      setVolume(readPlayerVolume(player));
+      try {
+        setMuted(player.isMuted());
+      } catch {
+        setMuted(false);
+      }
     }
     setCaptionsOn(captionsEnabled(player));
-    const available = readAvailableQualities(player);
-    if (available.length > 0) setQualities(available);
-    setQuality(readPlaybackQuality(player));
   }, [playerShellRef]);
 
   useEffect(() => {
@@ -101,10 +192,18 @@ export function WatchPlayerToolbar({
     [playerShellRef, syncFromPlayer],
   );
 
-  const toggleExpanded = () => {
-    const next = !expanded;
+  const setExpandedPersisted = (next: boolean) => {
     setExpanded(next);
     writeWatchPlayerToolbarVisible(next);
+  };
+
+  const handleVolumeChange = (value: number) => {
+    setVolume(value);
+    setMuted(value === 0);
+  };
+
+  const handleVolumeCommit = (value: number) => {
+    void withPlayer((p) => setPlayerVolume(p, value));
   };
 
   const handleCopyUrl = async () => {
@@ -115,166 +214,117 @@ export function WatchPlayerToolbar({
         await navigator.clipboard.writeText(url);
         setCopySnackbar(true);
       } catch {
-        /* ignore */
+        /* clipboard unavailable */
       }
     });
   };
 
-  return (
-    <Box sx={{ position: "relative" }}>
-      <Box
-        sx={{
-          position: "absolute",
-          top: -40,
-          right: 8,
-          zIndex: 2,
-        }}
-      >
-        <Tooltip title={expanded ? "Hide controls" : "Show controls"}>
-          <IconButton
-            size="small"
-            onClick={toggleExpanded}
-            aria-expanded={expanded}
-            aria-label={expanded ? "Hide player controls" : "Show player controls"}
-            sx={{
-              bgcolor: "background.paper",
-              border: 1,
-              borderColor: "divider",
-              minWidth: 44,
-              minHeight: 44,
-            }}
-          >
-            {expanded ? (
-              <ExpandLessIcon fontSize="small" />
-            ) : (
-              <ExpandMoreIcon fontSize="small" />
-            )}
-          </IconButton>
-        </Tooltip>
-      </Box>
-
-      {expanded ? (
-        <Paper
+  if (!expanded) {
+    return (
+      <Box sx={{ display: "flex", justifyContent: "center", mt: 1 }}>
+        <Button
           variant="outlined"
-          sx={{
-            mt: 1,
-            px: 1,
-            py: 0.75,
-            borderRadius: 1,
-            overflowX: "auto",
-            WebkitOverflowScrolling: "touch",
-          }}
+          size="small"
+          startIcon={<TuneIcon />}
+          onClick={() => setExpandedPersisted(true)}
+          sx={{ borderRadius: 999, px: 2, minHeight: 40 }}
         >
-          <Stack
-            direction="row"
-            spacing={0.5}
-            alignItems="center"
-            sx={{ minWidth: "min-content" }}
-          >
-            <Tooltip title={`Back ${SEEK_STEP_SEC}s`}>
-              <IconButton
-                aria-label={`Back ${SEEK_STEP_SEC} seconds`}
-                onClick={() => void withPlayer((p) => seekRelative(p, -SEEK_STEP_SEC))}
-                sx={{ minWidth: 44, minHeight: 44 }}
-              >
-                <Replay10Icon />
-              </IconButton>
-            </Tooltip>
+          Player controls
+        </Button>
+      </Box>
+    );
+  }
 
-            <Tooltip title={playing ? "Pause" : "Play"}>
-              <IconButton
-                aria-label={playing ? "Pause" : "Play"}
-                onClick={() => void withPlayer((p) => togglePlayPause(p))}
-                sx={{ minWidth: 44, minHeight: 44 }}
-              >
-                {playing ? <PauseIcon /> : <PlayArrowIcon />}
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title={`Forward ${SEEK_STEP_SEC}s`}>
-              <IconButton
-                aria-label={`Forward ${SEEK_STEP_SEC} seconds`}
-                onClick={() => void withPlayer((p) => seekRelative(p, SEEK_STEP_SEC))}
-                sx={{ minWidth: 44, minHeight: 44 }}
-              >
-                <Forward10Icon />
-              </IconButton>
-            </Tooltip>
-
-            <Tooltip title={muted ? "Unmute" : "Mute"}>
-              <IconButton
-                aria-label={muted ? "Unmute" : "Mute"}
-                onClick={() => void withPlayer((p) => toggleMute(p))}
-                sx={{ minWidth: 44, minHeight: 44 }}
-              >
-                {muted || volume === 0 ? <VolumeOffIcon /> : <VolumeUpIcon />}
-              </IconButton>
-            </Tooltip>
-
-            <Slider
-              aria-label="Volume"
-              value={muted ? 0 : volume}
-              min={0}
-              max={100}
-              onChange={(_, value) => {
-                const v = Array.isArray(value) ? value[0] : value;
-                setVolume(v);
-                setMuted(v === 0);
-              }}
-              onChangeCommitted={(_, value) => {
-                const v = Array.isArray(value) ? value[0] : value;
-                void withPlayer((p) => setPlayerVolume(p, v));
-              }}
-              sx={{ width: 88, mx: 0.5 }}
+  return (
+    <Box sx={{ mt: 1 }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, overflow: "hidden" }}>
+        <Box sx={{ display: "flex", justifyContent: "center" }}>
+          <Tooltip title="Hide controls">
+            <IconButton
+              aria-label="Hide player controls"
+              aria-expanded
+              onClick={() => setExpandedPersisted(false)}
               size="small"
-            />
+              sx={{ width: "100%", borderRadius: 0, py: 0.25 }}
+            >
+              <ExpandMoreIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        <Divider />
+        <Stack
+          direction="row"
+          flexWrap="wrap"
+          useFlexGap
+          rowGap={0.5}
+          alignItems="center"
+          justifyContent="space-evenly"
+          sx={{ px: 1, py: 1 }}
+        >
+          <Tooltip title={`Back ${SEEK_STEP_SEC}s`}>
+            <IconButton
+              aria-label={`Back ${SEEK_STEP_SEC} seconds`}
+              onClick={() => void withPlayer((p) => seekRelative(p, -SEEK_STEP_SEC))}
+              sx={TOUCH_TARGET_SX}
+            >
+              <Replay10Icon />
+            </IconButton>
+          </Tooltip>
 
-            <Tooltip title={captionsOn ? "Captions off" : "Captions on"}>
-              <IconButton
-                aria-label={captionsOn ? "Turn captions off" : "Turn captions on"}
-                onClick={() => void withPlayer((p) => toggleCaptions(p))}
-                sx={{ minWidth: 44, minHeight: 44 }}
-              >
-                {captionsOn ? (
-                  <ClosedCaptionIcon />
-                ) : (
-                  <ClosedCaptionOffIcon />
-                )}
-              </IconButton>
-            </Tooltip>
+          <Tooltip title={playing ? "Pause" : "Play"}>
+            <IconButton
+              aria-label={playing ? "Pause" : "Play"}
+              onClick={() => void withPlayer((p) => togglePlayPause(p))}
+              sx={TOUCH_TARGET_SX}
+            >
+              {playing ? <PauseIcon /> : <PlayArrowIcon />}
+            </IconButton>
+          </Tooltip>
 
-            {qualities.length > 0 ? (
-              <Select
-                size="small"
-                value={quality}
-                aria-label="Video quality"
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setQuality(next);
-                  void withPlayer((p) => setPlaybackQuality(p, next));
-                }}
-                sx={{ minWidth: 88, height: 36 }}
-              >
-                {qualities.map((q) => (
-                  <MenuItem key={q} value={q}>
-                    {formatPlaybackQuality(q)}
-                  </MenuItem>
-                ))}
-              </Select>
-            ) : null}
+          <Tooltip title={`Forward ${SEEK_STEP_SEC}s`}>
+            <IconButton
+              aria-label={`Forward ${SEEK_STEP_SEC} seconds`}
+              onClick={() => void withPlayer((p) => seekRelative(p, SEEK_STEP_SEC))}
+              sx={TOUCH_TARGET_SX}
+            >
+              <Forward10Icon />
+            </IconButton>
+          </Tooltip>
 
-            <Tooltip title="Copy YouTube URL">
-              <IconButton
-                aria-label="Copy YouTube URL"
-                onClick={() => void handleCopyUrl()}
-                sx={{ minWidth: 44, minHeight: 44 }}
-              >
-                <ContentCopyIcon />
-              </IconButton>
-            </Tooltip>
-          </Stack>
-        </Paper>
-      ) : null}
+          <VolumeControl
+            volume={volume}
+            muted={muted}
+            onToggleMute={() => void withPlayer((p) => toggleMute(p))}
+            onVolumeChange={handleVolumeChange}
+            onVolumeCommit={handleVolumeCommit}
+            onInteractingChange={(interacting) => {
+              volumeInteractingRef.current = interacting;
+            }}
+          />
+
+          <Tooltip title={captionsOn ? "Captions off" : "Captions on"}>
+            <IconButton
+              aria-label={captionsOn ? "Turn captions off" : "Turn captions on"}
+              aria-pressed={captionsOn}
+              onClick={() => void withPlayer((p) => toggleCaptions(p))}
+              color={captionsOn ? "primary" : "default"}
+              sx={TOUCH_TARGET_SX}
+            >
+              {captionsOn ? <ClosedCaptionIcon /> : <ClosedCaptionOffIcon />}
+            </IconButton>
+          </Tooltip>
+
+          <Tooltip title="Copy YouTube URL">
+            <IconButton
+              aria-label="Copy YouTube URL"
+              onClick={() => void handleCopyUrl()}
+              sx={TOUCH_TARGET_SX}
+            >
+              <ContentCopyIcon />
+            </IconButton>
+          </Tooltip>
+        </Stack>
+      </Paper>
 
       <Snackbar
         open={copySnackbar}

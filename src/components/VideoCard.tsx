@@ -48,10 +48,17 @@ export function VideoCard({ video, carousel = false }: VideoCardProps) {
               WebkitTapHighlightColor: "transparent",
             }
           : {}),
-        "&:hover": {
-          transform: "translateY(-2px)",
-          ...theme.applyStyles("dark", { boxShadow: cardShadowDark }),
-          ...theme.applyStyles("light", { boxShadow: cardShadowLight }),
+        /**
+         * Guard hover behind a real pointer. On touch (iOS) `:hover` sticks after
+         * the first tap, so the first tap only triggers hover and the second
+         * actually navigates — gating it removes that double-tap feel.
+         */
+        "@media (hover: hover) and (pointer: fine)": {
+          "&:hover": {
+            transform: "translateY(-2px)",
+            ...theme.applyStyles("dark", { boxShadow: cardShadowDark }),
+            ...theme.applyStyles("light", { boxShadow: cardShadowLight }),
+          },
         },
       })}
     >
@@ -65,9 +72,10 @@ export function VideoCard({ video, carousel = false }: VideoCardProps) {
             flexDirection: "column",
             alignItems: "stretch",
             height: "100%",
+            /** Removes the synthetic ~300ms tap delay so the first tap navigates. */
+            touchAction: "manipulation",
             ...(carousel
               ? {
-                  touchAction: "pan-x pan-y",
                   WebkitTapHighlightColor: "transparent",
                   "&:focus:not(:focus-visible)": {
                     backgroundColor: "transparent",

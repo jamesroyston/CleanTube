@@ -286,7 +286,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                   left: 0,
                   right: 0,
                   transform: `translate3d(0, calc((1 - ${revealProgress}) * -100%), 0)`,
-                  pointerEvents: revealProgress > 0.2 ? "auto" : "none",
+                  /** Interactive as soon as it starts revealing so the first tap lands. */
+                  pointerEvents: revealProgress > 0 ? "auto" : "none",
                   willChange: "transform",
                   /** JS rAF drives transform — CSS transition here fights it and flickers on idle hide. */
                   transition: "none",
