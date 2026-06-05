@@ -4,7 +4,8 @@ import type { MutableRefObject, RefObject } from "react";
 import { useEffect } from "react";
 
 import {
-  adjustVolume,
+  ensurePlayerVolume100,
+  primeCaptionsModule,
   resolveLiteYoutubePlayer,
   SEEK_STEP_SEC,
   seekRelative,
@@ -13,7 +14,6 @@ import {
   toggleFullscreen,
   toggleMute,
   togglePlayPause,
-  VOLUME_STEP,
 } from "@/lib/youtubePlayerControls";
 import { isYoutubePlayerAttached } from "@/lib/youtubePlayer";
 
@@ -74,17 +74,6 @@ export function useGlobalYoutubeShortcuts(
           const player = await getPlayer();
           if (!player || cancelled) return;
           await seekToTimelineFraction(player, digit);
-        })();
-        return;
-      }
-
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        e.preventDefault();
-        const delta = e.key === "ArrowUp" ? VOLUME_STEP : -VOLUME_STEP;
-        void (async () => {
-          const player = await getPlayer();
-          if (!player || cancelled) return;
-          adjustVolume(player, delta);
         })();
         return;
       }

@@ -5,35 +5,37 @@ import ClosedCaptionOffIcon from "@mui/icons-material/ClosedCaptionOff";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Forward10Icon from "@mui/icons-material/Forward10";
+import HdIcon from "@mui/icons-material/Hd";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Replay10Icon from "@mui/icons-material/Replay10";
 import TuneIcon from "@mui/icons-material/Tune";
-import VolumeDownIcon from "@mui/icons-material/VolumeDown";
 import VolumeOffIcon from "@mui/icons-material/VolumeOff";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
+import ListItemText from "@mui/material/ListItemText";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
-import Popover from "@mui/material/Popover";
-import Slider from "@mui/material/Slider";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
-import Typography from "@mui/material/Typography";
 import type { RefObject } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   buildYoutubeWatchUrl,
   captionsEnabled,
+  formatPlaybackQuality,
   isPlayerPlaying,
-  readPlayerVolume,
+  readAvailableQualities,
+  readPlaybackQuality,
   resolveLiteYoutubePlayer,
   SEEK_STEP_SEC,
-  setPlayerVolume,
+  setPlaybackQuality,
   toggleCaptions,
   toggleMute,
   togglePlayPause,
@@ -54,93 +56,53 @@ type WatchPlayerToolbarProps = {
 /** Comfortable tap targets — well above the 44px iOS minimum. */
 const TOUCH_TARGET_SX = { width: 52, height: 52 } as const;
 
-type VolumeControlProps = {
-  volume: number;
-  muted: boolean;
-  onToggleMute: () => void;
-  onVolumeChange: (value: number) => void;
-  onVolumeCommit: (value: number) => void;
-  onInteractingChange: (interacting: boolean) => void;
+type QualityControlProps = {
+  quality: string;
+  qualities: string[];
+  onQualityChange: (quality: string) => void;
 };
 
-function VolumeIcon({ volume, muted }: { volume: number; muted: boolean }) {
-  if (muted || volume === 0) return <VolumeOffIcon />;
-  if (volume < 50) return <VolumeDownIcon />;
-  return <VolumeUpIcon />;
-}
-
-function VolumeControl({
-  volume,
-  muted,
-  onToggleMute,
-  onVolumeChange,
-  onVolumeCommit,
-  onInteractingChange,
-}: VolumeControlProps) {
+function QualityControl({
+  quality,
+  qualities,
+  onQualityChange,
+}: QualityControlProps) {
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const open = Boolean(anchorEl);
-  const displayValue = muted ? 0 : volume;
+  const options = qualities.length > 0 ? qualities : ["auto"];
 
   return (
     <>
-      <Tooltip title="Volume">
+      <Tooltip title="Quality">
         <IconButton
-          aria-label="Adjust volume"
-          aria-haspopup="dialog"
+          aria-label="Video quality"
+          aria-haspopup="listbox"
           onClick={(event) => setAnchorEl(event.currentTarget)}
           sx={TOUCH_TARGET_SX}
         >
-          <VolumeIcon volume={volume} muted={muted} />
+          <HdIcon />
         </IconButton>
       </Tooltip>
-      <Popover
-        open={open}
+      <Menu
         anchorEl={anchorEl}
-        onClose={() => {
-          onInteractingChange(false);
-          setAnchorEl(null);
-        }}
+        open={open}
+        onClose={() => setAnchorEl(null)}
         anchorOrigin={{ vertical: "top", horizontal: "center" }}
         transformOrigin={{ vertical: "bottom", horizontal: "center" }}
-        slotProps={{ paper: { sx: { overflow: "visible", borderRadius: 2 } } }}
       >
-        <Stack alignItems="center" spacing={1} sx={{ py: 2, px: 1.5 }}>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontVariantNumeric: "tabular-nums" }}
+        {options.map((q) => (
+          <MenuItem
+            key={q}
+            selected={q === quality}
+            onClick={() => {
+              onQualityChange(q);
+              setAnchorEl(null);
+            }}
           >
-            {displayValue}
-          </Typography>
-          <Slider
-            aria-label="Volume"
-            orientation="vertical"
-            value={displayValue}
-            min={0}
-            max={100}
-            onChange={(_, value) => {
-              onInteractingChange(true);
-              const v = Array.isArray(value) ? value[0] : value;
-              onVolumeChange(v);
-            }}
-            onChangeCommitted={(_, value) => {
-              const v = Array.isArray(value) ? value[0] : value;
-              onVolumeCommit(v);
-              onInteractingChange(false);
-            }}
-            sx={{ height: 150, py: 1 }}
-          />
-          <Tooltip title={muted ? "Unmute" : "Mute"}>
-            <IconButton
-              aria-label={muted ? "Unmute" : "Mute"}
-              onClick={onToggleMute}
-              size="small"
-            >
-              <VolumeIcon volume={volume} muted={muted} />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-      </Popover>
+            <ListItemText primary={formatPlaybackQuality(q)} />
+          </MenuItem>
+        ))}
+      </Menu>
     </>
   );
 }
@@ -152,35 +114,34 @@ export function WatchPlayerToolbar({
 }: WatchPlayerToolbarProps) {
   const [expanded, setExpanded] = useState(() => readWatchPlayerToolbarVisible());
   const [playing, setPlaying] = useState(false);
-  const [volume, setVolume] = useState(100);
   const [muted, setMuted] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(false);
+  const [quality, setQuality] = useState("auto");
+  const [qualities, setQualities] = useState<string[]>([]);
   const [copySnackbar, setCopySnackbar] = useState(false);
-  const volumeInteractingRef = useRef(false);
 
   const syncFromPlayer = useCallback(async () => {
     const player = await resolveLiteYoutubePlayer(playerShellRef.current);
     if (!player) return;
     setPlaying(isPlayerPlaying(player));
-    if (!volumeInteractingRef.current) {
-      setVolume(readPlayerVolume(player));
-      try {
-        setMuted(player.isMuted());
-      } catch {
-        setMuted(false);
-      }
+    try {
+      setMuted(player.isMuted());
+    } catch {
+      setMuted(false);
     }
     setCaptionsOn(captionsEnabled(player));
+    setQuality(readPlaybackQuality(player));
+    setQualities(readAvailableQualities(player));
   }, [playerShellRef]);
 
   useEffect(() => {
-    if (!playerApiReady || !expanded) return;
+    if (!playerApiReady) return;
     void syncFromPlayer();
     const id = window.setInterval(() => {
       void syncFromPlayer();
     }, 1000);
     return () => window.clearInterval(id);
-  }, [playerApiReady, expanded, syncFromPlayer, videoId]);
+  }, [playerApiReady, syncFromPlayer, videoId]);
 
   const withPlayer = useCallback(
     async (fn: (player: YT.Player) => void | Promise<void>) => {
@@ -195,15 +156,6 @@ export function WatchPlayerToolbar({
   const setExpandedPersisted = (next: boolean) => {
     setExpanded(next);
     writeWatchPlayerToolbarVisible(next);
-  };
-
-  const handleVolumeChange = (value: number) => {
-    setVolume(value);
-    setMuted(value === 0);
-  };
-
-  const handleVolumeCommit = (value: number) => {
-    void withPlayer((p) => setPlayerVolume(p, value));
   };
 
   const handleCopyUrl = async () => {
@@ -291,15 +243,23 @@ export function WatchPlayerToolbar({
             </IconButton>
           </Tooltip>
 
-          <VolumeControl
-            volume={volume}
-            muted={muted}
-            onToggleMute={() => void withPlayer((p) => toggleMute(p))}
-            onVolumeChange={handleVolumeChange}
-            onVolumeCommit={handleVolumeCommit}
-            onInteractingChange={(interacting) => {
-              volumeInteractingRef.current = interacting;
-            }}
+          <Tooltip title={muted ? "Unmute" : "Mute"}>
+            <IconButton
+              aria-label={muted ? "Unmute" : "Mute"}
+              aria-pressed={muted}
+              onClick={() => void withPlayer((p) => toggleMute(p))}
+              sx={TOUCH_TARGET_SX}
+            >
+              {muted ? <VolumeOffIcon /> : <VolumeUpIcon />}
+            </IconButton>
+          </Tooltip>
+
+          <QualityControl
+            quality={quality}
+            qualities={qualities}
+            onQualityChange={(q) =>
+              void withPlayer((p) => setPlaybackQuality(p, q))
+            }
           />
 
           <Tooltip title={captionsOn ? "Captions off" : "Captions on"}>
