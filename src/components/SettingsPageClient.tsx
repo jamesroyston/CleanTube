@@ -178,8 +178,7 @@ export function SettingsPageClient() {
         <ListSubheader disableSticky>Maintenance</ListSubheader>
         <ListItemButton
           onClick={() => {
-            clearChannelPageSessionBackups();
-            router.refresh();
+            void clearChannelPageSessionBackups().then(() => router.refresh());
           }}
         >
           <ListItemIcon>
@@ -187,7 +186,7 @@ export function SettingsPageClient() {
           </ListItemIcon>
           <ListItemText
             primary="Clear channel page backups"
-            secondary="Clears session-only channel grid cache if the grid looks stuck."
+            secondary="Clears local channel grid backups if the grid looks stuck."
             secondaryTypographyProps={{
               sx: { whiteSpace: "normal", wordBreak: "break-word" },
             }}
