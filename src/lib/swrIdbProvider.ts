@@ -64,6 +64,24 @@ async function removeEntry(serializedKey: string): Promise<void> {
 }
 
 let hydrationStarted = false;
+let hydrationDone = false;
+let hydrationResolve: (() => void) | null = null;
+
+const hydrationPromise: Promise<void> =
+  typeof window === "undefined"
+    ? Promise.resolve()
+    : new Promise((resolve) => {
+        hydrationResolve = resolve;
+      });
+
+export function isSwrIdbHydrated(): boolean {
+  return hydrationDone;
+}
+
+export function getSwrIdbHydrationPromise(): Promise<void> {
+  if (hydrationDone) return Promise.resolve();
+  return hydrationPromise;
+}
 
 function hydrateFromIdb(map: Cache): void {
   if (hydrationStarted || typeof window === "undefined") return;
@@ -100,6 +118,9 @@ function hydrateFromIdb(map: Cache): void {
       }
     } catch {
       /* ignore IDB read errors */
+    } finally {
+      hydrationDone = true;
+      hydrationResolve?.();
     }
   })();
 }

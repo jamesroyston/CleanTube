@@ -11,7 +11,7 @@ import {
 
 /**
  * Records the in-app path the user left before entering `/watch/[id]`,
- * so WatchBackLink can offer contextual back navigation.
+ * so the app bar can offer contextual back navigation on `/watch/[id]`.
  */
 export function WatchReturnTracker() {
   const pathname = usePathname();

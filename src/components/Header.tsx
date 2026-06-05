@@ -23,6 +23,7 @@ import {
 import { AccountMenu } from "@/components/AccountMenu";
 import { CleanTubeLogo } from "@/components/CleanTubeLogo";
 import { SearchOverlay } from "@/components/SearchOverlay";
+import { WatchHeaderBackButton } from "@/components/WatchHeaderBackButton";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useHeaderScroll } from "@/context/HeaderScrollContext";
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
@@ -31,6 +32,7 @@ import {
   useScrollRevealHeader,
 } from "@/hooks/useCompactViewport";
 import { useNavigationProgress } from "@/context/NavigationProgressContext";
+import { useWatchBackTarget } from "@/hooks/useWatchBackTarget";
 import {
   getLastSearchSort,
   setLastSearchQuery,
@@ -257,6 +259,37 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
     const showScrollRevealHeader =
       scrollRevealHeader && desktopRail == null && headerOverlayActive;
     const revealProgress = showScrollRevealHeader ? headerRevealProgress : 0;
+    const watchBack = useWatchBackTarget();
+    const showWatchBack = watchBack != null;
+
+    const logoLink = (
+      <Box
+        component={Link}
+        href="/"
+        aria-label="CleanTube home"
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: compactSearch ? 0 : 1,
+          color: "text.primary",
+          textDecoration: "none",
+          flexShrink: 0,
+        }}
+      >
+        <CleanTubeLogo size={30} />
+        <Typography
+          variant="h6"
+          sx={{
+            display: compactSearch ? "none" : "block",
+            fontWeight: 600,
+            letterSpacing: "-0.02em",
+            whiteSpace: "nowrap",
+          }}
+        >
+          CleanTube
+        </Typography>
+      </Box>
+    );
 
     const appBar = (
         <AppBar
@@ -312,109 +345,112 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
         >
           <Toolbar
             sx={{
-              display: "flex",
               alignItems: "center",
               flexWrap: "nowrap",
               gap: compactSearch ? 0.75 : 2,
               py: { xs: 0.75, sm: 1 },
               px: { xs: 1, sm: 2 },
               minHeight: { xs: 56, sm: 64 },
-              ...(showBottomNav ? { justifyContent: "center" } : undefined),
+              ...(showBottomNav && showWatchBack
+                ? {
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto 1fr",
+                    columnGap: 0.5,
+                  }
+                : {
+                    display: "flex",
+                    ...(showBottomNav ? { justifyContent: "center" } : undefined),
+                  }),
             }}
           >
-            <Box
-              sx={{
-                display: showBottomNav ? "contents" : "flex",
-                alignItems: "center",
-                gap: compactSearch ? 0.5 : 1,
-                flexShrink: 0,
-                minWidth: 0,
-              }}
-            >
-              {!showBottomNav && leading ? (
-                <Box data-desktop-header-chrome sx={{ display: "contents" }}>
-                  {leading}
-                </Box>
-              ) : null}
-              <Box
-                component={Link}
-                href="/"
-                aria-label="CleanTube home"
-                sx={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: compactSearch ? 0 : 1,
-                  color: "text.primary",
-                  textDecoration: "none",
-                  flexShrink: 0,
-                }}
-              >
-                <CleanTubeLogo size={30} />
-                <Typography
-                  variant="h6"
-                  sx={{
-                    display: compactSearch ? "none" : "block",
-                    fontWeight: 600,
-                    letterSpacing: "-0.02em",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  CleanTube
-                </Typography>
-              </Box>
-            </Box>
-
-            {!showBottomNav ? (
-              <Box data-desktop-header-chrome sx={{ display: "contents" }}>
+            {showBottomNav ? (
+              showWatchBack && watchBack ? (
+                <>
+                  <Box sx={{ justifySelf: "start", display: "flex" }}>
+                    <WatchHeaderBackButton target={watchBack} />
+                  </Box>
+                  <Box sx={{ justifySelf: "center" }}>{logoLink}</Box>
+                  <Box
+                    aria-hidden
+                    sx={{ justifySelf: "end", width: 48, height: 48 }}
+                  />
+                </>
+              ) : (
+                logoLink
+              )
+            ) : (
+              <>
                 <Box
                   sx={{
-                    flex: 1,
-                    minWidth: 0,
                     display: "flex",
-                    justifyContent: "center",
-                    mx: compactSearch ? 0.25 : 1,
+                    alignItems: "center",
+                    gap: compactSearch ? 0.5 : 1,
+                    flexShrink: 0,
+                    minWidth: 0,
                   }}
                 >
-                  <TextField
-                    size="small"
-                    fullWidth
-                    variant="outlined"
-                    placeholder="Search or paste a YouTube URL"
-                    value={displayQuery}
-                    onClick={openSearchOverlay}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        openSearchOverlay();
-                      }
-                    }}
-                    slotProps={{
-                      input: {
-                        readOnly: true,
-                        "aria-label": "Open search",
-                        "aria-haspopup": "dialog",
-                        "aria-expanded": searchOverlayOpen,
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon color="action" fontSize="small" />
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                    sx={{
-                      minWidth: 0,
-                      maxWidth: compactSearch ? "100%" : 680,
-                      cursor: "pointer",
-                      "& .MuiInputBase-input": { cursor: "pointer" },
-                    }}
-                  />
+                  {leading ? (
+                    <Box data-desktop-header-chrome sx={{ display: "contents" }}>
+                      {leading}
+                    </Box>
+                  ) : null}
+                  {showWatchBack && watchBack ? (
+                    <WatchHeaderBackButton target={watchBack} />
+                  ) : null}
+                  {logoLink}
                 </Box>
 
-                <Box sx={{ flexShrink: 0 }}>
-                  <AccountMenu />
+                <Box data-desktop-header-chrome sx={{ display: "contents" }}>
+                  <Box
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      display: "flex",
+                      justifyContent: "center",
+                      mx: compactSearch ? 0.25 : 1,
+                    }}
+                  >
+                    <TextField
+                      size="small"
+                      fullWidth
+                      variant="outlined"
+                      placeholder="Search or paste a YouTube URL"
+                      value={displayQuery}
+                      onClick={openSearchOverlay}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          openSearchOverlay();
+                        }
+                      }}
+                      slotProps={{
+                        input: {
+                          readOnly: true,
+                          "aria-label": "Open search",
+                          "aria-haspopup": "dialog",
+                          "aria-expanded": searchOverlayOpen,
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <SearchIcon color="action" fontSize="small" />
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                      sx={{
+                        minWidth: 0,
+                        maxWidth: compactSearch ? "100%" : 680,
+                        cursor: "pointer",
+                        "& .MuiInputBase-input": { cursor: "pointer" },
+                      }}
+                    />
+                  </Box>
+
+                  <Box sx={{ flexShrink: 0 }}>
+                    <AccountMenu />
+                  </Box>
                 </Box>
-              </Box>
-            ) : null}
+              </>
+            )}
           </Toolbar>
         </AppBar>
     );

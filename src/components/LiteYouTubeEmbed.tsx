@@ -13,6 +13,10 @@ import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { isNearlyCompleteWatch } from "@/lib/cloudLibrary/sync";
 import { useGlobalYoutubeShortcuts } from "@/hooks/useGlobalYoutubeShortcuts";
 import {
+  ensurePlayerVolume100,
+  primeCaptionsModule,
+} from "@/lib/youtubePlayerControls";
+import {
   getAttachedLiteYoutubePlayer,
   isYoutubePlayerAttached,
   readPlayerCurrentTime,
@@ -149,6 +153,8 @@ export function LiteYouTubeEmbed({
 
   const params = new URLSearchParams();
   params.set("enablejsapi", "1");
+  params.set("cc_load_policy", "0");
+  params.set("cc_lang_pref", "en");
   if (start != null) params.set("start", String(start));
 
   const recordProgress = useCallback(
@@ -259,6 +265,8 @@ export function LiteYouTubeEmbed({
         attachedPlayer = player;
         ytPlayerRef.current = player;
         playerApiReadyRef.current = true;
+        ensurePlayerVolume100(player);
+        primeCaptionsModule(player);
         onPlayerApiReady?.(true);
         player.addEventListener("onStateChange", onStateChange);
         return;

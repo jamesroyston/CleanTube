@@ -5,6 +5,10 @@ const withSerwist = withSerwistInit({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV === "development",
+  globPublicPatterns: [
+    "**/*.{png,webmanifest,ico,jpg,jpeg,webp}",
+    "!**/{file,globe,next,vercel,window}.svg",
+  ],
 });
 
 const nextConfig: NextConfig = {

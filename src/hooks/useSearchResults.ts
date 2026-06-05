@@ -3,6 +3,7 @@
 import useSWR from "swr";
 
 import type { SearchApiResponse } from "@/app/api/search/route";
+import { useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
 import { readFetchJson } from "@/lib/fetchJson";
 import type { ResultSortMode, SearchSortMode } from "@/lib/uploadedAtSort";
 
@@ -65,7 +66,7 @@ export function useSearchResults({
     channels: data?.channels ?? [],
     videos: data?.videos ?? [],
     error: error instanceof Error ? error.message : null,
-    isInitialLoad: isLoading && !data,
+    isInitialLoad: useSwrInitialLoad(isLoading, Boolean(data)),
     isRefreshing: isValidating && Boolean(data),
     refresh: mutate,
   };

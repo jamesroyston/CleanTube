@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import useSWR from "swr";
 
 import type { ChannelPageApiResponse } from "@/app/api/channel/[id]/route";
+import { useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
 import {
   buildChannelPageCacheKey,
   readChannelPageCache,
@@ -109,7 +110,7 @@ export function useChannelPage({
     page,
     redirect,
     error: error instanceof Error ? error.message : null,
-    isInitialLoad: isLoading && !page,
+    isInitialLoad: useSwrInitialLoad(isLoading, Boolean(page)),
     isRefreshing: isValidating && Boolean(page),
     isSessionFallback: Boolean(sessionFallback && isValidating && page),
     refresh: mutate,

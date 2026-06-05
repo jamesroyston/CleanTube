@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
 
+import { useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
 import { readFetchJson } from "@/lib/fetchJson";
 import { clearSwrIdbCache } from "@/lib/swrIdbProvider";
 import type { ForYouFeedResult } from "@/lib/forYou/types";
@@ -67,7 +68,7 @@ export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
     feedEmpty: data?.empty ?? false,
     feedError: error instanceof Error ? error.message : null,
     /** True only when there is no cached feed yet (not on revisit). */
-    isInitialLoad: isLoading && !data,
+    isInitialLoad: useSwrInitialLoad(isLoading, Boolean(data)),
     /** Background refetch while stale sections remain visible. */
     isRefreshing: isValidating && Boolean(data),
     refreshFeed: () => mutate(),

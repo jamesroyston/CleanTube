@@ -45,6 +45,16 @@ const MOBILE_PORTRAIT =
 
 const watchPlayerShellSx = {
   mb: { xs: 2, sm: 3 },
+  width: "100%",
+  aspectRatio: "16 / 9",
+} as const;
+
+const watchPlayerPlaceholderSx = {
+  width: "100%",
+  height: "100%",
+  borderRadius: { xs: 0, sm: 1 },
+  bgcolor: "action.hover",
+  [MOBILE_PORTRAIT]: { borderRadius: 0 },
 } as const;
 
 const watchBelowPlayerPadSx = {
@@ -260,7 +270,9 @@ export function WatchExperienceClient({
                   playerShellRef={playerShellRef}
                   onPlayerApiReady={setPlayerApiReady}
                 />
-              ) : null}
+              ) : (
+                <Box aria-hidden sx={watchPlayerPlaceholderSx} />
+              )}
             </Box>
 
             {showBottomNav && canMountPlayer ? (

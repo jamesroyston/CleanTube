@@ -3,6 +3,7 @@
 import useSWR from "swr";
 
 import type { WatchVideoApiResponse } from "@/app/api/videos/[id]/route";
+import { useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
 import { readFetchJson } from "@/lib/fetchJson";
 import type { WatchVideoDetails } from "@/lib/youtubeTypes";
 
@@ -39,10 +40,12 @@ export function useWatchVideo(videoId: string) {
   const video: WatchVideoDetails | null =
     data && "video" in data && data.video ? data.video : null;
 
+  const isInitialLoad = useSwrInitialLoad(isLoading, Boolean(video));
+
   return {
     video,
     error: error instanceof Error ? error.message : null,
-    isInitialLoad: isLoading && !video,
+    isInitialLoad,
     isRefreshing: isValidating && Boolean(video),
     refresh: mutate,
   };

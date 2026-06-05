@@ -291,15 +291,6 @@ export function SearchOverlay({
               },
             }}
           />
-          {mobileExperience ? (
-            <Button
-              type="button"
-              onClick={onClose}
-              sx={{ flexShrink: 0, minHeight: 48, px: 1 }}
-            >
-              Cancel
-            </Button>
-          ) : null}
         </Box>
         <FormControlLabel
           sx={{ m: 0, mx: 0.5, alignSelf: "flex-start" }}

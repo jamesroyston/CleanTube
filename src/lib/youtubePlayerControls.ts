@@ -6,7 +6,6 @@ import {
 } from "@/lib/youtubePlayer";
 
 export const SEEK_STEP_SEC = 10;
-export const VOLUME_STEP = 5;
 export const YT_PLAYING = 1;
 
 /** IFrame API caption / module helpers not on base `YT.Player` typings. */
@@ -84,6 +83,16 @@ export function readPlayerVolume(player: YT.Player): number {
   }
 }
 
+/** App volume is always 100%; loudness is controlled via device hardware keys. */
+export function ensurePlayerVolume100(player: YT.Player): void {
+  if (!isYoutubePlayerAttached(player)) return;
+  try {
+    player.setVolume(100);
+  } catch {
+    /* not ready */
+  }
+}
+
 export function setPlayerVolume(player: YT.Player, volume: number): void {
   if (!isYoutubePlayerAttached(player)) return;
   const next = Math.min(100, Math.max(0, Math.round(volume)));
@@ -99,26 +108,12 @@ export function setPlayerVolume(player: YT.Player, volume: number): void {
   }
 }
 
-export function adjustVolume(player: YT.Player, delta: number): void {
-  if (!isYoutubePlayerAttached(player)) return;
-  try {
-    if (delta > 0 && player.isMuted()) player.unMute();
-    const current = player.getVolume?.();
-    const v = current == null || !Number.isFinite(current) ? 100 : current;
-    const next = Math.min(100, Math.max(0, Math.round(v + delta)));
-    player.setVolume(next);
-    if (next === 0) player.mute();
-  } catch {
-    /* not ready */
-  }
-}
-
 export async function toggleMute(player: YT.Player): Promise<void> {
   if (!isYoutubePlayerAttached(player)) return;
   try {
     if (player.isMuted()) {
       player.unMute();
-      if ((player.getVolume?.() ?? 0) === 0) player.setVolume(100);
+      player.setVolume(100);
     } else {
       player.mute();
     }
@@ -150,10 +145,7 @@ function readActiveCaptionModule(
   return null;
 }
 
-export async function toggleCaptions(player: YT.Player): Promise<void> {
-  if (!isYoutubePlayerAttached(player)) return;
-  const p = player as PlayerExtended;
-
+function loadCaptionModules(p: PlayerExtended): void {
   for (const moduleName of CAPTION_MODULES) {
     try {
       p.loadModule?.(moduleName);
@@ -161,6 +153,18 @@ export async function toggleCaptions(player: YT.Player): Promise<void> {
       /* ignore */
     }
   }
+}
+
+export function primeCaptionsModule(player: YT.Player): void {
+  if (!isYoutubePlayerAttached(player)) return;
+  loadCaptionModules(player as PlayerExtended);
+}
+
+export async function toggleCaptions(player: YT.Player): Promise<void> {
+  if (!isYoutubePlayerAttached(player)) return;
+  const p = player as PlayerExtended;
+
+  loadCaptionModules(p);
 
   if (captionsEnabled(player)) {
     for (const moduleName of CAPTION_MODULES) {
