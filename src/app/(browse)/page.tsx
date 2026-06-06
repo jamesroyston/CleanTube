@@ -7,7 +7,6 @@ import { ForYouHome } from "@/components/ForYouHome";
 import { ForYouPageFallback } from "@/components/ForYouPageFallback";
 import { HomeSearchResultsClient } from "@/components/HomeSearchResultsClient";
 import { LastSearchSync } from "@/components/LastSearchSync";
-import { SearchScrollRestore } from "@/components/SearchScrollRestore";
 import {
   channelPageHrefFromToken,
   extractChannelRouteTokenFromUrl,
@@ -71,7 +70,6 @@ async function HomeContent({ searchParams }: PageProps) {
     <Box component="main" sx={{ pb: 6 }}>
       <Suspense fallback={null}>
         <LastSearchSync />
-        <SearchScrollRestore />
       </Suspense>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
         {!query ? (

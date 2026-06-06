@@ -22,7 +22,6 @@ import { CompactLayoutProvider } from "@/context/CompactLayoutContext";
 import type { CompactLayoutHint } from "@/lib/compactLayoutHint";
 import { SWRConfig } from "swr";
 
-import { hydrateChannelPageCachesFromIdb } from "@/lib/channelPageClientCache";
 import { createIdbSwrProvider } from "@/lib/swrIdbProvider";
 import {
   type InitialThemeSettings,
@@ -322,9 +321,6 @@ export function AppProviders({
     initialWatchNarrowPlayerLayout,
   );
 
-  useEffect(() => {
-    hydrateChannelPageCachesFromIdb();
-  }, []);
   const [librarySidebarCollapsed, setLibrarySidebarCollapsedState] = useState(
     initialLibrarySidebarCollapsed,
   );

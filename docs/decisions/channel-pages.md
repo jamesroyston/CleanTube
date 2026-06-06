@@ -1,5 +1,7 @@
 # Channel Pages
 
+**Refactor plan:** Cursor plan `channel_page_refactor_7f3a2b1c` ([stub](./channel-page-refactor-plan.md)) — pagination UX, cache unification, Popular sort removal.
+
 ## Decision
 
 CleanTube supports dedicated channel pages at `/channel/[id]`. The first backend uses `youtubei.js`, but channel routes and UI depend on app-owned types in `src/lib/youtubeTypes.ts` rather than raw `youtubei.js` parser objects.
@@ -21,7 +23,7 @@ The app-owned channel contract is intentionally small:
 type ChannelVideosPage = {
   channel: ChannelDetails;
   videos: VideoLikeForSummary[];
-  sort: "latest" | "popular";
+  sort: "latest";
   pageToken?: string;
   nextPageToken?: string;
   previousPageToken?: string;
@@ -45,5 +47,5 @@ If CleanTube adopts the Data API, keep the route and UI contracts intact and add
 
 - `youtubei.js` parser shapes can change when YouTube changes internal payloads.
 - Channel handles, custom URLs, and user URLs are less canonical than `UC...` channel ids.
-- Popular sorting depends on the sort filters exposed by the current `youtubei.js` channel feed.
+- ~~Popular sorting~~ removed: `youtubei.js` no longer exposes working sort filters on channel feeds.
 - Page-number continuation is simple but inefficient for deep pages.

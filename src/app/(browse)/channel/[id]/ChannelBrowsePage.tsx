@@ -1,82 +1,51 @@
 "use client";
 
 import Avatar from "@mui/material/Avatar";
-import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
+import CircularProgress from "@mui/material/CircularProgress";
 import Container from "@mui/material/Container";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 
 import { ChannelGridEmptyState } from "@/components/ChannelGridEmptyState";
 import { CondensedDescription } from "@/components/CondensedDescription";
 import { ChannelPagination } from "@/components/ChannelPagination";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { VideoResultsGrid } from "@/components/VideoResultsGrid";
-import {
-  buildChannelPageCacheKey,
-  writeChannelPageCache,
-} from "@/lib/channelPageClientCache";
 import { setWatchReturnChannelLabel } from "@/lib/watchReturnNavigation";
 import { toVideoSummaries } from "@/lib/serializeVideo";
-import type { ChannelSortMode, ChannelVideosPage } from "@/lib/youtubeTypes";
-
-function channelHref(
-  id: string,
-  options?: { sort?: ChannelSortMode; page?: string; grid?: string },
-): string {
-  const qs = new URLSearchParams();
-  if (options?.sort && options.sort !== "latest") {
-    qs.set("sort", options.sort);
-  }
-  if (options?.page && options.page !== "1") {
-    qs.set("page", options.page);
-  }
-  if (options?.grid) {
-    qs.set("grid", options.grid);
-  }
-  const query = qs.toString();
-  return `/channel/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
-}
+import type { ChannelVideosPage } from "@/lib/youtubeTypes";
 
 export type ChannelBrowsePageProps = {
   page: ChannelVideosPage;
-  sort: ChannelSortMode;
-  gridQuery?: string;
-  /** True when rendered from sessionStorage after the server returned no page. */
-  stale?: boolean;
+  pageRaw?: string;
+  isRefreshing?: boolean;
+  isPageTransitioning?: boolean;
+  isPageSynced?: boolean;
 };
 
 export function ChannelBrowsePage({
   page,
-  sort,
-  gridQuery,
-  stale = false,
+  pageRaw,
+  isRefreshing = false,
+  isPageTransitioning = false,
+  isPageSynced = true,
 }: ChannelBrowsePageProps) {
-  const cacheKey = useMemo(
-    () =>
-      buildChannelPageCacheKey({
-        channelId: page.channel.id,
-        sort: page.sort,
-        pageToken: page.pageToken,
-      }),
-    [page.channel.id, page.sort, page.pageToken],
-  );
-
-  useEffect(() => {
-    if (stale) return;
-    writeChannelPageCache(cacheKey, page);
-  }, [cacheKey, page, stale]);
-
   useEffect(() => {
     const name = page.channel.title?.trim();
     if (name) setWatchReturnChannelLabel(name);
   }, [page.channel.title]);
 
   const videos = toVideoSummaries(page.videos);
-  const currentPage = Number.parseInt(page.pageToken ?? "1", 10) || 1;
+  const urlPage = Number.parseInt(pageRaw ?? "1", 10) || 1;
+  const currentPage = isPageSynced
+    ? Number.parseInt(page.pageToken ?? "1", 10) || 1
+    : urlPage;
+  const gridLoading = isRefreshing || isPageTransitioning || !isPageSynced;
+  const paginationDisabled = isPageTransitioning || !isPageSynced;
+
   const metaParts = [
     page.channel.handle,
     page.channel.subscriberText,
@@ -104,13 +73,6 @@ export function ChannelBrowsePage({
       ) : null}
 
       <Container maxWidth="xl" sx={{ pt: 2 }}>
-        {stale ? (
-          <Alert severity="warning" sx={{ mb: 2 }}>
-            Showing cached results from your last successful load. Refresh the page
-            or use Retry below to try again for the latest from YouTube.
-          </Alert>
-        ) : null}
-
         <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
           <Stack
             direction={{ xs: "column", sm: "row" }}
@@ -150,44 +112,17 @@ export function ChannelBrowsePage({
         </Paper>
 
         <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.5}
-          alignItems={{ xs: "stretch", sm: "center" }}
-          justifyContent="space-between"
+          direction="row"
+          justifyContent="flex-end"
           sx={{ mb: 2 }}
         >
-          <Stack direction="row" spacing={1}>
-            <Button
-              href={channelHref(page.channel.id, {
-                sort: "latest",
-                page: page.pageToken,
-                grid: gridQuery,
-              })}
-              variant={sort === "latest" ? "contained" : "outlined"}
-            >
-              Latest
-            </Button>
-            <Button
-              href={channelHref(page.channel.id, {
-                sort: "popular",
-                page: page.pageToken,
-                grid: gridQuery,
-              })}
-              variant={sort === "popular" ? "contained" : "outlined"}
-            >
-              Popular
-            </Button>
-          </Stack>
-          <Box sx={{ alignSelf: { xs: "center", sm: "auto" } }}>
-            <ChannelPagination
-              channelId={page.channel.id}
-              sort={sort}
-              currentPage={currentPage}
-              hasNextPage={Boolean(page.nextPageToken)}
-              totalPages={page.totalPages}
-              gridQuery={gridQuery}
-            />
-          </Box>
+          <ChannelPagination
+            channelId={page.channel.id}
+            currentPage={currentPage}
+            hasNextPage={isPageSynced ? Boolean(page.nextPageToken) : true}
+            totalPages={isPageSynced ? page.totalPages : undefined}
+            disabled={paginationDisabled}
+          />
         </Stack>
 
         {videos.length === 0 ? (
@@ -196,19 +131,41 @@ export function ChannelBrowsePage({
             partialLoad={page.gridPartialLoad}
           />
         ) : (
-          <Box data-channel-grid-ready>
-            <VideoResultsGrid videos={videos} />
+          <Box
+            sx={{
+              position: "relative",
+              opacity: gridLoading ? 0.5 : 1,
+              transition: "opacity 0.15s ease",
+            }}
+          >
+            {gridLoading ? (
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  justifyContent: "center",
+                  pt: 4,
+                  zIndex: 1,
+                  pointerEvents: "none",
+                }}
+              >
+                <CircularProgress size={28} aria-label="Loading videos" />
+              </Box>
+            ) : null}
+            <Box data-channel-grid-ready={!gridLoading ? true : undefined}>
+              <VideoResultsGrid videos={videos} />
+            </Box>
           </Box>
         )}
 
         <Stack alignItems="center" sx={{ mt: 4 }}>
           <ChannelPagination
             channelId={page.channel.id}
-            sort={sort}
             currentPage={currentPage}
-            hasNextPage={Boolean(page.nextPageToken)}
-            totalPages={page.totalPages}
-            gridQuery={gridQuery}
+            hasNextPage={isPageSynced ? Boolean(page.nextPageToken) : true}
+            totalPages={isPageSynced ? page.totalPages : undefined}
+            disabled={paginationDisabled}
           />
         </Stack>
       </Container>

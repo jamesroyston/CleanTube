@@ -1,18 +1,24 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { ChannelPageClient, ChannelPageSkeleton } from "./ChannelPageClient";
 import { decodeRouteToken } from "@/lib/decodeRouteToken";
 import { getChannelDetailsCached } from "@/lib/youtubeChannelResolveCache";
-import type { ChannelSortMode } from "@/lib/youtubeTypes";
 
 type PageProps = {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ sort?: string; page?: string; grid?: string }>;
 };
 
-function normalizeChannelSort(value: string | undefined): ChannelSortMode {
-  return value === "popular" ? "popular" : "latest";
+function canonicalChannelPath(
+  rawId: string,
+  pageRaw?: string,
+): string {
+  const qs = new URLSearchParams();
+  if (pageRaw && pageRaw !== "1") qs.set("page", pageRaw);
+  const query = qs.toString();
+  return `/channel/${rawId}${query ? `?${query}` : ""}`;
 }
 
 export async function generateMetadata({
@@ -34,17 +40,12 @@ async function ChannelPageContent({ params, searchParams }: PageProps) {
   const { id: rawId } = await params;
   const { sort: sortRaw, page: pageRaw, grid: gridRaw } = await searchParams;
   const id = decodeRouteToken(rawId);
-  const sort = normalizeChannelSort(sortRaw);
-  const gridQuery = gridRaw?.trim() || undefined;
 
-  return (
-    <ChannelPageClient
-      channelId={id}
-      sort={sort}
-      pageRaw={pageRaw}
-      gridQuery={gridQuery}
-    />
-  );
+  if (sortRaw === "popular" || gridRaw?.trim()) {
+    redirect(canonicalChannelPath(rawId, pageRaw));
+  }
+
+  return <ChannelPageClient channelId={id} pageRaw={pageRaw} />;
 }
 
 /**
