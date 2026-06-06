@@ -12,6 +12,7 @@ export type VideoLikeForSummary = {
   thumbnailUrls: string[];
 };
 
+/** @deprecated Legacy URLs may still carry `popular`; API normalizes to latest. */
 export type ChannelSortMode = "latest" | "popular";
 
 export type ChannelDetails = {

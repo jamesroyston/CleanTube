@@ -303,22 +303,6 @@ function totalPagesFromVideoCount(
   return Math.max(1, Math.ceil(totalVideos / pageSize));
 }
 
-async function sortedVideosFeed(
-  feed: FeedLike,
-  sort: ChannelSortMode,
-): Promise<FeedLike> {
-  if (sort === "latest") return feed;
-  const sortFilter = feed.sort_filters?.find((filter) =>
-    filter.toLowerCase().includes("popular"),
-  );
-  if (!sortFilter || typeof feed.applySort !== "function") return feed;
-  try {
-    return await feed.applySort(sortFilter);
-  } catch {
-    return feed;
-  }
-}
-
 function listVideoLockups(feed: FeedLike): unknown[] {
   const memo = feed.memo;
   if (!memo || typeof memo.getType !== "function") return [];
@@ -534,9 +518,8 @@ async function getChannelVideosRobustInner({
     return null;
   }
 
-  const sortedFeed = await sortedVideosFeed(videosFeed, sort);
   const { feed: pageStart, continuationFailed: pageWalkFailed } = await feedAtPage(
-    sortedFeed,
+    videosFeed,
     pageNumber,
   );
 

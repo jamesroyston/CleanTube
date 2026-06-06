@@ -1,6 +1,5 @@
 "use client";
 
-import ClearAllOutlinedIcon from "@mui/icons-material/ClearAllOutlined";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import Box from "@mui/material/Box";
@@ -15,8 +14,6 @@ import ListSubheader from "@mui/material/ListSubheader";
 import Paper from "@mui/material/Paper";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
-import { useRouter } from "next/navigation";
-
 import { LogoConceptsPreview } from "@/components/LogoConceptsPreview";
 import { MobilePageHeader } from "@/components/MobilePageHeader";
 import { PwaInstallButton } from "@/components/PwaInstallButton";
@@ -31,11 +28,8 @@ import {
   compactMainPaddingBottom,
   useShowBottomNav,
 } from "@/hooks/useCompactViewport";
-import { clearChannelPageSessionBackups } from "@/lib/channelPageClientCache";
-
 export function SettingsPageClient() {
   const showBottomNav = useShowBottomNav();
-  const router = useRouter();
   const { mode, toggleMode } = useThemeMode();
   const { visible: commentsVisible, setWatchCommentsVisible } =
     useWatchCommentsVisible();
@@ -175,24 +169,7 @@ export function SettingsPageClient() {
       <LogoConceptsPreview />
 
       <List component={Paper} variant="outlined" disablePadding sx={{ mb: 3 }}>
-        <ListSubheader disableSticky>Maintenance</ListSubheader>
-        <ListItemButton
-          onClick={() => {
-            void clearChannelPageSessionBackups().then(() => router.refresh());
-          }}
-        >
-          <ListItemIcon>
-            <ClearAllOutlinedIcon />
-          </ListItemIcon>
-          <ListItemText
-            primary="Clear channel page backups"
-            secondary="Clears local channel grid backups if the grid looks stuck."
-            secondaryTypographyProps={{
-              sx: { whiteSpace: "normal", wordBreak: "break-word" },
-            }}
-          />
-        </ListItemButton>
-        <Divider component="li" />
+        <ListSubheader disableSticky>App</ListSubheader>
         <PwaInstallButton />
       </List>
 

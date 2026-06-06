@@ -6,39 +6,25 @@ import Link from "next/link";
 
 type ChannelPaginationProps = {
   channelId: string;
-  sort: "latest" | "popular";
   currentPage: number;
   hasNextPage: boolean;
   totalPages?: number;
-  /** Preserve optional `?grid=` for shared/bookmarked URLs. */
-  gridQuery?: string;
+  disabled?: boolean;
 };
 
-function channelHref(
-  id: string,
-  options?: { sort?: "latest" | "popular"; page?: number; grid?: string },
-): string {
-  const qs = new URLSearchParams();
-  if (options?.sort && options.sort !== "latest") {
-    qs.set("sort", options.sort);
+function channelHref(id: string, page?: number): string {
+  if (!page || page <= 1) {
+    return `/channel/${encodeURIComponent(id)}`;
   }
-  if (options?.page && options.page > 1) {
-    qs.set("page", String(options.page));
-  }
-  if (options?.grid) {
-    qs.set("grid", options.grid);
-  }
-  const query = qs.toString();
-  return `/channel/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
+  return `/channel/${encodeURIComponent(id)}?page=${page}`;
 }
 
 export function ChannelPagination({
   channelId,
-  sort,
   currentPage,
   hasNextPage,
   totalPages,
-  gridQuery,
+  disabled = false,
 }: ChannelPaginationProps) {
   const count = totalPages ?? (hasNextPage ? currentPage + 1 : currentPage);
   if (count <= 1) return null;
@@ -51,12 +37,11 @@ export function ChannelPagination({
       page={currentPage}
       renderItem={(item) => (
         <PaginationItem
-          component={Link}
-          href={channelHref(channelId, {
-            sort,
-            page: item.page ?? 1,
-            grid: gridQuery,
-          })}
+          component={disabled ? "div" : Link}
+          href={disabled ? undefined : channelHref(channelId, item.page ?? 1)}
+          tabIndex={disabled ? -1 : undefined}
+          aria-disabled={disabled || undefined}
+          sx={disabled ? { pointerEvents: "none", opacity: 0.5 } : undefined}
           {...item}
         />
       )}

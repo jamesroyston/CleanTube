@@ -4,7 +4,7 @@ import { decodeRouteToken } from "@/lib/decodeRouteToken";
 import { getChannelDetailsCached } from "@/lib/youtubeChannelResolveCache";
 import { getChannelVideosPageCached } from "@/lib/youtubeChannel";
 import { isValidYoutubeChannelId } from "@/lib/youtubeUrl";
-import type { ChannelSortMode, ChannelVideosPage } from "@/lib/youtubeTypes";
+import type { ChannelVideosPage } from "@/lib/youtubeTypes";
 
 export const maxDuration = 60;
 
@@ -12,20 +12,9 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-function normalizeChannelSort(value: string | null): ChannelSortMode {
-  return value === "popular" ? "popular" : "latest";
-}
-
-function channelRedirectPath(
-  id: string,
-  sort: ChannelSortMode,
-  page: string | null,
-  grid: string | null,
-): string {
+function channelRedirectPath(id: string, page: string | null): string {
   const qs = new URLSearchParams();
-  if (sort !== "latest") qs.set("sort", sort);
   if (page && page !== "1") qs.set("page", page);
-  if (grid?.trim()) qs.set("grid", grid.trim());
   const query = qs.toString();
   return `/channel/${encodeURIComponent(id)}${query ? `?${query}` : ""}`;
 }
@@ -39,15 +28,19 @@ export async function GET(request: Request, context: RouteContext) {
   const { id: rawId } = await context.params;
   const id = decodeRouteToken(rawId);
   const { searchParams } = new URL(request.url);
-  const sort = normalizeChannelSort(searchParams.get("sort"));
   const pageRaw = searchParams.get("page");
-  const grid = searchParams.get("grid");
+
+  if (searchParams.get("sort") === "popular" || searchParams.get("grid")?.trim()) {
+    return NextResponse.json({
+      redirect: channelRedirectPath(id, pageRaw),
+    } satisfies ChannelPageApiResponse);
+  }
 
   if (!isValidYoutubeChannelId(id)) {
     const channel = await getChannelDetailsCached(id);
     if (channel?.id && channel.id !== id) {
       return NextResponse.json({
-        redirect: channelRedirectPath(channel.id, sort, pageRaw, grid),
+        redirect: channelRedirectPath(channel.id, pageRaw),
       } satisfies ChannelPageApiResponse);
     }
   }
@@ -55,7 +48,7 @@ export async function GET(request: Request, context: RouteContext) {
   try {
     const page = await getChannelVideosPageCached({
       channelId: id,
-      sort,
+      sort: "latest",
       pageToken: pageRaw ?? undefined,
     });
 

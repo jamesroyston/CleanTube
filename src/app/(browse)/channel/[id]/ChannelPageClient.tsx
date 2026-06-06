@@ -14,13 +14,10 @@ import { useEffect } from "react";
 import { ChannelBrowsePage } from "@/app/(browse)/channel/[id]/ChannelBrowsePage";
 import { VideoCardGridSkeleton } from "@/components/skeletons/VideoCardGridSkeleton";
 import { useChannelPage } from "@/hooks/useChannelPage";
-import type { ChannelSortMode } from "@/lib/youtubeTypes";
 
 export type ChannelPageClientProps = {
   channelId: string;
-  sort: ChannelSortMode;
   pageRaw?: string;
-  gridQuery?: string;
 };
 
 export function ChannelPageSkeleton() {
@@ -45,16 +42,10 @@ export function ChannelPageSkeleton() {
         </Paper>
 
         <Stack
-          direction={{ xs: "column", sm: "row" }}
-          spacing={1.5}
-          alignItems={{ xs: "stretch", sm: "center" }}
-          justifyContent="space-between"
+          direction="row"
+          justifyContent="flex-end"
           sx={{ mb: 2 }}
         >
-          <Stack direction="row" spacing={1}>
-            <Skeleton variant="rounded" width={72} height={36} />
-            <Skeleton variant="rounded" width={80} height={36} />
-          </Stack>
           <Skeleton variant="rounded" width={160} height={32} />
         </Stack>
 
@@ -66,9 +57,7 @@ export function ChannelPageSkeleton() {
 
 export function ChannelPageClient({
   channelId,
-  sort,
   pageRaw,
-  gridQuery,
 }: ChannelPageClientProps) {
   const router = useRouter();
   const {
@@ -76,9 +65,11 @@ export function ChannelPageClient({
     redirect,
     error,
     isInitialLoad,
-    isSessionFallback,
+    isRefreshing,
+    isPageTransitioning,
+    isPageSynced,
     refresh,
-  } = useChannelPage({ channelId, sort, pageRaw });
+  } = useChannelPage({ channelId, pageRaw });
 
   useEffect(() => {
     if (redirect) {
@@ -94,9 +85,10 @@ export function ChannelPageClient({
     return (
       <ChannelBrowsePage
         page={page}
-        sort={sort}
-        gridQuery={gridQuery}
-        stale={isSessionFallback}
+        pageRaw={pageRaw}
+        isRefreshing={isRefreshing}
+        isPageTransitioning={isPageTransitioning}
+        isPageSynced={isPageSynced}
       />
     );
   }
@@ -113,7 +105,7 @@ export function ChannelPageClient({
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
           {error ??
-            "That channel could not be loaded right now, and there is no cached copy in this browser session."}
+            "That channel could not be loaded right now, and there is no cached copy in this browser."}
         </Typography>
         <Stack direction="row" spacing={1} justifyContent="center">
           <Button variant="outlined" onClick={() => void refresh()}>
