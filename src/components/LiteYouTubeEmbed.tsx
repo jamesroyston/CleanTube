@@ -21,7 +21,10 @@ import {
   isYoutubePlayerAttached,
   readPlayerCurrentTime,
   readPlayerDuration,
+  releaseLiteYoutubePlayer,
+  stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
+import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
 
@@ -226,6 +229,27 @@ export function LiteYouTubeEmbed({
 
   recordProgressRef.current = recordProgress;
 
+  const stopPlayer = useCallback(() => {
+    stopLiteYoutubePlayer(ytPlayerRef.current);
+    playingRef.current = false;
+  }, []);
+
+  const releasePlayer = useCallback(() => {
+    releaseLiteYoutubePlayer(ytPlayerRef.current);
+    ytPlayerRef.current = null;
+    playerApiReadyRef.current = false;
+    playingRef.current = false;
+    onPlayerApiReady?.(false);
+  }, [onPlayerApiReady]);
+
+  useEffect(() => {
+    const unregister = registerWatchPlayerStop(stopPlayer);
+    return () => {
+      unregister();
+      releasePlayer();
+    };
+  }, [stopPlayer, releasePlayer]);
+
   useEffect(() => {
     if (!ready) return;
 
@@ -275,10 +299,6 @@ export function LiteYouTubeEmbed({
 
     return () => {
       cancelled = true;
-      ytPlayerRef.current = null;
-      playerApiReadyRef.current = false;
-      onPlayerApiReady?.(false);
-      playingRef.current = false;
       if (attachedPlayer && isYoutubePlayerAttached(attachedPlayer)) {
         try {
           attachedPlayer.removeEventListener("onStateChange", onStateChange);

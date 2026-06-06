@@ -5,6 +5,7 @@ import IconButton from "@mui/material/IconButton";
 import Link from "next/link";
 
 import type { WatchBackTarget } from "@/hooks/useWatchBackTarget";
+import { stopActiveWatchPlayer } from "@/lib/watchPlayerLifecycle";
 
 const TOUCH_TARGET_SX = {
   minWidth: 48,
@@ -21,6 +22,7 @@ export function WatchHeaderBackButton({ target }: { target: WatchBackTarget }) {
       scroll={false}
       aria-label={target.label}
       edge="start"
+      onClick={() => stopActiveWatchPlayer()}
       sx={TOUCH_TARGET_SX}
     >
       <ArrowBackIcon />
