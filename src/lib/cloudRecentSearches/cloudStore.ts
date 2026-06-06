@@ -30,28 +30,6 @@ export async function fetchCloudRecentSearches(
   return (data as RecentSearchRow[]).map(toRecentSearchEntry);
 }
 
-export async function replaceRecentSearches(
-  supabase: SupabaseClient,
-  userId: string,
-  entries: RecentSearchEntry[],
-) {
-  const { error: deleteError } = await supabase
-    .from("recent_searches")
-    .delete()
-    .eq("user_id", userId);
-  if (deleteError) throw deleteError;
-
-  if (entries.length === 0) return;
-
-  const rows = entries.map((entry) => ({
-    user_id: userId,
-    query: entry.query,
-    searched_at: entry.searchedAt,
-  }));
-  const { error } = await supabase.from("recent_searches").insert(rows);
-  if (error) throw error;
-}
-
 export async function upsertRecentSearch(
   supabase: SupabaseClient,
   userId: string,

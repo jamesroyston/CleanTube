@@ -78,14 +78,21 @@ function useCommittedStartSeconds(videoId: string, startSeconds?: number) {
     start: undefined,
   });
 
+  const normalizedStart =
+    startSeconds != null &&
+    Number.isFinite(startSeconds) &&
+    startSeconds > 0
+      ? Math.floor(startSeconds)
+      : undefined;
+
   if (commitRef.current.videoId !== videoId) {
-    const next =
-      startSeconds != null &&
-      Number.isFinite(startSeconds) &&
-      startSeconds > 0
-        ? Math.floor(startSeconds)
-        : undefined;
-    commitRef.current = { videoId, start: next };
+    commitRef.current = { videoId, start: normalizedStart };
+  } else if (
+    (commitRef.current.start == null || commitRef.current.start <= 0) &&
+    normalizedStart != null &&
+    normalizedStart > 0
+  ) {
+    commitRef.current.start = normalizedStart;
   }
 
   return commitRef.current.start;
