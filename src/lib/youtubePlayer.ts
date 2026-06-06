@@ -40,6 +40,40 @@ export function readPlayerCurrentTime(player: YT.Player): number | undefined {
   }
 }
 
+/** Stop playback immediately (e.g. before client-side navigation). */
+export function stopLiteYoutubePlayer(
+  player: YT.Player | null | undefined,
+): void {
+  if (!player) return;
+  try {
+    if (isYoutubePlayerAttached(player)) {
+      player.stopVideo();
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Tear down the iframe player (call on watch-page unmount). */
+export function destroyLiteYoutubePlayer(
+  player: YT.Player | null | undefined,
+): void {
+  if (!player) return;
+  try {
+    player.destroy();
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Stop then destroy — single teardown for unmount. */
+export function releaseLiteYoutubePlayer(
+  player: YT.Player | null | undefined,
+): void {
+  stopLiteYoutubePlayer(player);
+  destroyLiteYoutubePlayer(player);
+}
+
 /** Safe read of duration; returns undefined if player is not ready / attached. */
 export function readPlayerDuration(player: YT.Player): number | undefined {
   if (!isYoutubePlayerAttached(player)) return undefined;
