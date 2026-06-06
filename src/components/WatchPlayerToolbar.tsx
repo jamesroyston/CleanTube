@@ -24,7 +24,7 @@ import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import type { RefObject } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   buildYoutubeWatchUrl,
@@ -32,7 +32,6 @@ import {
   formatPlaybackQuality,
   isPlayerPlaying,
   readAvailableQualities,
-  readPlaybackQuality,
   resolveLiteYoutubePlayer,
   SEEK_STEP_SEC,
   setPlaybackQuality,
@@ -45,6 +44,11 @@ import {
   readWatchPlayerToolbarVisible,
   writeWatchPlayerToolbarVisible,
 } from "@/lib/watchPlayerToolbarPersistence";
+import {
+  readWatchQualityPreference,
+  writeWatchQualityPreference,
+  type WatchQualityPreference,
+} from "@/lib/watchQualityPersistence";
 import { readPlayerCurrentTime } from "@/lib/youtubePlayer";
 
 type WatchPlayerToolbarProps = {
@@ -116,9 +120,12 @@ export function WatchPlayerToolbar({
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [captionsOn, setCaptionsOn] = useState(false);
-  const [quality, setQuality] = useState("auto");
+  const [quality, setQuality] = useState<WatchQualityPreference>(() =>
+    readWatchQualityPreference(),
+  );
   const [qualities, setQualities] = useState<string[]>([]);
   const [copySnackbar, setCopySnackbar] = useState(false);
+  const qualityUserSetRef = useRef(false);
 
   const syncFromPlayer = useCallback(async () => {
     const player = await resolveLiteYoutubePlayer(playerShellRef.current);
@@ -130,18 +137,11 @@ export function WatchPlayerToolbar({
       setMuted(false);
     }
     setCaptionsOn(captionsEnabled(player));
-    setQuality(readPlaybackQuality(player));
     setQualities(readAvailableQualities(player));
+    if (!qualityUserSetRef.current) {
+      setQuality(readWatchQualityPreference());
+    }
   }, [playerShellRef]);
-
-  useEffect(() => {
-    if (!playerApiReady) return;
-    void syncFromPlayer();
-    const id = window.setInterval(() => {
-      void syncFromPlayer();
-    }, 1000);
-    return () => window.clearInterval(id);
-  }, [playerApiReady, syncFromPlayer, videoId]);
 
   const withPlayer = useCallback(
     async (fn: (player: YT.Player) => void | Promise<void>) => {
@@ -152,6 +152,23 @@ export function WatchPlayerToolbar({
     },
     [playerShellRef, syncFromPlayer],
   );
+
+  useEffect(() => {
+    qualityUserSetRef.current = false;
+  }, [videoId]);
+
+  useEffect(() => {
+    if (!playerApiReady) return;
+    void syncFromPlayer();
+    const saved = readWatchQualityPreference();
+    if (saved !== "auto") {
+      void withPlayer((p) => setPlaybackQuality(p, saved, videoId));
+    }
+    const id = window.setInterval(() => {
+      void syncFromPlayer();
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [playerApiReady, syncFromPlayer, videoId, withPlayer]);
 
   const setExpandedPersisted = (next: boolean) => {
     setExpanded(next);
@@ -257,9 +274,13 @@ export function WatchPlayerToolbar({
           <QualityControl
             quality={quality}
             qualities={qualities}
-            onQualityChange={(q) =>
-              void withPlayer((p) => setPlaybackQuality(p, q))
-            }
+            onQualityChange={(q) => {
+              qualityUserSetRef.current = true;
+              const next = q as WatchQualityPreference;
+              setQuality(next);
+              writeWatchQualityPreference(next);
+              void withPlayer((p) => setPlaybackQuality(p, next, videoId));
+            }}
           />
 
           <Tooltip title={captionsOn ? "Captions off" : "Captions on"}>

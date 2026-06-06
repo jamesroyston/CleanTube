@@ -18,6 +18,7 @@ import {
 } from "@/components/VideoCarouselRow";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useForYouFeed } from "@/hooks/useForYouFeed";
+import { useSwrIdbHydrated } from "@/hooks/useSwrInitialLoad";
 import { forYouHasLibrarySignals } from "@/lib/forYou/recommendations";
 import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
 import type { WatchProgressEntry } from "@/types/watchProgress";
@@ -95,7 +96,14 @@ export function ForYouFeedView({
     enabled: effectiveSignedIn && canPersistLibrary && libraryReady,
   });
 
+  const idbHydrated = useSwrIdbHydrated();
   const hasCachedFeed = sections.length > 0;
+
+  const awaitingFeed =
+    effectiveSignedIn && canPersistLibrary && !hasCachedFeed;
+  const showFeedSkeleton =
+    awaitingFeed &&
+    (isInitialLoad || !libraryReady || (!idbHydrated && !hasCachedFeed));
 
   const hasSignals = forYouHasLibrarySignals(
     savedChannels,
@@ -193,7 +201,7 @@ export function ForYouFeedView({
                 </Alert>
               ) : null}
 
-              {isInitialLoad ? (
+              {showFeedSkeleton ? (
                 <FeedSectionsSkeleton sectionCount={3} />
               ) : !hasSignals && !hasCachedFeed ? (
                 <Typography color="text.secondary" sx={{ py: 2 }}>

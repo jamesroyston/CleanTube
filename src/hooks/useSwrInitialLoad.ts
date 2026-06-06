@@ -24,11 +24,15 @@ export function useSwrIdbHydrated(): boolean {
   return hydrated;
 }
 
-/** Gate route skeletons until IDB hydration completes and SWR has no cached data yet. */
+/**
+ * True while there is no cached data yet and we are still waiting on IDB hydration
+ * and/or the SWR fetch. Showing a skeleton during IDB hydration avoids a blank gap
+ * before persisted cache merges; once data exists, cached UI renders immediately.
+ */
 export function useSwrInitialLoad(
   isLoading: boolean,
   hasData: boolean,
 ): boolean {
   const idbHydrated = useSwrIdbHydrated();
-  return idbHydrated && isLoading && !hasData;
+  return !hasData && (!idbHydrated || isLoading);
 }

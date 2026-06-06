@@ -17,8 +17,14 @@ import {
 import { WatchExperienceClient } from "@/components/WatchExperienceClient";
 import { WatchLaterBanner } from "@/components/WatchLaterBanner";
 import { WatchNextCardSkeleton } from "@/components/WatchNextSidebar";
-import { useShowBottomNav } from "@/hooks/useCompactViewport";
 import { useWatchVideo } from "@/hooks/useWatchVideo";
+import {
+  watchBelowPlayerPadSx,
+  watchPageGridSx,
+  watchPlayerPlaceholderSx,
+  watchPlayerShellSx,
+  watchSidebarPadSx,
+} from "@/lib/watchLayoutSx";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
 import {
   channelPageHrefFromToken,
@@ -45,57 +51,57 @@ function channelHrefForWatchVideo(video: {
   return token ? channelPageHrefFromToken(token) : null;
 }
 
-const MOBILE_PORTRAIT =
-  "@media (max-width: 599.95px) and (orientation: portrait)";
-
 function WatchPageSkeletonBody({
   reserveUpNextColumn,
   upNextVisible,
-  showToolbarPlaceholder,
 }: {
   reserveUpNextColumn: boolean;
   upNextVisible: boolean;
-  showToolbarPlaceholder: boolean;
 }) {
   return (
-    <Grid
-      container
-      spacing={{ xs: 0, sm: 3 }}
-      sx={{
-        px: { xs: 2, sm: 0 },
-        alignItems: "flex-start",
-        [MOBILE_PORTRAIT]: { px: 0 },
-      }}
-    >
+    <Grid container spacing={{ xs: 0, sm: 3 }} sx={watchPageGridSx}>
       <Grid size={{ xs: 12, lg: reserveUpNextColumn ? 8 : 12 }}>
         <Stack spacing={1.5}>
-          <Skeleton
-            variant="rectangular"
-            sx={{
-              width: "100%",
-              aspectRatio: "16 / 9",
-              borderRadius: { xs: 0, sm: 1 },
-              [MOBILE_PORTRAIT]: { borderRadius: 0 },
-            }}
-          />
-          {showToolbarPlaceholder ? (
-            <Box sx={{ display: "flex", justifyContent: "center" }}>
+          <Box sx={watchPlayerShellSx}>
+            <Skeleton
+              variant="rectangular"
+              animation="wave"
+              sx={watchPlayerPlaceholderSx}
+            />
+          </Box>
+
+          <Stack spacing={1.5} sx={watchBelowPlayerPadSx}>
+            <Skeleton
+              variant="text"
+              width="72%"
+              sx={{ fontSize: "1.125rem", fontWeight: 700 }}
+            />
+            <Skeleton variant="text" width="38%" sx={{ fontSize: "0.875rem" }} />
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Skeleton variant="rounded" width={108} height={32} />
+              <Skeleton variant="rounded" width={116} height={32} />
+              <Skeleton variant="rounded" width={96} height={32} />
+            </Stack>
+            <Box
+              sx={{
+                mt: 2,
+                pt: 2,
+                borderTop: 1,
+                borderColor: "divider",
+              }}
+            >
+              <Stack spacing={0.75}>
+                <Skeleton variant="text" width="100%" sx={{ fontSize: "0.875rem" }} />
+                <Skeleton variant="text" width="96%" sx={{ fontSize: "0.875rem" }} />
+                <Skeleton variant="text" width="88%" sx={{ fontSize: "0.875rem" }} />
+              </Stack>
               <Skeleton
                 variant="rounded"
-                width={160}
-                height={40}
-                sx={{ borderRadius: 999 }}
+                width={96}
+                height={28}
+                sx={{ mt: 1, borderRadius: 1 }}
               />
             </Box>
-          ) : null}
-          <Stack spacing={1.5} sx={watchBelowPlayerPadSx}>
-            <Skeleton variant="text" width="70%" sx={{ fontSize: "1.5rem" }} />
-            <Skeleton variant="text" width="45%" sx={{ fontSize: "0.875rem" }} />
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-              <Skeleton variant="rounded" width={112} height={36} />
-              <Skeleton variant="rounded" width={120} height={36} />
-              <Skeleton variant="rounded" width={100} height={36} />
-            </Stack>
           </Stack>
         </Stack>
       </Grid>
@@ -117,18 +123,9 @@ function WatchPageSkeletonBody({
   );
 }
 
-const watchBelowPlayerPadSx = {
-  [MOBILE_PORTRAIT]: { px: 2 },
-} as const;
-
-const watchSidebarPadSx = {
-  [MOBILE_PORTRAIT]: { px: 2 },
-} as const;
-
 export function WatchPageSkeleton({ videoId }: { videoId: string }) {
   const { visible: upNextVisible } = useWatchUpNextVisible();
   const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
-  const showBottomNav = useShowBottomNav();
   const reserveUpNextColumn = narrowPlayerLayout || upNextVisible;
 
   return (
@@ -150,7 +147,6 @@ export function WatchPageSkeleton({ videoId }: { videoId: string }) {
         <WatchPageSkeletonBody
           reserveUpNextColumn={reserveUpNextColumn}
           upNextVisible={upNextVisible}
-          showToolbarPlaceholder={showBottomNav}
         />
       </Container>
     </Box>
