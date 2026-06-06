@@ -112,48 +112,6 @@ function toWatchProgressEntry(row: WatchProgressRow): WatchProgressEntry {
   };
 }
 
-/** Merge two watch-progress lists by video id, keeping the newer `updatedAt`. */
-export function mergeWatchProgressEntries(
-  a: WatchProgressEntry[],
-  b: WatchProgressEntry[],
-): WatchProgressEntry[] {
-  const byId = new Map<string, WatchProgressEntry>();
-  const mergeEverCompleted = (
-    a: WatchProgressEntry,
-    b: WatchProgressEntry,
-  ): boolean =>
-    a.everCompleted === true ||
-    b.everCompleted === true ||
-    a.completed ||
-    b.completed;
-
-  const put = (e: WatchProgressEntry) => {
-    const cur = byId.get(e.videoId);
-    if (!cur) {
-      byId.set(e.videoId, {
-        ...e,
-        everCompleted:
-          e.everCompleted === true || e.completed ? true : undefined,
-      });
-      return;
-    }
-    const eNewer =
-      e.updatedAt > cur.updatedAt ||
-      (e.updatedAt === cur.updatedAt && e.lastWatchedAt > cur.lastWatchedAt);
-    const winner = eNewer ? e : cur;
-    const loser = eNewer ? cur : e;
-    byId.set(e.videoId, {
-      ...winner,
-      everCompleted: mergeEverCompleted(winner, loser) ? true : undefined,
-    });
-  };
-  for (const e of a) put(e);
-  for (const e of b) put(e);
-  return Array.from(byId.values()).sort((x, y) =>
-    x.lastWatchedAt < y.lastWatchedAt ? 1 : x.lastWatchedAt > y.lastWatchedAt ? -1 : 0,
-  );
-}
-
 export async function fetchCloudSnapshot(
   supabase: SupabaseClient,
 ): Promise<CloudSnapshot> {

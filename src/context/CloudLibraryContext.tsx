@@ -905,7 +905,7 @@ export function CloudLibraryProvider({
     try {
       await deleteAllWatchLater(supabase, user.id);
     } catch {
-      /* keep empty local state */
+      /* keep cleared in-memory state on cloud error */
     }
   }, [supabase, user]);
 
@@ -1063,7 +1063,7 @@ export function CloudLibraryProvider({
     try {
       await deleteAllWatchProgress(supabase, user.id);
     } catch {
-      /* keep empty local state */
+      /* keep cleared in-memory state on cloud error */
     }
   }, [supabase, user]);
 
@@ -1108,7 +1108,7 @@ export function CloudLibraryProvider({
     try {
       await deleteAllRecentSearches(supabase, user.id);
     } catch {
-      /* keep empty local state */
+      /* keep cleared in-memory state on cloud error */
     }
   }, [supabase, user]);
 

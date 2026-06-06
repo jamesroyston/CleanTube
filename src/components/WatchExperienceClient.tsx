@@ -84,9 +84,6 @@ export function WatchExperienceClient({
     localLibraryHydrated,
     canPersistLibrary,
     libraryCloudSyncState,
-    watchProgress,
-    savedChannels,
-    watchLaterEntries,
   } = useCloudLibrary();
   const { visible: upNextVisible } = useWatchUpNextVisible();
   const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
@@ -99,26 +96,25 @@ export function WatchExperienceClient({
     parseYouTubeTimeParam(searchParams.get("start"));
   const hasUrlStart = urlStartSeconds != null && urlStartSeconds > 0;
 
-  const hasLibraryInMemory =
-    watchProgress.length > 0 ||
-    savedChannels.length > 0 ||
-    watchLaterEntries.length > 0;
+  const libraryBootstrapComplete =
+    localLibraryHydrated && authStatus === "ready";
 
-  const libraryReadyForPlayback =
+  /**
+   * Signed-in resume without `?t=` must wait for the cloud snapshot — not
+   * "syncing with channels in memory" — or we freeze start at 0 before
+   * watch_progress rows arrive.
+   */
+  const cloudResumeReady =
     !canPersistLibrary ||
+    hasUrlStart ||
     libraryCloudSyncState === "synced" ||
-    libraryCloudSyncState === "error" ||
-    (libraryCloudSyncState === "syncing" && hasLibraryInMemory);
+    libraryCloudSyncState === "error";
 
-  /** Mount player once auth (and cloud sync, when signed in) are ready. */
-  const progressResolvable =
-    localLibraryHydrated &&
-    authStatus === "ready" &&
-    libraryReadyForPlayback;
+  const canResolveResume = libraryBootstrapComplete && cloudResumeReady;
 
   const effectiveStartSeconds = useMemo(() => {
     if (hasUrlStart) return urlStartSeconds!;
-    if (!progressResolvable) return startSeconds;
+    if (!canResolveResume) return startSeconds;
     if (canPersistLibrary) {
       const resume = getResumeSeconds(videoId);
       if (resume != null && resume > 0) return resume;
@@ -127,34 +123,39 @@ export function WatchExperienceClient({
   }, [
     hasUrlStart,
     urlStartSeconds,
-    progressResolvable,
+    canResolveResume,
     canPersistLibrary,
     videoId,
     getResumeSeconds,
     startSeconds,
   ]);
 
-  /** Freeze start at first mount so saving progress on pause does not remount the player. */
+  /** Freeze start at first player mount so progress saves do not remount the iframe. */
   const playerMountRef = useRef<{
     videoId: string;
     startSeconds: number;
   } | null>(null);
+  const playerHasMountedRef = useRef(false);
+
   if (
     playerMountRef.current &&
     playerMountRef.current.videoId !== videoId
   ) {
     playerMountRef.current = null;
+    playerHasMountedRef.current = false;
   }
-  const canCommitPlayerStart =
-    progressResolvable || hasUrlStart || !canPersistLibrary;
 
-  if (
-    localLibraryHydrated &&
-    authStatus === "ready" &&
-    canCommitPlayerStart
-  ) {
+  if (canResolveResume) {
     const prev = playerMountRef.current;
     if (!prev || prev.videoId !== videoId) {
+      playerMountRef.current = {
+        videoId,
+        startSeconds: effectiveStartSeconds,
+      };
+    } else if (
+      !playerHasMountedRef.current &&
+      prev.startSeconds !== effectiveStartSeconds
+    ) {
       playerMountRef.current = {
         videoId,
         startSeconds: effectiveStartSeconds,
@@ -163,10 +164,11 @@ export function WatchExperienceClient({
   }
 
   const canMountPlayer =
-    localLibraryHydrated &&
-    authStatus === "ready" &&
-    canCommitPlayerStart &&
-    playerMountRef.current?.videoId === videoId;
+    canResolveResume && playerMountRef.current?.videoId === videoId;
+
+  if (canMountPlayer) {
+    playerHasMountedRef.current = true;
+  }
 
   const playerStartSeconds =
     playerMountRef.current?.startSeconds ?? effectiveStartSeconds;
