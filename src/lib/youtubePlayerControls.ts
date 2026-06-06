@@ -218,6 +218,16 @@ const QUALITY_LABELS: Record<string, string> = {
   tiny: "144p",
 };
 
+/** Fallback when `getAvailableQualityLevels` returns nothing (deprecated API). */
+export const PLAYBACK_QUALITY_OPTIONS = [
+  "auto",
+  "hd1080",
+  "hd720",
+  "large",
+  "medium",
+  "small",
+] as const;
+
 export function formatPlaybackQuality(quality: string): string {
   return QUALITY_LABELS[quality] ?? quality;
 }
@@ -226,10 +236,12 @@ export function readAvailableQualities(player: YT.Player): string[] {
   if (!isYoutubePlayerAttached(player)) return [];
   try {
     const levels = player.getAvailableQualityLevels?.() ?? [];
-    return levels.filter((q) => Boolean(q));
+    const filtered = levels.filter((q) => Boolean(q));
+    if (filtered.length > 0) return filtered;
   } catch {
-    return [];
+    /* ignore */
   }
+  return [...PLAYBACK_QUALITY_OPTIONS];
 }
 
 export function readPlaybackQuality(player: YT.Player): string {
@@ -241,10 +253,30 @@ export function readPlaybackQuality(player: YT.Player): string {
   }
 }
 
-export function setPlaybackQuality(player: YT.Player, quality: string): void {
+/**
+ * YouTube deprecated `setPlaybackQuality`; reload the current video at the
+ * requested level via `loadVideoById` + `suggestedQuality` instead.
+ */
+export function setPlaybackQuality(
+  player: YT.Player,
+  quality: string,
+  videoId: string,
+): void {
   if (!isYoutubePlayerAttached(player)) return;
+  const startSeconds = Math.max(0, Math.floor(readPlayerCurrentTime(player) ?? 0));
+  const wasPlaying = isPlayerPlaying(player);
+
   try {
-    player.setPlaybackQuality?.(quality as YT.SuggestedVideoQuality);
+    if (quality === "auto") {
+      player.loadVideoById({ videoId, startSeconds });
+    } else {
+      player.loadVideoById({
+        videoId,
+        startSeconds,
+        suggestedQuality: quality as YT.SuggestedVideoQuality,
+      });
+    }
+    if (wasPlaying) player.playVideo();
   } catch {
     /* not ready */
   }

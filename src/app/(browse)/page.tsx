@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { ForYouHome } from "@/components/ForYouHome";
+import { ForYouPageFallback } from "@/components/ForYouPageFallback";
 import { HomeSearchResultsClient } from "@/components/HomeSearchResultsClient";
 import { LastSearchSync } from "@/components/LastSearchSync";
 import { SearchScrollRestore } from "@/components/SearchScrollRestore";
@@ -33,7 +34,7 @@ function HomeFallback() {
   return (
     <Box component="main" sx={{ pb: 6 }}>
       <Container maxWidth="xl" sx={{ pt: 2 }}>
-        <ForYouHome />
+        <ForYouPageFallback />
       </Container>
     </Box>
   );

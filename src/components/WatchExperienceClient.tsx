@@ -30,6 +30,13 @@ import type { VideoSummary } from "@/components/VideoSummary";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { readFetchJson } from "@/lib/fetchJson";
 import {
+  watchBelowPlayerPadSx,
+  watchPageGridSx,
+  watchPlayerPlaceholderSx,
+  watchPlayerShellSx,
+  watchSidebarPadSx,
+} from "@/lib/watchLayoutSx";
+import {
   parseYouTubeTimeParam,
 } from "@/lib/youtubeTime";
 import type { WatchVideoComments, WatchVideoDetails } from "@/lib/youtubeTypes";
@@ -38,32 +45,6 @@ type WatchNextApiResponse = {
   videos?: VideoSummary[];
   error?: string;
 };
-
-/** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
-const MOBILE_PORTRAIT =
-  "@media (max-width: 599.95px) and (orientation: portrait)";
-
-const watchPlayerShellSx = {
-  mb: { xs: 2, sm: 3 },
-  width: "100%",
-  aspectRatio: "16 / 9",
-} as const;
-
-const watchPlayerPlaceholderSx = {
-  width: "100%",
-  height: "100%",
-  borderRadius: { xs: 0, sm: 1 },
-  bgcolor: "action.hover",
-  [MOBILE_PORTRAIT]: { borderRadius: 0 },
-} as const;
-
-const watchBelowPlayerPadSx = {
-  [MOBILE_PORTRAIT]: { px: 2 },
-} as const;
-
-const watchSidebarPadSx = {
-  [MOBILE_PORTRAIT]: { px: 2 },
-} as const;
 
 export type WatchExperienceClientProps = {
   videoId: string;
@@ -247,15 +228,7 @@ export function WatchExperienceClient({
         px: { xs: 0, sm: 3 },
       }}
     >
-      <Grid
-        container
-        spacing={{ xs: 0, sm: 3 }}
-        sx={{
-          px: { xs: 2, sm: 0 },
-          alignItems: "flex-start",
-          [MOBILE_PORTRAIT]: { px: 0 },
-        }}
-      >
+      <Grid container spacing={{ xs: 0, sm: 3 }} sx={watchPageGridSx}>
         <Grid size={{ xs: 12, lg: reserveUpNextColumn ? 8 : 12 }}>
           <Stack spacing={1.5}>
             <Box sx={watchPlayerShellSx}>
