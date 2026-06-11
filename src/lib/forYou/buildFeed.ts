@@ -9,6 +9,11 @@ import {
   forYouHasLibrarySignals,
   rankForYouCandidates,
 } from "./recommendations";
+import {
+  forYouDayKey,
+  recentSearchesForFeed,
+  selectSavedChannelsForFeed,
+} from "./selection";
 import type {
   ForYouCandidate,
   ForYouCandidateSource,
@@ -21,6 +26,10 @@ function normalizeSeedName(value: string | undefined): string {
   return value?.trim().toLowerCase() ?? "";
 }
 
+function normalizeSearchQuery(value: string | undefined): string {
+  return value?.trim().toLowerCase() ?? "";
+}
+
 function candidatesForSeed(
   pool: ForYouCandidate[],
   source: ForYouCandidateSource,
@@ -30,13 +39,6 @@ function candidatesForSeed(
   return pool.filter(
     (c) => c.source === source && normalizeSeedName(c.seedChannelName) === key,
   );
-}
-
-function candidatesBySource(
-  pool: ForYouCandidate[],
-  source: ForYouCandidateSource,
-): ForYouCandidate[] {
-  return pool.filter((c) => c.source === source);
 }
 
 function rankSection(
@@ -80,10 +82,14 @@ function buildChannelSections(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
   limits: typeof DEFAULT_FOR_YOU_LIMITS,
+  dayKey: string,
 ): ForYouSection[] {
-  const channelEntries = snapshot.savedChannels
-    .filter((c) => effectiveSavedChannelKind(c) === "saved_channel")
-    .slice(0, limits.maxSavedChannels);
+  const channelEntries = selectSavedChannelsForFeed(
+    snapshot.savedChannels,
+    snapshot.watchProgress,
+    limits.maxSavedChannels,
+    dayKey,
+  );
 
   const sections: ForYouSection[] = [];
   for (const channel of channelEntries) {
@@ -167,19 +173,40 @@ function buildPinnedSearchSections(
   return sections;
 }
 
-function buildRecentSearchSection(
+function buildRecentSearchSections(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
-): ForYouSection | null {
-  const candidates = candidatesBySource(pool, "recent_search");
-  const videos = rankSection(candidates, snapshot, 16);
-  if (videos.length === 0) return null;
+  recentSearches: ForYouLibrarySignals["recentSearches"],
+): ForYouSection[] {
+  const queries = recentSearchesForFeed(recentSearches);
+  const sections: ForYouSection[] = [];
 
-  return {
-    id: "recent-searches",
-    title: "From your recent searches",
-    videos,
-  };
+  for (const entry of queries) {
+    const queryKey = normalizeSearchQuery(entry.query);
+    const candidates = pool.filter(
+      (c) =>
+        c.source === "recent_search" &&
+        normalizeSearchQuery(c.seedSearchQuery) === queryKey,
+    );
+    const videos = rankSection(candidates, snapshot, 8);
+    if (videos.length === 0) continue;
+
+    sections.push({
+      id: `recent-search-${hashSectionId(entry.query)}`,
+      title: `From search: ${entry.query}`,
+      videos,
+    });
+  }
+
+  return sections;
+}
+
+function hashSectionId(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(36);
 }
 
 function buildMoreForYouSection(
@@ -202,6 +229,7 @@ export async function buildForYouFeed(
 ): Promise<ForYouFeedResult> {
   const { snapshot, recentSearches, recentSearchQueries } = signals;
   const limits = DEFAULT_FOR_YOU_LIMITS;
+  const dayKey = forYouDayKey();
 
   if (
     !forYouHasLibrarySignals(
@@ -213,23 +241,32 @@ export async function buildForYouFeed(
     return { sections: [], empty: true };
   }
 
-  const pool = await fetchForYouCandidates(snapshot, recentSearches, limits);
+  const pool = await fetchForYouCandidates(
+    snapshot,
+    recentSearches,
+    limits,
+    dayKey,
+  );
 
-  const channelSections = buildChannelSections(snapshot, pool, limits);
+  const channelSections = buildChannelSections(snapshot, pool, limits, dayKey);
   const becauseYouWatchedSections = buildBecauseYouWatchedSections(
     snapshot,
     pool,
     limits,
   );
   const pinnedSections = buildPinnedSearchSections(snapshot, pool, limits);
-  const recentSection = buildRecentSearchSection(snapshot, pool);
+  const recentSections = buildRecentSearchSections(
+    snapshot,
+    pool,
+    recentSearches,
+  );
   const moreSection = buildMoreForYouSection(snapshot, pool, limits);
 
   const primary = [
-    ...channelSections,
     ...becauseYouWatchedSections,
+    ...channelSections,
     ...pinnedSections,
-    ...(recentSection ? [recentSection] : []),
+    ...recentSections,
   ];
 
   const sections = dedupeSections(primary, moreSection ?? undefined);

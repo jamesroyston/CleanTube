@@ -335,6 +335,8 @@ export function CloudLibraryProvider({
   const [watchProgressLivePatches, setWatchProgressLivePatches] = useState<
     Map<string, WatchProgressLivePatch>
   >(() => new Map());
+  const watchProgressLivePatchesRef = useRef(watchProgressLivePatches);
+  watchProgressLivePatchesRef.current = watchProgressLivePatches;
   const [passkeysSupported, setPasskeysSupported] = useState(false);
   const [libraryCloudSyncState, setLibraryCloudSyncState] =
     useState<LibraryCloudSyncState>(() =>
@@ -909,9 +911,22 @@ export function CloudLibraryProvider({
     }
   }, [supabase, user]);
 
-  const isInWatchLaterFn = useCallback(
-    (videoId: string) => watchLaterEntries.some((entry) => entry.videoId === videoId),
+  const watchLaterVideoIds = useMemo(
+    () => new Set(watchLaterEntries.map((entry) => entry.videoId)),
     [watchLaterEntries],
+  );
+
+  const watchProgressByVideoId = useMemo(() => {
+    const map = new Map<string, WatchProgressEntry>();
+    for (const entry of watchProgress) {
+      map.set(entry.videoId, entry);
+    }
+    return map;
+  }, [watchProgress]);
+
+  const isInWatchLaterFn = useCallback(
+    (videoId: string) => watchLaterVideoIds.has(videoId),
+    [watchLaterVideoIds],
   );
 
   const upsertWatchProgress = useCallback(
@@ -933,7 +948,7 @@ export function CloudLibraryProvider({
         const existing = existingBase
           ? mergeWatchProgressLivePatch(
               existingBase,
-              watchProgressLivePatches.get(normalized.videoId),
+              watchProgressLivePatchesRef.current.get(normalized.videoId),
             )
           : undefined;
 
@@ -1033,7 +1048,7 @@ export function CloudLibraryProvider({
         );
       }
     },
-    [supabase, user, watchProgressLivePatches],
+    [supabase, user],
   );
 
   const removeWatchProgressByVideoId = useCallback(
@@ -1069,14 +1084,14 @@ export function CloudLibraryProvider({
 
   const getProgressByVideoId = useCallback(
     (videoId: string) => {
-      const base = watchProgress.find((entry) => entry.videoId === videoId);
+      const base = watchProgressByVideoId.get(videoId);
       if (!base) return undefined;
       return mergeWatchProgressLivePatch(
         base,
-        watchProgressLivePatches.get(videoId),
+        watchProgressLivePatchesRef.current.get(videoId),
       );
     },
-    [watchProgress, watchProgressLivePatches],
+    [watchProgressByVideoId],
   );
 
   const getResumeSeconds = useCallback(
@@ -1132,17 +1147,8 @@ export function CloudLibraryProvider({
     supabase == null ? "unavailable" : libraryCloudSyncState;
 
   const inProgressEntries = useMemo(() => {
-    return sortWatchProgressByRecency(
-      watchProgress
-        .map((entry) =>
-          mergeWatchProgressLivePatch(
-            entry,
-            watchProgressLivePatches.get(entry.videoId),
-          ),
-        )
-        .filter(isFreshInProgress),
-    );
-  }, [watchProgress, watchProgressLivePatches]);
+    return sortWatchProgressByRecency(watchProgress.filter(isFreshInProgress));
+  }, [watchProgress]);
 
   const value = useMemo<CloudLibraryContextValue>(
     () => ({
