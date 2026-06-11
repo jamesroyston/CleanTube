@@ -8,7 +8,6 @@ html,
 body {
   margin: 0;
   min-height: 100%;
-  min-height: -webkit-fill-available;
 }
 
 body {
@@ -32,8 +31,8 @@ lite-youtube > iframe {
  * When the head script sets data-mobile-experience, hide desktop chrome before React hydrates.
  */
 html[data-mobile-experience="1"] [data-desktop-shell],
-html[data-mobile-experience="1"] [data-desktop-header-spacer] {
-  display: none !important;
+html[data-mobile-experience="1"] [data-shell-content] {
+  padding-top: 0 !important;
 }
 
 html[data-mobile-experience="1"] [data-desktop-header-chrome] {
@@ -55,7 +54,12 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
 @media (display-mode: standalone), (hover: none) and (pointer: coarse), (pointer: coarse) {
   @media (max-width: 1023.95px) {
     html [data-desktop-shell],
-    html [data-desktop-header-spacer],
+    html [data-shell-content],
+    html [data-desktop-header-chrome] {
+      padding-top: 0 !important;
+    }
+
+    html [data-desktop-shell],
     html [data-desktop-header-chrome] {
       display: none !important;
     }
@@ -73,7 +77,12 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
 /** Installed PWA: always treat as touch-primary for chrome hiding up to tablet width. */
 @media (display-mode: standalone) and (max-width: 1023.95px) {
   html [data-desktop-shell],
-  html [data-desktop-header-spacer],
+  html [data-shell-content],
+  html [data-desktop-header-chrome] {
+    padding-top: 0 !important;
+  }
+
+  html [data-desktop-shell],
   html [data-desktop-header-chrome] {
     display: none !important;
   }

@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
 
 import { useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
@@ -54,14 +53,6 @@ export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
       dedupingInterval: 30_000,
     },
   );
-
-  const wasEnabledRef = useRef(false);
-  useEffect(() => {
-    if (enabled && userId && !wasEnabledRef.current) {
-      void mutate();
-    }
-    wasEnabledRef.current = Boolean(enabled && userId);
-  }, [enabled, userId, mutate]);
 
   return {
     sections: data?.sections ?? [],

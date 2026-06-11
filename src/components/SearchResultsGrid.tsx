@@ -36,10 +36,12 @@ function ChannelCard({ channel }: { channel: ChannelSearchResult }) {
         height: "100%",
         position: "relative",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
-        "&:hover": {
-          transform: "translateY(-2px)",
-          ...theme.applyStyles("dark", { boxShadow: cardShadowDark }),
-          ...theme.applyStyles("light", { boxShadow: cardShadowLight }),
+        "@media (hover: hover) and (pointer: fine)": {
+          "&:hover": {
+            transform: "translateY(-2px)",
+            ...theme.applyStyles("dark", { boxShadow: cardShadowDark }),
+            ...theme.applyStyles("light", { boxShadow: cardShadowLight }),
+          },
         },
       })}
     >

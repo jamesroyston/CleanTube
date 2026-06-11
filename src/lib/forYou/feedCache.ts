@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from "next/cache";
 
 import { buildForYouFeed } from "./buildFeed";
 import type { ForYouLibrarySignals } from "./loadLibrarySignals";
+import { forYouDayKey } from "./selection";
 import type { ForYouFeedResult } from "./types";
 
 /** Per-user feed cache TTL (default 10 minutes). */
@@ -21,13 +22,19 @@ export function libraryFeedRevision(signals: ForYouLibrarySignals): string {
     if (Number.isFinite(t) && t > latestProgress) latestProgress = t;
   }
 
+  const recentSearchFingerprint = recentSearchQueries
+    .map((q) => q.trim().toLowerCase())
+    .filter(Boolean)
+    .join("|");
+
   return [
+    forYouDayKey(),
     snapshot.savedChannels.length,
     snapshot.watchLater.length,
     snapshot.watchProgress.length,
     latestProgress,
     recentSearchQueries.length,
-    recentSearchQueries[0] ?? "",
+    recentSearchFingerprint,
   ].join(":");
 }
 

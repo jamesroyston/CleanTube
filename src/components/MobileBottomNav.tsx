@@ -56,7 +56,6 @@ export function MobileBottomNav() {
           height: BOTTOM_NAV_HEIGHT_PX,
           bgcolor: "background.paper",
           borderTop: (t) => `1px solid ${t.vars.palette.divider}`,
-          backdropFilter: "blur(12px)",
           /** Remove the synthetic tap delay so the first tap navigates immediately. */
           "& .MuiButtonBase-root": { touchAction: "manipulation" },
         }}

@@ -19,6 +19,7 @@ import {
   useVideoWatchHref,
   VideoCardThumbnailWithProgress,
 } from "@/components/VideoCardThumbnailWithProgress";
+import { ForYouVideoCardMenu } from "@/components/ForYouVideoCardMenu";
 import { WatchLaterCardButton } from "@/components/WatchLaterCardButton";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
@@ -28,9 +29,17 @@ export type VideoCardProps = {
   video: VideoSummary;
   /** In horizontal carousels: allow vertical page scroll when touch starts on card. */
   carousel?: boolean;
+  /** Show for-you dismiss menu (top-right). */
+  forYouMenu?: boolean;
+  onDismissFromForYou?: (videoId: string) => void;
 };
 
-export function VideoCard({ video, carousel = false }: VideoCardProps) {
+export function VideoCard({
+  video,
+  carousel = false,
+  forYouMenu = false,
+  onDismissFromForYou,
+}: VideoCardProps) {
   const watchHref = useVideoWatchHref(video.id);
 
   return (
@@ -170,6 +179,21 @@ export function VideoCard({ video, carousel = false }: VideoCardProps) {
         >
           <WatchLaterCardButton video={video} />
         </Box>
+        {forYouMenu && onDismissFromForYou ? (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              zIndex: 2,
+            }}
+          >
+            <ForYouVideoCardMenu
+              videoId={video.id}
+              onDismiss={onDismissFromForYou}
+            />
+          </Box>
+        ) : null}
       </Box>
     </Card>
   );

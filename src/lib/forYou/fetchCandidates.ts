@@ -1,4 +1,3 @@
-import { entriesToQueryList } from "@/lib/cloudRecentSearches/sync";
 import type { RecentSearchEntry } from "@/lib/cloudRecentSearches/types";
 import type { CloudSnapshot } from "@/lib/cloudLibrary/cloudStore";
 import { searchMixedResultsCached } from "@/lib/youtubeSearchCache";
@@ -8,8 +7,13 @@ import { getWatchNextRelatedVideos } from "@/lib/youtubeWatchNext";
 import { extractHighConfidenceChannelLookup } from "@/lib/youtubeUrl";
 import type { SavedChannel } from "@/types/savedChannel";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
-import { isStaleInProgress } from "@/lib/cloudLibrary/sync";
 import type { WatchProgressEntry } from "@/types/watchProgress";
+import {
+  forYouDayKey,
+  isRecentEnoughHistorySeed,
+  recentSearchesForFeed,
+  selectSavedChannelsForFeed,
+} from "./selection";
 import type { ForYouCandidate, ForYouFeedLimits } from "./types";
 import { DEFAULT_FOR_YOU_LIMITS } from "./types";
 
@@ -130,7 +134,7 @@ export function recentHistorySeeds(
   max: number,
 ): WatchProgressEntry[] {
   return [...watchProgress]
-    .filter((entry) => !isStaleInProgress(entry))
+    .filter((entry) => isRecentEnoughHistorySeed(entry))
     .sort((a, b) => {
       const ta = Date.parse(a.lastWatchedAt);
       const tb = Date.parse(b.lastWatchedAt);
@@ -172,6 +176,7 @@ export async function fetchFromRecentSearch(
     return results.videos.map((video) => ({
       video,
       source: "recent_search" as const,
+      seedSearchQuery: q,
     }));
   } catch {
     return [];
@@ -182,11 +187,15 @@ export async function fetchForYouCandidates(
   snapshot: CloudSnapshot,
   recentSearches: RecentSearchEntry[],
   limits: ForYouFeedLimits = DEFAULT_FOR_YOU_LIMITS,
+  dayKey: string = forYouDayKey(),
 ): Promise<ForYouCandidate[]> {
   const savedChannels = snapshot.savedChannels;
-  const channelEntries = savedChannels
-    .filter((c) => effectiveSavedChannelKind(c) === "saved_channel")
-    .slice(0, limits.maxSavedChannels);
+  const channelEntries = selectSavedChannelsForFeed(
+    savedChannels,
+    snapshot.watchProgress,
+    limits.maxSavedChannels,
+    dayKey,
+  );
   const pinnedSearches = savedChannels
     .filter((c) => effectiveSavedChannelKind(c) === "pinned_search")
     .slice(0, limits.maxSavedChannels);
@@ -196,7 +205,9 @@ export async function fetchForYouCandidates(
     limits.maxHistorySeeds,
   );
 
-  const recentQueries = entriesToQueryList(recentSearches).slice(0, 5);
+  const recentQueries = recentSearchesForFeed(recentSearches).map(
+    (entry) => entry.query,
+  );
 
   const batches = await Promise.all([
     mapWithBoundedConcurrency(channelEntries, FETCH_CONCURRENCY, (ch) =>

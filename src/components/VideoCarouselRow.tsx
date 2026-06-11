@@ -13,13 +13,21 @@ type VideoCarouselRowProps = {
   videos: VideoSummary[];
   /** Accessible name for the scroll region (e.g. section title). */
   ariaLabel?: string;
+  /** Enable for-you dismiss menu on each card. */
+  forYouMenu?: boolean;
+  onDismissFromForYou?: (videoId: string) => void;
 };
 
 /**
  * Horizontal strip for For You subsections. Uses native touch scrolling (swipe)
  * with pan-x/pan-y so vertical page scroll works when a touch starts on a card.
  */
-export function VideoCarouselRow({ videos, ariaLabel }: VideoCarouselRowProps) {
+export function VideoCarouselRow({
+  videos,
+  ariaLabel,
+  forYouMenu = false,
+  onDismissFromForYou,
+}: VideoCarouselRowProps) {
   if (videos.length === 0) return null;
 
   return (
@@ -52,7 +60,12 @@ export function VideoCarouselRow({ videos, ariaLabel }: VideoCarouselRowProps) {
             touchAction: "pan-x pan-y",
           }}
         >
-          <VideoCard video={video} carousel />
+          <VideoCard
+            video={video}
+            carousel
+            forYouMenu={forYouMenu}
+            onDismissFromForYou={onDismissFromForYou}
+          />
         </Box>
       ))}
     </Box>

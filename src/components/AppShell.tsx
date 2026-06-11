@@ -56,10 +56,10 @@ function AppShellDrawerPathSync({
 }
 
 /**
- * Desktop browse header spacer before measure: Toolbar minHeight 64 (sm+) + py 1 (8×2).
- * Safe-area is applied on the fixed AppBar and included in ResizeObserver measurement.
+ * Toolbar minHeight (sm+) before ResizeObserver measures the fixed AppBar.
+ * Safe-area is on the AppBar itself and included in measurement.
  */
-const DESKTOP_HEADER_INSET_FALLBACK_PX = 80;
+const HEADER_INSET_FALLBACK_PX = 64;
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
@@ -124,9 +124,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   const appBarRef = useRef<HTMLDivElement | null>(null);
   const mainScrollRef = useRef<HTMLDivElement | null>(null);
-  const [headerInsetPx, setHeaderInsetPx] = useState(
-    DESKTOP_HEADER_INSET_FALLBACK_PX,
-  );
+  const [headerInsetPx, setHeaderInsetPx] = useState(HEADER_INSET_FALLBACK_PX);
+  const reserveFixedHeaderSpace =
+    !mobileExperience &&
+    (desktopLayout || (!desktopLayout && headerOverlayActive));
 
   useEffect(() => {
     registerScrollElementGetter(() =>
@@ -239,17 +240,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             }),
       }}
     >
-      {desktopLayout || (!desktopLayout && headerOverlayActive) ? (
-        <Box
-          aria-hidden
-          data-desktop-header-spacer
-          sx={{
-            flexShrink: 0,
-            height: `${headerInsetPx}px`,
-            /** Reserves space when browse `Header` is `position="fixed"` (desktop or mobile overlay). */
-          }}
-        />
-      ) : null}
       <Suspense fallback={<HeaderFallback />}>
         <AppShellDrawerPathSync onPathChange={resetMobileDrawerOnNavigate} />
         <WatchReturnTracker />
@@ -264,6 +254,21 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           }
         />
       </Suspense>
+      <Box
+        data-shell-content
+        sx={{
+          display: "flex",
+          flex: 1,
+          minHeight: 0,
+          flexDirection: "column",
+          ...(reserveFixedHeaderSpace
+            ? {
+                /** Offset content below the fixed browse AppBar (live-measured height). */
+                pt: `${headerInsetPx}px`,
+              }
+            : {}),
+        }}
+      >
       <CompactLayoutChrome
         showBottomNav={showBottomNav}
         bottomNav={
@@ -386,6 +391,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           </Box>
         </Box>
       )}
+      </Box>
     </Box>
     </ScrollContainerProvider>
   );

@@ -17,6 +17,7 @@ import {
   VideoCarouselRowSkeleton,
 } from "@/components/VideoCarouselRow";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
+import { useForYouDismissed } from "@/hooks/useForYouDismissed";
 import { useForYouFeed } from "@/hooks/useForYouFeed";
 import { useSwrIdbHydrated } from "@/hooks/useSwrInitialLoad";
 import { forYouHasLibrarySignals } from "@/lib/forYou/recommendations";
@@ -85,8 +86,8 @@ export function ForYouFeedView({
   const effectiveSignedIn = signedIn || canPersistLibrary;
 
   const {
-    sections,
-    feedEmpty,
+    sections: rawSections,
+    feedEmpty: rawFeedEmpty,
     feedError,
     isInitialLoad,
     isRefreshing,
@@ -95,6 +96,14 @@ export function ForYouFeedView({
     userId: user?.id,
     enabled: effectiveSignedIn && canPersistLibrary && libraryReady,
   });
+
+  const { dismissVideo, filterFeed } = useForYouDismissed(user?.id, {
+    cloudEnabled: canPersistLibrary,
+  });
+  const { sections, empty: feedEmpty } = useMemo(
+    () => filterFeed({ sections: rawSections, empty: rawFeedEmpty }),
+    [filterFeed, rawFeedEmpty, rawSections],
+  );
 
   const idbHydrated = useSwrIdbHydrated();
   const hasCachedFeed = sections.length > 0;
@@ -138,7 +147,7 @@ export function ForYouFeedView({
         </Stack>
         <Typography variant="body2" color="text.secondary">
           {effectiveSignedIn
-            ? "Recommendations from your saved channels, watch history, and pinned searches."
+            ? "Fresh picks from your watch history, saved channels, and searches — tap ··· on a card to hide one."
             : "Sign in to personalize this page with your library."}
         </Typography>
       </Stack>
@@ -227,6 +236,8 @@ export function ForYouFeedView({
                       <VideoCarouselRow
                         videos={section.videos}
                         ariaLabel={section.title}
+                        forYouMenu
+                        onDismissFromForYou={dismissVideo}
                       />
                     </Box>
                   ))}
