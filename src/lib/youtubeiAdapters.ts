@@ -308,6 +308,35 @@ export function formatYoutubeDurationSeconds(total: number | undefined): string 
   return `${m}:${String(r).padStart(2, "0")}`;
 }
 
+function parseCountDigits(text: string | undefined): number | undefined {
+  if (!text) return undefined;
+  const digits = text.replace(/[^\d]/g, "");
+  if (!digits) return undefined;
+  const n = Number.parseInt(digits, 10);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * View count from `primary_info` (the InnerTube `/next` response). This is the
+ * datacenter-reliable source: `basic_info.view_count` comes from `/player`, which is
+ * bot-challenged from Vercel IPs, whereas `/next` is not.
+ */
+function viewCountFromPrimaryInfo(
+  primary: YT.VideoInfo["primary_info"],
+): number | undefined {
+  const vc = primary?.view_count;
+  if (!vc) return undefined;
+  if (
+    typeof vc.original_view_count === "number" &&
+    vc.original_view_count > 0
+  ) {
+    return vc.original_view_count;
+  }
+  // `view_count` is the long form ("1,234,567 views"); short_view_count ("1.2M")
+  // is intentionally not digit-stripped because it would yield a wrong number.
+  return parseCountDigits(vc.view_count?.toString());
+}
+
 function channelThumbnailUrlFromVideoInfo(info: YT.VideoInfo): string | undefined {
   const author = info.secondary_info?.owner?.author;
   if (!author) return undefined;
@@ -336,21 +365,41 @@ export function videoInfoToWatchDetails(
   id: string,
 ): WatchVideoDetails {
   const bi = info.basic_info;
+  const primary = info.primary_info;
+  const owner = info.secondary_info?.owner?.author;
   const live = Boolean(bi.is_live || bi.is_live_content);
-  const title = bi.title?.trim() || "Video";
+
+  // `basic_info` is populated from the InnerTube `/player` endpoint, which is
+  // bot-challenged from datacenter IPs (e.g. Vercel) and comes back empty there.
+  // `primary_info` / `secondary_info` come from `/next` (same response that powers
+  // the watch-next rail and comments), which is NOT gated — so fall back to those
+  // fields to keep watch metadata populated server-side in production.
+  const title =
+    bi.title?.trim() || primary?.title?.toString()?.trim() || "Video";
   const channel = bi.channel;
-  const channelName = channel?.name?.trim() || bi.author?.trim() || "Unknown channel";
-  const channelId = channel?.id;
-  const channelUrl = channel?.url;
+  const channelName =
+    channel?.name?.trim() ||
+    bi.author?.trim() ||
+    owner?.name?.trim() ||
+    "Unknown channel";
+  const channelId = channel?.id || owner?.id || undefined;
+  const channelUrl = channel?.url || owner?.url || undefined;
   const channelThumbnailUrl = channelThumbnailUrlFromVideoInfo(info);
 
   const thumbList = collectThumbnailUrls(
     bi.thumbnail as Thumbnailish[] | undefined,
   );
   const uploadedAt =
-    info.primary_info?.relative_date?.toString()?.trim() ||
-    info.primary_info?.published?.toString()?.trim() ||
+    primary?.relative_date?.toString()?.trim() ||
+    primary?.published?.toString()?.trim() ||
     undefined;
+
+  const views =
+    (typeof bi.view_count === "number" && bi.view_count > 0
+      ? bi.view_count
+      : undefined) ??
+    viewCountFromPrimaryInfo(primary) ??
+    0;
 
   const videoLike: VideoLikeForSummary = {
     id,
@@ -374,7 +423,7 @@ export function videoInfoToWatchDetails(
     channelUrl,
     channelThumbnailUrl,
     uploadedAt,
-    views: bi.view_count ?? 0,
+    views,
     description: description || undefined,
     thumbnailUrl: preferredYoutubeThumbnailPath(id, videoLike),
     source: "youtubei.js",

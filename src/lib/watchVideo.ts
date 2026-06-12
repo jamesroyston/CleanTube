@@ -4,11 +4,12 @@ import {
   fetchYouTubeOEmbed,
   parseChannelIdFromYoutubeUrl,
 } from "@/lib/oembed";
-import {
-  canonicalYoutubeThumbnailUrl,
-  preferredYoutubeThumbnailPath,
-} from "@/lib/serializeVideo";
+import { preferredYoutubeThumbnailPath } from "@/lib/serializeVideo";
 import { getCachedInnertubeVideoInfo } from "@/lib/innertubeVideoInfoCache";
+import {
+  getVideoDetailsViaDataApi,
+  isYoutubeDataApiEnabled,
+} from "@/lib/youtubeDataApi";
 import { videoInfoToWatchDetails } from "@/lib/youtubeiAdapters";
 import type { WatchVideoDetails } from "@/lib/youtubeTypes";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
@@ -47,240 +48,67 @@ function fromOEmbed(
   };
 }
 
-type WatchHtmlPlayerResponse = {
-  videoDetails?: {
-    title?: string;
-    author?: string;
-    channelId?: string;
-    shortDescription?: string;
-    viewCount?: string;
-    thumbnail?: {
-      thumbnails?: { url?: string }[];
-    };
-    /** Present in many `ytInitialPlayerResponse` payloads — channel / author avatar. */
-    authorThumbnail?: {
-      thumbnails?: { url?: string }[];
-    };
-  };
-  microformat?: {
-    playerMicroformatRenderer?: {
-      ownerProfileUrl?: string;
-      publishDate?: string;
-      uploadDate?: string;
-      viewCount?: string;
-      description?: {
-        simpleText?: string;
-      };
-    };
-  };
-};
-
-function extractBalancedJson(source: string, marker: string): string | null {
-  const markerIndex = source.indexOf(marker);
-  if (markerIndex < 0) return null;
-  const start = source.indexOf("{", markerIndex);
-  if (start < 0) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  for (let i = start; i < source.length; i++) {
-    const char = source[i];
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === "\"") {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === "\"") {
-      inString = true;
-      continue;
-    }
-    if (char === "{") depth += 1;
-    if (char === "}") {
-      depth -= 1;
-      if (depth === 0) return source.slice(start, i + 1);
-    }
-  }
-
-  return null;
+function isWatchMetadataComplete(video: WatchVideoDetails): boolean {
+  return (
+    Boolean(video.description?.trim()) &&
+    video.views > 0 &&
+    Boolean(video.uploadedAt?.trim()) &&
+    Boolean(video.channelThumbnailUrl?.trim())
+  );
 }
 
-function parseIsoDateLabel(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function descriptionFromWatchPlayerDetails(
-  details: WatchHtmlPlayerResponse["videoDetails"],
-): string | undefined {
-  if (!details || typeof details !== "object") return undefined;
-  const d = details as Record<string, unknown>;
-  if (typeof d.shortDescription === "string") {
-    const t = d.shortDescription.trim();
-    if (t) return t;
-  }
-  const raw = d.description;
-  if (typeof raw === "string") {
-    const t = raw.trim();
-    return t || undefined;
-  }
-  if (raw && typeof raw === "object") {
-    const o = raw as Record<string, unknown>;
-    if (typeof o.simpleText === "string" && o.simpleText.trim()) {
-      return o.simpleText.trim();
-    }
-    const runs = o.runs;
-    if (Array.isArray(runs)) {
-      const text = runs
-        .map((r) =>
-          r && typeof r === "object" && typeof (r as { text?: string }).text === "string"
-            ? (r as { text: string }).text
-            : "",
-        )
-        .join("");
-      const t = text.trim();
-      if (t) return t;
-    }
-  }
-  return undefined;
-}
-
-function fromWatchHtml(
-  id: string,
-  html: string,
-): WatchVideoDetails | null {
-  const raw =
-    extractBalancedJson(html, "ytInitialPlayerResponse") ??
-    extractBalancedJson(html, "initialPlayerResponse");
-  if (!raw) return null;
-
-  let parsed: WatchHtmlPlayerResponse;
-  try {
-    parsed = JSON.parse(raw) as WatchHtmlPlayerResponse;
-  } catch {
-    return null;
-  }
-
-  const details = parsed.videoDetails;
-  if (!details?.title?.trim()) return null;
-
-  const microformat = parsed.microformat?.playerMicroformatRenderer;
-  const channelUrl = microformat?.ownerProfileUrl
-    ? `https://www.youtube.com${microformat.ownerProfileUrl}`
-    : details.channelId
-      ? `https://www.youtube.com/channel/${details.channelId}`
-      : undefined;
-  const thumbnails = details.thumbnail?.thumbnails ?? [];
-  const bestThumbnail = thumbnails
-    .map((thumbnail) => thumbnail.url)
-    .filter((url): url is string => Boolean(url))
-    .at(-1);
-
-  const authorThumbs = details.authorThumbnail?.thumbnails ?? [];
-  const rawChannelThumb = authorThumbs
-    .map((t) => t.url)
-    .filter((url): url is string => Boolean(url))
-    .at(-1);
-  let channelThumbnailUrl: string | undefined;
-  if (rawChannelThumb) {
-    try {
-      channelThumbnailUrl = canonicalYoutubeThumbnailUrl(rawChannelThumb);
-    } catch {
-      channelThumbnailUrl = rawChannelThumb;
-    }
-  }
-
+/** Primary fields win; gaps are filled from the secondary source. */
+function mergeWatchDetails(
+  primary: WatchVideoDetails,
+  secondary: WatchVideoDetails | null,
+): WatchVideoDetails {
+  if (!secondary) return primary;
   return {
-    id,
-    title: details.title.trim(),
-    channelName: details.author?.trim() || "Unknown channel",
-    channelId: details.channelId,
-    channelUrl,
-    channelThumbnailUrl,
-    uploadedAt: parseIsoDateLabel(microformat?.publishDate ?? microformat?.uploadDate),
-    views: Number.parseInt(
-      details.viewCount ?? microformat?.viewCount ?? "0",
-      10,
-    ) || 0,
-    description:
-      descriptionFromWatchPlayerDetails(details) ||
-      microformat?.description?.simpleText?.trim() ||
-      undefined,
-    thumbnailUrl: bestThumbnail
-      ? canonicalYoutubeThumbnailUrl(bestThumbnail)
-      : preferredYoutubeThumbnailPath(id),
-    source: "watch-html",
+    ...primary,
+    title:
+      primary.title.trim() && primary.title.trim() !== FALLBACK_TITLE
+        ? primary.title
+        : secondary.title,
+    channelName:
+      primary.channelName.trim() &&
+      primary.channelName.trim() !== FALLBACK_CHANNEL
+        ? primary.channelName
+        : secondary.channelName,
+    channelId: primary.channelId ?? secondary.channelId,
+    channelUrl: primary.channelUrl ?? secondary.channelUrl,
+    channelThumbnailUrl:
+      primary.channelThumbnailUrl ?? secondary.channelThumbnailUrl,
+    uploadedAt: primary.uploadedAt ?? secondary.uploadedAt,
+    views: primary.views > 0 ? primary.views : secondary.views,
+    description: primary.description?.trim()
+      ? primary.description
+      : secondary.description,
+    thumbnailUrl: primary.thumbnailUrl ?? secondary.thumbnailUrl,
   };
 }
 
 /**
- * Backfill description and/or channel avatar from watch HTML when InnerTube omits them
- * (`short_description`, `secondary_info.owner.author.thumbnails`, etc.).
+ * Backfill any fields InnerTube omitted using the official Data API.
+ * InnerTube `getInfo` is bot-challenged from datacenter IPs (Vercel), so this is what
+ * keeps description / views / date / channel avatar populated in production. Inert when
+ * no Data API key is configured (e.g. localhost keeps its InnerTube-only behavior).
  */
-async function mergeDescriptionFromWatchHtml(
+async function backfillWatchFromDataApi(
   id: string,
   video: WatchVideoDetails,
 ): Promise<WatchVideoDetails> {
-  const hasDesc = Boolean(video.description?.trim());
-  const hasThumb = Boolean(video.channelThumbnailUrl?.trim());
-  if (hasDesc && hasThumb) return video;
-
-  const html = await fetchWatchHtml(id);
-  if (!html) return video;
-  const fromHtml = fromWatchHtml(id, html);
-  if (!fromHtml) return video;
-
-  let next = video;
-  const desc = fromHtml.description?.trim();
-  if (desc) {
-    if (!hasDesc || desc.length > (video.description?.trim().length ?? 0)) {
-      next = { ...next, description: desc };
-    }
+  if (!isYoutubeDataApiEnabled() || isWatchMetadataComplete(video)) {
+    return video;
   }
-  const chThumb = fromHtml.channelThumbnailUrl?.trim();
-  if (!hasThumb && chThumb) {
-    next = { ...next, channelThumbnailUrl: chThumb };
-  }
-  return next;
+  const fromApi = await getVideoDetailsViaDataApi(id);
+  return mergeWatchDetails(video, fromApi);
 }
 
-async function fetchWatchHtml(videoId: string): Promise<string | null> {
-  const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}&hl=en`;
-  try {
-    const res = await fetch(watchUrl, {
-      cache: "no-store",
-      headers: {
-        Accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Sec-CH-UA":
-          '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-        "Sec-CH-UA-Mobile": "?0",
-        "Sec-CH-UA-Platform": '"macOS"',
-        "User-Agent":
-          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      },
-    });
-    if (!res.ok) return null;
-    return await res.text();
-  } catch {
-    return null;
-  }
-}
-
+/**
+ * Metadata sources, in order: InnerTube (`youtubei.js`) → official Data API → oEmbed.
+ * There is intentionally no HTML scrape: it is CPU-heavy (full watch-page fetch + balanced
+ * JSON scan) and reliably fails from datacenter IPs, so the Data API replaces it.
+ */
 async function loadWatchVideoDetails(
   id: string,
 ): Promise<WatchVideoDetails | null> {
@@ -293,26 +121,30 @@ async function loadWatchVideoDetails(
     try {
       const video = videoInfoToWatchDetails(info, id);
       if (hasUsableWatchMetadata(video)) {
-        return await mergeDescriptionFromWatchHtml(id, video);
+        return await backfillWatchFromDataApi(id, video);
       }
       fallbackVideo = video;
     } catch {
-      /* fall through to HTML / oEmbed fallbacks */
+      /* fall through to Data API / oEmbed fallbacks */
     }
   }
 
-  const watchHtml = await fetchWatchHtml(id);
-  if (watchHtml) {
-    const fromHtml = fromWatchHtml(id, watchHtml);
-    if (fromHtml) {
-      if (hasUsableWatchMetadata(fromHtml)) return fromHtml;
-      fallbackVideo ??= fromHtml;
-    }
+  // Reliable datacenter fallback when InnerTube is blocked (e.g. Vercel).
+  const fromDataApi = await getVideoDetailsViaDataApi(id);
+  if (fromDataApi && hasUsableWatchMetadata(fromDataApi)) {
+    return mergeWatchDetails(fromDataApi, fallbackVideo);
   }
 
+  // oEmbed only carries title + channel name; merge in any usable fields the partial
+  // InnerTube result already pulled from `/next` (description / date / views / avatar)
+  // so we never discard data we successfully fetched.
   const oembed = await fetchYouTubeOEmbed(id);
-  return fromOEmbed(id, oembed) ?? fallbackVideo;
+  const oembedVideo = fromOEmbed(id, oembed);
+  const base = oembedVideo
+    ? mergeWatchDetails(oembedVideo, fallbackVideo)
+    : fallbackVideo;
+  return base ? await backfillWatchFromDataApi(id, base) : base;
 }
 
-/** Dedupes InnerTube/HTML work within a single RSC request (e.g. `generateMetadata` + page). */
+/** Dedupes InnerTube/Data API work within a single RSC request (e.g. `generateMetadata` + page). */
 export const getWatchVideoDetails = cache(loadWatchVideoDetails);

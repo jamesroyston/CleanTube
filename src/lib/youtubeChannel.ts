@@ -4,6 +4,11 @@ import { YTNodes } from "youtubei.js";
 
 import { logChannelFetchFailure } from "@/lib/channelFetchLog";
 import { canonicalYoutubeThumbnailUrl } from "@/lib/serializeVideo";
+import {
+  getChannelDetailsViaDataApi,
+  getChannelPageViaDataApi,
+  isYoutubeDataApiEnabled,
+} from "@/lib/youtubeDataApi";
 import { channelFeedVideoToVideoLike } from "@/lib/youtubeiAdapters";
 import { getInnertube } from "@/lib/youtubeiClient";
 import type {
@@ -608,6 +613,15 @@ export async function getChannelVideosPage(input: {
   limit?: number;
 }): Promise<ChannelVideosPage | null> {
   const page = await getChannelVideosRobustInner(input);
+  if (page && page.videos.length > 0) return page;
+
+  // InnerTube `getChannel` is bot-challenged from datacenter IPs (Vercel): when it
+  // returns nothing, fall back to the official Data API so channel pages still populate.
+  if (isYoutubeDataApiEnabled()) {
+    const apiPage = await getChannelPageViaDataApi(input);
+    if (apiPage) return apiPage;
+  }
+
   if (!page) {
     logChannelFetchFailure("channel_videos_page_null", {
       channelId: input.channelId,
@@ -683,5 +697,8 @@ export async function getChannelVideosPageCached(input: {
 export async function getChannelDetails(
   channelIdOrUrl: string,
 ): Promise<ChannelDetails | null> {
-  return youtubeiChannelBackend.getChannelDetails(channelIdOrUrl);
+  const details = await youtubeiChannelBackend.getChannelDetails(channelIdOrUrl);
+  if (details) return details;
+  // Datacenter fallback (Vercel): official Data API when InnerTube `getChannel` is blocked.
+  return getChannelDetailsViaDataApi(channelIdOrUrl);
 }

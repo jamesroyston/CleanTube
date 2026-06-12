@@ -307,3 +307,16 @@ export function buildYoutubeWatchUrl(
   }
   return base;
 }
+
+/** Absolute CleanTube watch URL, optionally resuming at the current timestamp. */
+export function buildCleantubeWatchUrl(
+  origin: string,
+  videoId: string,
+  currentSeconds?: number,
+): string {
+  const base = `${origin}/watch/${encodeURIComponent(videoId)}`;
+  if (currentSeconds != null && currentSeconds > 0) {
+    return `${base}?t=${Math.floor(currentSeconds)}`;
+  }
+  return base;
+}
