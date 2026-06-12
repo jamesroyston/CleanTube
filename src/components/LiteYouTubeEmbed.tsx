@@ -18,6 +18,7 @@ import {
 } from "@/lib/youtubePlayerControls";
 import {
   getAttachedLiteYoutubePlayer,
+  isLiteYoutubeElementActivated,
   isYoutubePlayerAttached,
   readPlayerCurrentTime,
   readPlayerDuration,
@@ -283,6 +284,16 @@ export function LiteYouTubeEmbed({
         });
       }
     };
+
+    // The App Router keeps the watch page's DOM cached, so re-opening the same
+    // video reconnects a <lite-youtube> that was already activated against a now
+    // destroyed player. Reviving it in place races lite-youtube's async
+    // activation and spawns a duplicate (background-audio) iframe, so force a
+    // fresh element via the key bump instead; this effect re-runs cleanly after.
+    if (isLiteYoutubeElementActivated(shellRef.current)) {
+      setPlayerGeneration((g) => g + 1);
+      return;
+    }
 
     void (async () => {
       const root = shellRef.current;
