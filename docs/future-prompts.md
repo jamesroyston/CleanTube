@@ -28,7 +28,29 @@
 
 > When I select a different search sort mode and then search again, I want the search mode preserved unless I reset it.
 
-## YouTube Data API v3 migration (not yet implemented)
+## YouTube Data API v3 fallback — partially implemented (watch + channel metadata)
+
+**Shipped:** A Data API v3 backend in `src/lib/youtubeDataApi.ts`, gated on `YOUTUBE_API_KEY`
+(or `YOUTUBE_DATA_API_KEY`). It backfills/falls back for the endpoints InnerTube cannot reach
+from datacenter IPs (Vercel): **watch metadata** (`videos.list` → description, views, upload
+date, channel avatar in `watchVideo.ts`) and **channel info + uploads grid** (`channels.list` +
+`playlistItems.list` in `youtubeChannel.ts`). Inert without a key, so localhost keeps its
+InnerTube-only behavior. **Root cause confirmed empirically:** InnerTube `search` works from
+Vercel, but `getInfo` (watch `/player`) and `getChannel` (`/browse`) are bot-challenged and fall
+through to oEmbed / empty, dropping descriptions and channel info.
+
+**Watch waterfall is now InnerTube → Data API → oEmbed (no HTML scrape).** The old
+`fetchWatchHtml` / `ytInitialPlayerResponse` parse was removed: it was CPU-heavy (full watch-page
+fetch + balanced-JSON scan over ~1 MB) and reliably failed from datacenter IPs, so the Data API
+replaces it as the description/avatar source.
+
+**Still on InnerTube (no Data API equivalent / out of scope):** search (works from Vercel),
+related "Up next" (`watch_next_feed` has no Data API analog), and comments. **Compute/CPU and
+follow-up backend ideas now live in [`docs/future-optimizations.md`](./future-optimizations.md)** —
+including comments via `commentThreads.list`, skipping InnerTube on watch in prod, caching watch
+metadata, and not wasting `getInfo` on related/comments.
+
+### Original goal (search migration — not implemented)
 
 **Goal:** Replace or complement **youtubei.js** (InnerTube) with the **official [YouTube Data API v3](https://developers.google.com/youtube/v3/docs/search/list)** for search (and optionally metadata), so behavior is **fully documented and stable** (`order=date`, `publishedAfter` / `publishedBefore`, `videoDuration`, `regionCode`, etc.).
 
@@ -38,27 +60,10 @@
 
 **Implementation sketch:** Server-side route or `searchVideos` branch; env e.g. `YOUTUBE_DATA_API_KEY`; map `search.list` + optional **`videos.list`** into **`VideoSummary`**; keep **youtubei.js** as fallback if quota is exhausted.
 
-### youtubei.js hardening notes (pending)
+### youtubei.js hardening + consolidate one `getInfo` on watch
 
-- Add a controlled fallback path when `Innertube.search` fails or parser churn spikes:
-  - first retry with a different youtubei client profile (`WEB` -> `ANDROID`),
-  - then fallback to a stable server-side API path (YouTube Data API when available).
-- Keep parser-noise suppression limited to known non-fatal node mismatches (`VideoSummaryContentView` / `VideoSummaryParagraphView`) and keep logging all other parser errors.
-- Add lightweight runtime telemetry (counter per query for parser/fallback events) so we can detect breakages early without flooding logs.
-- Consider pinning `youtubei.js` and upgrading intentionally after quick smoke tests (`search`, `watch details`, continuations, newest sort).
-
-### Consolidate one `getInfo` on watch (not yet implemented)
-
-**Problem:** The watch route runs **`getBasicInfo`** in `getWatchVideoDetails` (`src/lib/watchVideo.ts`) and **`getInfo`** in `getWatchNextRelatedVideos` (`src/lib/youtubeWatchNext.ts`) for the same `videoId` when the related sidebar is shown. That is **two Innertube player/next-style round trips** for one page load. `getBasicInfo` also omits the watch **`/next`** payload, so **full description** often depends on `short_description` or the **public watch HTML** parse (`fromWatchHtml` / `mergeDescriptionFromWatchHtml`).
-
-**Preferred direction:** Load **`getInfo` once** per request and derive:
-
-1. **`WatchVideoDetails`** from that result (via `videoInfoToWatchDetails` or equivalent for `getInfo`’s `VideoInfo` — it should carry **`secondary_info`** for the rich description in most cases).
-2. **Related list** from the same `info.watch_next_feed` (already the shape `youtubeWatchNext` uses).
-
-**Edge case:** In **theatre / focus** mode the page skips the related fetch (`WatchPage` uses an empty `watchNext` array). Then no `getInfo` runs; either keep **`getBasicInfo` + optional HTML** for that branch only, or call **`getInfo` once** for details even when the sidebar is hidden (slightly more work than `getBasicInfo` but consistent metadata).
-
-**Optional:** Keep the **HTML / oEmbed** path as a **last-resort** when `getInfo` throws or still lacks description.
+Moved to [`docs/future-optimizations.md`](./future-optimizations.md) (§5 consolidate `getInfo`,
+§6 youtubei.js hardening / telemetry), since both are primarily compute/reliability optimizations.
 
 ### Revert plan: re-implement youtube-sr quickly
 

@@ -27,7 +27,7 @@ export type ChannelDetails = {
   videoCountText?: string;
   viewCountText?: string;
   joinedDateText?: string;
-    source: "youtubei.js";
+  source: "youtubei.js" | "data-api";
 };
 
 export type ChannelVideosPage = {
@@ -76,7 +76,7 @@ export type WatchVideoDetails = {
   views: number;
   description?: string;
   thumbnailUrl?: string;
-  source: "youtubei.js" | "watch-html" | "oembed";
+  source: "youtubei.js" | "oembed" | "data-api";
 };
 
 export type WatchVideoComment = {

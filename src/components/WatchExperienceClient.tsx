@@ -23,6 +23,7 @@ import {
 } from "@/components/LiteYouTubeEmbed";
 import { SaveChannelButton } from "@/components/SaveChannelButton";
 import { WatchLaterAddButton } from "@/components/WatchLaterAddButton";
+import { WatchShareButton } from "@/components/WatchShareButton";
 import { WatchComments } from "@/components/WatchComments";
 import { WatchDescription } from "@/components/WatchDescription";
 import { WatchNextSidebar } from "@/components/WatchNextSidebar";
@@ -281,6 +282,10 @@ export function WatchExperienceClient({
                   thumbnailUrl={thumb}
                   channelName={video.channelName}
                   startSecondsContext={effectiveStartSeconds}
+                />
+                <WatchShareButton
+                  videoId={videoId}
+                  playerShellRef={playerShellRef}
                 />
               </Stack>
               {video.description?.trim() ? (

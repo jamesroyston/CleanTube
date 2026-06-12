@@ -1,11 +1,7 @@
 "use client";
 
-import ClosedCaptionIcon from "@mui/icons-material/ClosedCaption";
-import ClosedCaptionOffIcon from "@mui/icons-material/ClosedCaptionOff";
-import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import Forward10Icon from "@mui/icons-material/Forward10";
-import HdIcon from "@mui/icons-material/Hd";
 import PauseIcon from "@mui/icons-material/Pause";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import Replay10Icon from "@mui/icons-material/Replay10";
@@ -16,26 +12,16 @@ import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
-import ListItemText from "@mui/material/ListItemText";
-import Menu from "@mui/material/Menu";
-import MenuItem from "@mui/material/MenuItem";
 import Paper from "@mui/material/Paper";
-import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
 import Tooltip from "@mui/material/Tooltip";
 import type { RefObject } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
-  buildYoutubeWatchUrl,
-  captionsEnabled,
-  formatPlaybackQuality,
   isPlayerPlaying,
-  readAvailableQualities,
   resolveLiteYoutubePlayer,
   SEEK_STEP_SEC,
-  setPlaybackQuality,
-  toggleCaptions,
   toggleMute,
   togglePlayPause,
   seekRelative,
@@ -44,12 +30,6 @@ import {
   readWatchPlayerToolbarVisible,
   writeWatchPlayerToolbarVisible,
 } from "@/lib/watchPlayerToolbarPersistence";
-import {
-  readWatchQualityPreference,
-  writeWatchQualityPreference,
-  type WatchQualityPreference,
-} from "@/lib/watchQualityPersistence";
-import { readPlayerCurrentTime } from "@/lib/youtubePlayer";
 
 type WatchPlayerToolbarProps = {
   videoId: string;
@@ -60,72 +40,13 @@ type WatchPlayerToolbarProps = {
 /** Comfortable tap targets — well above the 44px iOS minimum. */
 const TOUCH_TARGET_SX = { width: 52, height: 52 } as const;
 
-type QualityControlProps = {
-  quality: string;
-  qualities: string[];
-  onQualityChange: (quality: string) => void;
-};
-
-function QualityControl({
-  quality,
-  qualities,
-  onQualityChange,
-}: QualityControlProps) {
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const open = Boolean(anchorEl);
-  const options = qualities.length > 0 ? qualities : ["auto"];
-
-  return (
-    <>
-      <Tooltip title="Quality">
-        <IconButton
-          aria-label="Video quality"
-          aria-haspopup="listbox"
-          onClick={(event) => setAnchorEl(event.currentTarget)}
-          sx={TOUCH_TARGET_SX}
-        >
-          <HdIcon />
-        </IconButton>
-      </Tooltip>
-      <Menu
-        anchorEl={anchorEl}
-        open={open}
-        onClose={() => setAnchorEl(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-        transformOrigin={{ vertical: "bottom", horizontal: "center" }}
-      >
-        {options.map((q) => (
-          <MenuItem
-            key={q}
-            selected={q === quality}
-            onClick={() => {
-              onQualityChange(q);
-              setAnchorEl(null);
-            }}
-          >
-            <ListItemText primary={formatPlaybackQuality(q)} />
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
-  );
-}
-
 export function WatchPlayerToolbar({
-  videoId,
   playerShellRef,
   playerApiReady,
 }: WatchPlayerToolbarProps) {
   const [expanded, setExpanded] = useState(() => readWatchPlayerToolbarVisible());
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
-  const [captionsOn, setCaptionsOn] = useState(false);
-  const [quality, setQuality] = useState<WatchQualityPreference>(() =>
-    readWatchQualityPreference(),
-  );
-  const [qualities, setQualities] = useState<string[]>([]);
-  const [copySnackbar, setCopySnackbar] = useState(false);
-  const qualityUserSetRef = useRef(false);
 
   const syncFromPlayer = useCallback(async () => {
     const player = await resolveLiteYoutubePlayer(playerShellRef.current);
@@ -135,11 +56,6 @@ export function WatchPlayerToolbar({
       setMuted(player.isMuted());
     } catch {
       setMuted(false);
-    }
-    setCaptionsOn(captionsEnabled(player));
-    setQualities(readAvailableQualities(player));
-    if (!qualityUserSetRef.current) {
-      setQuality(readWatchQualityPreference());
     }
   }, [playerShellRef]);
 
@@ -154,38 +70,17 @@ export function WatchPlayerToolbar({
   );
 
   useEffect(() => {
-    qualityUserSetRef.current = false;
-  }, [videoId]);
-
-  useEffect(() => {
     if (!playerApiReady) return;
     void syncFromPlayer();
-    const saved = readWatchQualityPreference();
-    if (saved !== "auto") {
-      void withPlayer((p) => setPlaybackQuality(p, saved, videoId));
-    }
     const id = window.setInterval(() => {
       void syncFromPlayer();
     }, 1000);
     return () => window.clearInterval(id);
-  }, [playerApiReady, syncFromPlayer, videoId, withPlayer]);
+  }, [playerApiReady, syncFromPlayer]);
 
   const setExpandedPersisted = (next: boolean) => {
     setExpanded(next);
     writeWatchPlayerToolbarVisible(next);
-  };
-
-  const handleCopyUrl = async () => {
-    await withPlayer(async (player) => {
-      const t = readPlayerCurrentTime(player);
-      const url = buildYoutubeWatchUrl(videoId, t);
-      try {
-        await navigator.clipboard.writeText(url);
-        setCopySnackbar(true);
-      } catch {
-        /* clipboard unavailable */
-      }
-    });
   };
 
   if (!expanded) {
@@ -270,50 +165,8 @@ export function WatchPlayerToolbar({
               {muted ? <VolumeOffIcon /> : <VolumeUpIcon />}
             </IconButton>
           </Tooltip>
-
-          <QualityControl
-            quality={quality}
-            qualities={qualities}
-            onQualityChange={(q) => {
-              qualityUserSetRef.current = true;
-              const next = q as WatchQualityPreference;
-              setQuality(next);
-              writeWatchQualityPreference(next);
-              void withPlayer((p) => setPlaybackQuality(p, next, videoId));
-            }}
-          />
-
-          <Tooltip title={captionsOn ? "Captions off" : "Captions on"}>
-            <IconButton
-              aria-label={captionsOn ? "Turn captions off" : "Turn captions on"}
-              aria-pressed={captionsOn}
-              onClick={() => void withPlayer((p) => toggleCaptions(p))}
-              color={captionsOn ? "primary" : "default"}
-              sx={TOUCH_TARGET_SX}
-            >
-              {captionsOn ? <ClosedCaptionIcon /> : <ClosedCaptionOffIcon />}
-            </IconButton>
-          </Tooltip>
-
-          <Tooltip title="Copy YouTube URL">
-            <IconButton
-              aria-label="Copy YouTube URL"
-              onClick={() => void handleCopyUrl()}
-              sx={TOUCH_TARGET_SX}
-            >
-              <ContentCopyIcon />
-            </IconButton>
-          </Tooltip>
         </Stack>
       </Paper>
-
-      <Snackbar
-        open={copySnackbar}
-        autoHideDuration={2500}
-        onClose={() => setCopySnackbar(false)}
-        message="Link copied"
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-      />
     </Box>
   );
 }

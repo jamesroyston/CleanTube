@@ -67,4 +67,26 @@ Passkeys are implemented with **`@simplewebauthn/server`** and **`@simplewebauth
 
 You can still run `npm run generate-icons` locally after changing the SVG. Committing the generated files is optional but keeps `npm run dev` in sync without relying on a prior build.
 
+## YouTube metadata (Data API v3 fallback)
+
+Video and channel data come from **`youtubei.js`** (InnerTube). On localhost that returns full
+metadata, but from **datacenter IPs (e.g. Vercel)** YouTube bot-challenges the watch
+(`getInfo`/`/player`) and channel (`getChannel`/`/browse`) endpoints, so **descriptions, view
+counts, upload dates, channel avatars, channel descriptions, and channel video grids go missing**
+in production (search keeps working). To fix that reliably, set a server-only **YouTube Data API
+v3** key:
+
+```bash
+YOUTUBE_API_KEY=
+```
+
+1. Google Cloud Console → **APIs & Services** → enable **YouTube Data API v3**.
+2. **Credentials** → **Create credentials → API key** (optionally restrict it to the YouTube Data API).
+3. Add `YOUTUBE_API_KEY` to your Vercel project (Production **and** Preview) and redeploy.
+
+When the key is present the app uses the official API to backfill any fields InnerTube omits
+(`videos.list` + `channels.list` + `playlistItems.list`, ~1 quota unit each, only when InnerTube
+comes back sparse). When it is **absent the code is inert**, so localhost keeps its
+InnerTube-only behavior. `YOUTUBE_DATA_API_KEY` is also accepted as an alias.
+
 More detail: [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying).
