@@ -74,6 +74,31 @@ export function releaseLiteYoutubePlayer(
   destroyLiteYoutubePlayer(player);
 }
 
+/** Locate the <lite-youtube> element within (or as) a shell node. */
+function findLiteYoutubeElement(
+  root: HTMLElement | null,
+): LiteYoutubeElement | null {
+  if (!root) return null;
+  if (root.matches?.("lite-youtube")) return root as LiteYoutubeElement;
+  return root.querySelector("lite-youtube") as LiteYoutubeElement | null;
+}
+
+/**
+ * True when the shell holds an <lite-youtube> that has already been activated.
+ *
+ * The App Router keeps the watch page's DOM in its client-side cache, so the
+ * same custom element is reconnected when the user re-opens the same video.
+ * Such a reused element still carries `lyt-activated` and a cached
+ * `playerPromise` resolving to the player we destroyed on the previous unmount.
+ * Trying to revive it in place races lite-youtube's async `activate()` (which
+ * can spawn a duplicate iframe) and otherwise leaves only the poster thumbnail.
+ * Callers should instead remount a fresh element so activation is clean.
+ */
+export function isLiteYoutubeElementActivated(root: HTMLElement | null): boolean {
+  const el = findLiteYoutubeElement(root);
+  return Boolean(el && el.classList.contains("lyt-activated"));
+}
+
 /** Safe read of duration; returns undefined if player is not ready / attached. */
 export function readPlayerDuration(player: YT.Player): number | undefined {
   if (!isYoutubePlayerAttached(player)) return undefined;
