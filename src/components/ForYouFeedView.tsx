@@ -1,14 +1,16 @@
 "use client";
 
+import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import DynamicFeedOutlinedIcon from "@mui/icons-material/DynamicFeedOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
+import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import type { VideoSummary } from "@/components/VideoSummary";
@@ -91,11 +93,17 @@ export function ForYouFeedView({
     feedError,
     isInitialLoad,
     isRefreshing,
+    feedStale,
+    feedDayKey,
     refreshFeed,
   } = useForYouFeed({
     userId: user?.id,
     enabled: effectiveSignedIn && canPersistLibrary && libraryReady,
   });
+
+  const [dismissedFeedDayKey, setDismissedFeedDayKey] = useState<string | null>(
+    null,
+  );
 
   const { dismissVideo, filterFeed } = useForYouDismissed(user?.id, {
     cloudEnabled: canPersistLibrary,
@@ -129,6 +137,11 @@ export function ForYouFeedView({
       (canPersistLibrary && libraryCloudSyncState === "syncing"));
 
   const showSignInPrompt = authStatus === "ready" && !canPersistLibrary;
+  const showFreshPrompt =
+    feedStale &&
+    hasCachedFeed &&
+    !isRefreshing &&
+    dismissedFeedDayKey !== feedDayKey;
   const resolvedFeedError = feedError ?? initialError ?? null;
   const showContinueWatchingInSkeleton =
     showLibrarySyncSkeleton && continueWatchingVideos.length > 0;
@@ -151,6 +164,20 @@ export function ForYouFeedView({
             : "Sign in to personalize this page with your library."}
         </Typography>
       </Stack>
+
+      {showFreshPrompt ? (
+        <Box sx={{ mb: 3 }}>
+          <Chip
+            color="primary"
+            variant="filled"
+            icon={<AutorenewRoundedIcon />}
+            label="Fresh recommendations available — tap to update"
+            onClick={() => void refreshFeed()}
+            onDelete={() => setDismissedFeedDayKey(feedDayKey ?? null)}
+            sx={{ maxWidth: "100%", height: "auto", py: 0.75, "& .MuiChip-label": { whiteSpace: "normal" } }}
+          />
+        </Box>
+      ) : null}
 
       {showSignInPrompt ? (
         <LibrarySignInPrompt

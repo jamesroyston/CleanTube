@@ -238,7 +238,7 @@ export async function buildForYouFeed(
       recentSearchQueries,
     )
   ) {
-    return { sections: [], empty: true };
+    return { sections: [], empty: true, generatedDayKey: dayKey };
   }
 
   const pool = await fetchForYouCandidates(
@@ -273,5 +273,6 @@ export async function buildForYouFeed(
   return {
     sections,
     empty: sections.length === 0,
+    generatedDayKey: dayKey,
   };
 }

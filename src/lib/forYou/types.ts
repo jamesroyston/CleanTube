@@ -47,4 +47,7 @@ export type ForYouSection = {
 export type ForYouFeedResult = {
   sections: ForYouSection[];
   empty: boolean;
+  /** UTC day key the feed was generated for; lets the client surface a
+   * non-destructive "fresh recommendations" prompt once it rolls over. */
+  generatedDayKey?: string;
 };
