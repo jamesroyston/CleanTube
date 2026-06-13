@@ -1,5 +1,6 @@
 import { getCachedInnertubeVideoInfo } from "@/lib/innertubeVideoInfoCache";
 import { preferredYoutubeThumbnailPath } from "@/lib/serializeVideo";
+import { cleanYtText, isRelativeDateText } from "@/lib/youtubeiAdapters";
 import type { VideoLikeForSummary } from "@/lib/youtubeTypes";
 import { isValidYoutubeVideoId } from "@/lib/youtubeUrl";
 
@@ -37,26 +38,25 @@ function lockupToVideoLike(item: unknown): VideoLikeForSummary | null {
   if (typeof id !== "string" || !isValidYoutubeVideoId(id)) return null;
   if (o.content_type && o.content_type !== "VIDEO") return null;
 
-  const title = o.metadata?.title?.toString?.().trim() || "Video";
+  const title = cleanYtText(o.metadata?.title?.toString?.()) || "Video";
   const rows = o.metadata?.metadata?.metadata_rows ?? [];
   const channelName =
-    rows[0]?.metadata_parts?.[0] != null
-      ? partText(rows[0].metadata_parts[0]) || "Unknown channel"
-      : "Unknown channel";
+    cleanYtText(partText(rows[0]?.metadata_parts?.[0])) || "Unknown channel";
 
-  const flatParts: string[] = [];
-  for (const row of rows) {
-    for (const part of row.metadata_parts ?? []) {
+  // Collect metadata parts EXCEPT the channel-name part (row 0, part 0) so a
+  // channel name (e.g. "...Daily", "Minecraft") can't be mistaken for a date.
+  const metaParts: string[] = [];
+  rows.forEach((row, rowIdx) => {
+    (row.metadata_parts ?? []).forEach((part, partIdx) => {
+      if (rowIdx === 0 && partIdx === 0) return;
       const t = partText(part);
-      if (t) flatParts.push(t);
-    }
-  }
-  const uploadedAt =
-    flatParts.find(
-      (t) => /ago|yesterday|today|hour|min|day|week|month|year/i.test(t),
-    ) || undefined;
-  const durationFromMeta = flatParts.find((t) => DURATION_LIKE.test(t));
-  const live = flatParts.some((t) => /live/i.test(t));
+      if (t) metaParts.push(t);
+    });
+  });
+
+  const uploadedAt = metaParts.find((t) => isRelativeDateText(t)) || undefined;
+  const durationFromMeta = metaParts.find((t) => DURATION_LIKE.test(t));
+  const live = metaParts.some((t) => /\blive\b/i.test(t));
   const durationFormatted = live
     ? "LIVE"
     : durationFromMeta

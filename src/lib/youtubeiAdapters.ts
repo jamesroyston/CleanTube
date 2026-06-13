@@ -67,6 +67,35 @@ function textish(value: unknown): string | undefined {
   return undefined;
 }
 
+/** youtubei.js emits the literal "N/A" (and similar) for missing string fields. */
+const YT_EMPTY_SENTINELS = new Set(["n/a", "null", "undefined"]);
+
+/**
+ * Normalizes a youtubei.js text/value, dropping its "N/A"-style sentinels so they
+ * never leak into the UI (e.g. a channel name rendering as "N/A").
+ */
+export function cleanYtText(value: unknown): string | undefined {
+  const s = textish(value);
+  if (!s) return undefined;
+  return YT_EMPTY_SENTINELS.has(s.toLowerCase()) ? undefined : s;
+}
+
+/**
+ * Strict relative-date / publish-time detector. Intentionally word-boundaried so a
+ * channel name or title containing a unit substring (e.g. "Minecraft" -> "min",
+ * "...Daily" -> "day") is NOT mistaken for an upload date.
+ */
+export function isRelativeDateText(value: string): boolean {
+  const t = value.trim();
+  if (!t) return false;
+  return (
+    /\bago\b/i.test(t) ||
+    /\b(today|yesterday|just now)\b/i.test(t) ||
+    /^(streamed|premiered|posted|uploaded)\b/i.test(t) ||
+    /\bscheduled\b/i.test(t)
+  );
+}
+
 function thumbnailUrlsFromLockupContentImage(ci: unknown): string[] {
   if (!ci || typeof ci !== "object") return [];
   const o = ci as Record<string, unknown>;
@@ -114,13 +143,7 @@ function uploadedAtFromLockupMetadata(metadata: unknown): string | undefined {
     for (const part of parts ?? []) {
       if (!part || typeof part !== "object") continue;
       const t = textish((part as { text?: unknown }).text);
-      if (
-        t &&
-        (/\bago\b/i.test(t) ||
-          /\b(today|yesterday|just now)\b/i.test(t) ||
-          /^(streamed|premiered|posted|uploaded)\b/i.test(t) ||
-          /\bscheduled\b/i.test(t))
-      ) {
+      if (t && isRelativeDateText(t)) {
         return t;
       }
     }
@@ -219,35 +242,15 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
   const id = o.id;
   if (typeof id !== "string" || !FEED_VIDEO_ID.test(id)) return null;
 
-  const title =
-    o.title &&
-    typeof o.title === "object" &&
-    o.title !== null &&
-    typeof (o.title as { toString?: () => string }).toString === "function"
-      ? String((o.title as { toString: () => string }).toString())
-      : undefined;
+  const title = cleanYtText(o.title);
 
-  let channelName = "Unknown channel";
   const author = o.author;
-  if (
-    author &&
-    typeof author === "object" &&
-    author !== null &&
-    typeof (author as { name?: string }).name === "string"
-  ) {
-    channelName = (author as { name: string }).name.trim() || channelName;
-  }
+  const channelName =
+    (author && typeof author === "object" && author !== null
+      ? cleanYtText((author as { name?: unknown }).name)
+      : undefined) ?? "Unknown channel";
 
-  let uploadedAt: string | undefined;
-  if (
-    o.published &&
-    typeof o.published === "object" &&
-    o.published !== null &&
-    typeof (o.published as { toString?: () => string }).toString === "function"
-  ) {
-    const p = String((o.published as { toString: () => string }).toString()).trim();
-    if (p) uploadedAt = p;
-  }
+  const uploadedAt = cleanYtText(o.published);
 
   const thumbs = o.thumbnails as Thumbnailish[] | undefined;
   let thumbnailUrls = collectThumbnailUrls(thumbs);
@@ -375,24 +378,22 @@ export function videoInfoToWatchDetails(
   // the watch-next rail and comments), which is NOT gated — so fall back to those
   // fields to keep watch metadata populated server-side in production.
   const title =
-    bi.title?.trim() || primary?.title?.toString()?.trim() || "Video";
+    cleanYtText(bi.title) ?? cleanYtText(primary?.title) ?? "Video";
   const channel = bi.channel;
   const channelName =
-    channel?.name?.trim() ||
-    bi.author?.trim() ||
-    owner?.name?.trim() ||
+    cleanYtText(channel?.name) ??
+    cleanYtText(bi.author) ??
+    cleanYtText(owner?.name) ??
     "Unknown channel";
-  const channelId = channel?.id || owner?.id || undefined;
-  const channelUrl = channel?.url || owner?.url || undefined;
+  const channelId = cleanYtText(channel?.id) ?? cleanYtText(owner?.id);
+  const channelUrl = cleanYtText(channel?.url) ?? cleanYtText(owner?.url);
   const channelThumbnailUrl = channelThumbnailUrlFromVideoInfo(info);
 
   const thumbList = collectThumbnailUrls(
     bi.thumbnail as Thumbnailish[] | undefined,
   );
   const uploadedAt =
-    primary?.relative_date?.toString()?.trim() ||
-    primary?.published?.toString()?.trim() ||
-    undefined;
+    cleanYtText(primary?.relative_date) ?? cleanYtText(primary?.published);
 
   const views =
     (typeof bi.view_count === "number" && bi.view_count > 0
