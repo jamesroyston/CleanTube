@@ -13,7 +13,6 @@ import ListItemText from "@mui/material/ListItemText";
 import Stack from "@mui/material/Stack";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
-import Link from "@mui/material/Link";
 import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import { useSearchParams } from "next/navigation";
@@ -31,8 +30,6 @@ type MfaPanel =
   | { kind: "pick" }
   | { kind: "totp"; factorId: string }
   | { kind: "phone"; factorId: string; challengeId: string | null; smsSent: boolean };
-
-type PasskeyRegistrationStatus = "preparing" | "prompt" | "saving" | null;
 
 export function AuthPageClient() {
   const searchParams = useSearchParams();
@@ -73,8 +70,6 @@ export function AuthPageClient() {
     { id: string; device_name: string | null; created_at: string }[]
   >([]);
   const [passkeyBusy, setPasskeyBusy] = useState(false);
-  const [passkeyRegistrationStatus, setPasskeyRegistrationStatus] =
-    useState<PasskeyRegistrationStatus>(null);
 
   const [mfaPanel, setMfaPanel] = useState<MfaPanel>({ kind: "none" });
   const [mfaFactors, setMfaFactors] = useState<ListedFactor[]>([]);
@@ -94,28 +89,13 @@ export function AuthPageClient() {
 
   const helperCopy = useMemo(() => {
     if (mode === "sign-up") {
-      return "Create an account to save watch later, saved channels, watch history, and pinned searches across devices. Passkeys are added after you can sign in—see the note on this tab.";
+      return "Create an account to sync your library across devices.";
     }
     if (mode === "reset") {
-      return "Send a password reset email for your Supabase account.";
+      return "We'll email you a password reset link.";
     }
-    return passkeysSupported
-      ? "Sign in to save watch history, Watch Later, saved channels, and pinned searches. Your device may offer a passkey when this page opens."
-      : "Sign in to save watch history, Watch Later, saved channels, and pinned searches to your account.";
-  }, [mode, passkeysSupported]);
-
-  const passkeyRegistrationCopy = useMemo(() => {
-    if (passkeyRegistrationStatus === "preparing") {
-      return "Preparing passkey setup with the server...";
-    }
-    if (passkeyRegistrationStatus === "prompt") {
-      return "Check your browser, device, or password manager for the passkey prompt. It may appear outside this page.";
-    }
-    if (passkeyRegistrationStatus === "saving") {
-      return "Passkey created. Saving it to your account...";
-    }
-    return null;
-  }, [passkeyRegistrationStatus]);
+    return "Sign in to sync your library across devices.";
+  }, [mode]);
 
   const finishSignIn = useCallback(async () => {
     const mfa = await getPendingSupabaseMfa();
@@ -163,7 +143,7 @@ export function AuthPageClient() {
       result = await signUp(trimmedEmail, password);
       if (!result.error) {
         setMessage(
-          "Account created. If your project sends a confirmation email, open it to verify, then sign in on the Sign in tab. After you are signed in, stay on this Account page and use Register passkey to add a passkey.",
+          "Account created. Check your email to confirm if required, then sign in.",
         );
       }
     } else if (mode === "reset") {
@@ -265,13 +245,15 @@ export function AuthPageClient() {
       });
       if (cancelled || !document.getElementById("cleantube-signin-email")) return;
 
-      setPasskeyBusy(true);
-      setError(null);
+      // Conditional autofill stays pending until the user picks a passkey, so it must
+      // NOT set passkeyBusy — that would keep the manual "Sign in with passkey" button
+      // disabled the whole time the page is open. It runs silently in the background.
       const res = await signInWithPasskeyConditional();
-      if (!cancelled) setPasskeyBusy(false);
       if (cancelled) return;
       if (res.error) {
-        setError(res.error);
+        // Aborted autofill (e.g. the user used the manual button or password) is not an
+        // error worth surfacing; only show genuine failures.
+        if (!res.dismissed) setError(res.error);
         return;
       }
       if (res.dismissed) return;
@@ -292,20 +274,18 @@ export function AuthPageClient() {
 
   async function onRegisterPasskey() {
     setPasskeyBusy(true);
-    setPasskeyRegistrationStatus("preparing");
     setMessage(null);
     setError(null);
 
-    const res = await registerPasskey(passkeyFriendlyName, setPasskeyRegistrationStatus);
+    const res = await registerPasskey(passkeyFriendlyName);
     setPasskeyBusy(false);
-    setPasskeyRegistrationStatus(null);
 
     if (res.error) {
       setError(res.error);
       return;
     }
 
-    setMessage("Passkey registered. Next time, enter your email on the Sign in tab and choose Sign in with passkey.");
+    setMessage("Passkey registered.");
     void listPasskeys().then((r) => {
       if (!r.error) setRegisteredPasskeys(r.factors);
     });
@@ -328,7 +308,6 @@ export function AuthPageClient() {
           <Stack spacing={2}>
             <Alert severity="success">
               Signed in as {user.email ?? "your account"}. Your library syncs to your account.
-              {passkeysSupported ? " Register a passkey below to use this device for future sign-ins." : null}
             </Alert>
             {message ? <Alert severity="success">{message}</Alert> : null}
             {error ? <Alert severity="error">{error}</Alert> : null}
@@ -342,20 +321,13 @@ export function AuthPageClient() {
                     </Typography>
                   </Stack>
                   <Typography variant="body2" color="text.secondary">
-                    Click register, then approve the browser or OS passkey prompt. After it is saved,
-                    future sign-ins use your email plus this device passkey instead of your password.
+                    Sign in on this device without a password.
                   </Typography>
-                  {passkeyRegistrationCopy ? (
-                    <Alert severity="info" icon={<FingerprintIcon />}>
-                      {passkeyRegistrationCopy}
-                    </Alert>
-                  ) : null}
                   <TextField
                     size="small"
                     label="Passkey label"
                     value={passkeyFriendlyName}
                     onChange={(e) => setPasskeyFriendlyName(e.target.value)}
-                    helperText="Use a different label for each device."
                   />
                   <Button
                     variant="outlined"
@@ -363,7 +335,7 @@ export function AuthPageClient() {
                     disabled={passkeyBusy}
                     onClick={() => void onRegisterPasskey()}
                   >
-                    {passkeyBusy ? "Registering passkey..." : "Register passkey on this device"}
+                    {passkeyBusy ? "Adding passkey..." : "Add passkey"}
                   </Button>
                   {registeredPasskeys.length > 0 ? (
                     <>
@@ -432,34 +404,6 @@ export function AuthPageClient() {
                 {urlError ? <Alert severity="error">{urlError}</Alert> : null}
                 {message ? <Alert severity="success">{message}</Alert> : null}
                 {error ? <Alert severity="error">{error}</Alert> : null}
-
-                {mode === "sign-up" ? (
-                  <Alert severity="info" icon={<FingerprintIcon />}>
-                    <Typography variant="body2" component="span" sx={{ display: "block", fontWeight: 600, mb: 0.5 }}>
-                      Passkeys and sign-up
-                    </Typography>
-                    <Typography variant="body2" component="span" sx={{ display: "block" }}>
-                      A passkey is tied to your account, so it cannot be created before you have signed up and
-                      signed in at least once. After you create your account (and confirm your email if your
-                      project requires it), go to the <strong>Sign in</strong> tab, sign in, then use{" "}
-                      <strong>Register passkey on this device</strong> on this same page—or open Account from
-                      the header anytime.
-                    </Typography>
-                    <Link
-                      component="button"
-                      type="button"
-                      variant="body2"
-                      sx={{ mt: 1, cursor: "pointer" }}
-                      onClick={() => {
-                        setMode("sign-in");
-                        setMessage(null);
-                        setError(null);
-                      }}
-                    >
-                      Already have an account? Sign in to add a passkey
-                    </Link>
-                  </Alert>
-                ) : null}
 
                 {mfaPanel.kind === "pick" ? (
                   <Stack spacing={2}>
@@ -649,9 +593,6 @@ export function AuthPageClient() {
                         >
                           Sign in with passkey
                         </Button>
-                        <Typography variant="caption" color="text.secondary">
-                          Use the passkey prompt above, or tap here after entering your email.
-                        </Typography>
                       </Stack>
                     ) : null}
                   </>

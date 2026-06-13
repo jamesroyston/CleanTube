@@ -49,12 +49,17 @@ export async function POST(request: Request) {
   }
 
   const credentialId = body.credential.id;
-  const { data: row, error: rowErr } = await service
+  // Conditional UI / autofill challenges have no user_id (the passkey is discoverable),
+  // so look up by credential_id alone and trust the resolved owner. Only constrain by
+  // user_id for email-initiated sign-in, where the challenge is bound to an account.
+  let credentialQuery = service
     .from("webauthn_credentials")
     .select("id, user_id, credential_id, public_key, counter, transports")
-    .eq("credential_id", credentialId)
-    .eq("user_id", challengeRow.user_id)
-    .maybeSingle();
+    .eq("credential_id", credentialId);
+  if (challengeRow.user_id) {
+    credentialQuery = credentialQuery.eq("user_id", challengeRow.user_id);
+  }
+  const { data: row, error: rowErr } = await credentialQuery.maybeSingle();
 
   if (rowErr || !row) {
     return NextResponse.json({ error: "Credential not found for this account." }, { status: 400 });
