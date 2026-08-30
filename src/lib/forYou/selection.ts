@@ -90,12 +90,20 @@ export function isRecentEnoughHistorySeed(entry: WatchProgressEntry): boolean {
 export function recentSearchesForFeed(
   entries: RecentSearchEntry[],
   max = RECENT_SEARCH_FEED_MAX_QUERIES,
+  mutedQueries?: Iterable<string>,
 ): RecentSearchEntry[] {
+  const muted = new Set(
+    [...(mutedQueries ?? [])]
+      .map((query) => query.trim().toLowerCase())
+      .filter(Boolean),
+  );
   const cutoff = Date.now() - RECENT_SEARCH_MAX_AGE_MS;
   return entries
     .filter((entry) => {
       const t = Date.parse(entry.searchedAt);
-      return Number.isFinite(t) && t >= cutoff;
+      if (!Number.isFinite(t) || t < cutoff) return false;
+      if (muted.has(entry.query.trim().toLowerCase())) return false;
+      return true;
     })
     .slice(0, max);
 }

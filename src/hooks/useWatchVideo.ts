@@ -25,13 +25,19 @@ async function fetchWatchVideo([, videoId]: WatchVideoKey): Promise<WatchVideoAp
   return payload;
 }
 
-export function useWatchVideo(videoId: string) {
+export function useWatchVideo(
+  videoId: string,
+  initialVideo?: WatchVideoDetails | null,
+) {
   const swrKey: WatchVideoKey = ["watch-video", videoId] as const;
+  const fallbackData =
+    initialVideo != null ? { video: initialVideo } : undefined;
 
   const { data, error, isLoading, isValidating, mutate } = useSWR(
     swrKey,
     fetchWatchVideo,
     {
+      fallbackData,
       revalidateOnFocus: false,
       dedupingInterval: 60_000,
     },

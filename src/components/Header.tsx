@@ -308,6 +308,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
           sx={[
             {
               pt: "env(safe-area-inset-top, 0px)",
+              pl: "env(safe-area-inset-left, 0px)",
+              pr: "env(safe-area-inset-right, 0px)",
               boxSizing: "border-box",
               zIndex: showScrollRevealHeader
                 ? (t) => t.zIndex.modal - 1
@@ -335,11 +337,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                   mr: 0,
                 }
               : {
-                  position: { xs: "static", sm: "sticky" },
-                  /** Mobile landscape: avoid sticky bar over video/content */
-                  "@media (max-width: 899.95px) and (orientation: landscape)": {
-                    position: "static",
-                  },
+                  position: "sticky",
+                  top: 0,
                 },
           ]}
         >
@@ -351,33 +350,26 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
               py: { xs: 0.75, sm: 1 },
               px: { xs: 1, sm: 2 },
               minHeight: { xs: 56, sm: 64 },
-              ...(showBottomNav && showWatchBack
-                ? {
-                    display: "grid",
-                    gridTemplateColumns: "1fr auto 1fr",
-                    columnGap: 0.5,
-                  }
-                : {
-                    display: "flex",
-                    ...(showBottomNav ? { justifyContent: "center" } : undefined),
-                  }),
+              display: "flex",
+              ...(showBottomNav
+                ? { justifyContent: "flex-start" }
+                : undefined),
             }}
           >
             {showBottomNav ? (
-              showWatchBack && watchBack ? (
-                <>
-                  <Box sx={{ justifySelf: "start", display: "flex" }}>
-                    <WatchHeaderBackButton target={watchBack} />
-                  </Box>
-                  <Box sx={{ justifySelf: "center" }}>{logoLink}</Box>
-                  <Box
-                    aria-hidden
-                    sx={{ justifySelf: "end", width: 48, height: 48 }}
-                  />
-                </>
-              ) : (
-                logoLink
-              )
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  minWidth: 0,
+                }}
+              >
+                {showWatchBack && watchBack ? (
+                  <WatchHeaderBackButton target={watchBack} />
+                ) : null}
+                {logoLink}
+              </Box>
             ) : (
               <>
                 <Box

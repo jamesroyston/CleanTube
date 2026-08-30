@@ -12,6 +12,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useMemo, useState } from "react";
 
+import { ForYouSearchSectionMenu } from "@/components/ForYouSearchSectionMenu";
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import type { VideoSummary } from "@/components/VideoSummary";
 import {
@@ -20,6 +21,10 @@ import {
 } from "@/components/VideoCarouselRow";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useForYouDismissed } from "@/hooks/useForYouDismissed";
+import {
+  searchQueryFromForYouSection,
+  useForYouMutedSearches,
+} from "@/hooks/useForYouMutedSearches";
 import { useForYouFeed } from "@/hooks/useForYouFeed";
 import { useSwrIdbHydrated } from "@/hooks/useSwrInitialLoad";
 import { forYouHasLibrarySignals } from "@/lib/forYou/recommendations";
@@ -105,13 +110,23 @@ export function ForYouFeedView({
     null,
   );
 
-  const { dismissVideo, filterFeed } = useForYouDismissed(user?.id, {
-    cloudEnabled: canPersistLibrary,
-  });
-  const { sections, empty: feedEmpty } = useMemo(
-    () => filterFeed({ sections: rawSections, empty: rawFeedEmpty }),
-    [filterFeed, rawFeedEmpty, rawSections],
+  const { dismissVideo, filterFeed: filterDismissed } = useForYouDismissed(
+    user?.id,
+    {
+      cloudEnabled: canPersistLibrary,
+    },
   );
+  const { muteSearch, filterFeed: filterMutedSearches } =
+    useForYouMutedSearches(user?.id, {
+      cloudEnabled: canPersistLibrary,
+    });
+  const { sections, empty: feedEmpty } = useMemo(() => {
+    const afterDismissed = filterDismissed({
+      sections: rawSections,
+      empty: rawFeedEmpty,
+    });
+    return filterMutedSearches(afterDismissed);
+  }, [filterDismissed, filterMutedSearches, rawFeedEmpty, rawSections]);
 
   const idbHydrated = useSwrIdbHydrated();
   const hasCachedFeed = sections.length > 0;
@@ -251,15 +266,35 @@ export function ForYouFeedView({
                 </Typography>
               ) : (
                 <Stack spacing={4} data-for-you-feed-ready>
-                  {sections.map((section) => (
+                  {sections.map((section) => {
+                    const searchQuery = searchQueryFromForYouSection(section);
+                    return (
                     <Box key={section.id}>
-                      <Typography
-                        variant="h6"
-                        component="h2"
-                        sx={{ fontWeight: 700, mb: 2 }}
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        alignItems="center"
+                        justifyContent="space-between"
+                        sx={{ mb: 2 }}
                       >
-                        {section.title}
-                      </Typography>
+                        <Typography
+                          variant="h6"
+                          component="h2"
+                          sx={{ fontWeight: 700, minWidth: 0 }}
+                        >
+                          {section.title}
+                        </Typography>
+                        {searchQuery ? (
+                          <ForYouSearchSectionMenu
+                            query={searchQuery}
+                            onRemove={(query) => {
+                              void muteSearch(query).then(() =>
+                                void refreshFeed(),
+                              );
+                            }}
+                          />
+                        ) : null}
+                      </Stack>
                       <VideoCarouselRow
                         videos={section.videos}
                         ariaLabel={section.title}
@@ -267,7 +302,8 @@ export function ForYouFeedView({
                         onDismissFromForYou={dismissVideo}
                       />
                     </Box>
-                  ))}
+                    );
+                  })}
                 </Stack>
               )}
 

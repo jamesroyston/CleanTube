@@ -15,7 +15,7 @@ const FOR_YOU_FEED_CACHE_SECONDS = (() => {
 
 /** Bust cache when library activity changes. */
 export function libraryFeedRevision(signals: ForYouLibrarySignals): string {
-  const { snapshot, recentSearchQueries } = signals;
+  const { snapshot, recentSearchQueries, mutedSearchQueries } = signals;
   let latestProgress = 0;
   for (const entry of snapshot.watchProgress) {
     const t = Date.parse(entry.updatedAt);
@@ -27,6 +27,12 @@ export function libraryFeedRevision(signals: ForYouLibrarySignals): string {
     .filter(Boolean)
     .join("|");
 
+  const mutedSearchFingerprint = mutedSearchQueries
+    .map((q) => q.trim().toLowerCase())
+    .filter(Boolean)
+    .sort()
+    .join("|");
+
   return [
     forYouDayKey(),
     snapshot.savedChannels.length,
@@ -35,6 +41,7 @@ export function libraryFeedRevision(signals: ForYouLibrarySignals): string {
     latestProgress,
     recentSearchQueries.length,
     recentSearchFingerprint,
+    mutedSearchFingerprint,
   ].join(":");
 }
 

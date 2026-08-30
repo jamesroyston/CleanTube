@@ -42,6 +42,8 @@ export type ForYouSection = {
   id: string;
   title: string;
   videos: VideoSummary[];
+  /** Present on recent-search carousels so the heading menu can mute that query. */
+  seedSearchQuery?: string;
 };
 
 export type ForYouFeedResult = {

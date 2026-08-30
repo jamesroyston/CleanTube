@@ -25,7 +25,15 @@ export const watchSidebarPadSx = {
 } as const;
 
 export const watchPageGridSx = {
-  px: { xs: 2, sm: 0 },
   alignItems: "flex-start",
-  [MOBILE_PORTRAIT]: { px: 0 },
+  /** Horizontal safe-area so landscape iPhone (including >900px) clears the notch. */
+  pl: {
+    xs: "max(16px, env(safe-area-inset-left, 0px))",
+    sm: "env(safe-area-inset-left, 0px)",
+  },
+  pr: {
+    xs: "max(16px, env(safe-area-inset-right, 0px))",
+    sm: "env(safe-area-inset-right, 0px)",
+  },
+  [MOBILE_PORTRAIT]: { pl: 0, pr: 0 },
 } as const;

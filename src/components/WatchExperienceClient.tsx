@@ -84,7 +84,6 @@ export function WatchExperienceClient({
     authStatus,
     localLibraryHydrated,
     canPersistLibrary,
-    libraryCloudSyncState,
   } = useCloudLibrary();
   const { visible: upNextVisible } = useWatchUpNextVisible();
   const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
@@ -101,17 +100,11 @@ export function WatchExperienceClient({
     localLibraryHydrated && authStatus === "ready";
 
   /**
-   * Signed-in resume without `?t=` must wait for the cloud snapshot — not
-   * "syncing with channels in memory" — or we freeze start at 0 before
-   * watch_progress rows arrive.
+   * Local library is enough to freeze resume for this device. Waiting on cloud
+   * sync delayed the iframe on refresh; cross-device catch-up still happens on
+   * the next visit once IndexedDB has the snapshot.
    */
-  const cloudResumeReady =
-    !canPersistLibrary ||
-    hasUrlStart ||
-    libraryCloudSyncState === "synced" ||
-    libraryCloudSyncState === "error";
-
-  const canResolveResume = libraryBootstrapComplete && cloudResumeReady;
+  const canResolveResume = libraryBootstrapComplete;
 
   const effectiveStartSeconds = useMemo(() => {
     if (hasUrlStart) return urlStartSeconds!;

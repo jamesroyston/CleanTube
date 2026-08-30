@@ -8,6 +8,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
+import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 import {
@@ -15,6 +16,7 @@ import {
   useWatchUpNextVisible,
 } from "@/app/providers";
 import { WatchExperienceClient } from "@/components/WatchExperienceClient";
+import { preloadLiteYoutubeEmbed } from "@/components/LiteYouTubeEmbed";
 import { WatchLaterBanner } from "@/components/WatchLaterBanner";
 import { WatchNextCardSkeleton } from "@/components/WatchNextSidebar";
 import { useWatchVideo } from "@/hooks/useWatchVideo";
@@ -26,6 +28,7 @@ import {
   watchSidebarPadSx,
 } from "@/lib/watchLayoutSx";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
+import type { WatchVideoDetails } from "@/lib/youtubeTypes";
 import {
   channelPageHrefFromToken,
   extractChannelRouteTokenFromUrl,
@@ -36,6 +39,8 @@ export type WatchPageClientProps = {
   videoId: string;
   /** User preference: load comments after video shell (no SSR block). */
   commentsEnabled: boolean;
+  /** Server-fetched details so refresh can mount the player without waiting on `/api/videos`. */
+  initialVideo?: WatchVideoDetails | null;
 };
 
 function channelHrefForWatchVideo(video: {
@@ -156,9 +161,17 @@ export function WatchPageSkeleton({ videoId }: { videoId: string }) {
 export function WatchPageClient({
   videoId,
   commentsEnabled,
+  initialVideo = null,
 }: WatchPageClientProps) {
   const searchParams = useSearchParams();
-  const { video, error, isInitialLoad, refresh } = useWatchVideo(videoId);
+  const { video, error, isInitialLoad, refresh } = useWatchVideo(
+    videoId,
+    initialVideo,
+  );
+
+  useEffect(() => {
+    preloadLiteYoutubeEmbed();
+  }, []);
 
   const startSeconds =
     startSecondsFromWatchPageQuery({
@@ -207,7 +220,17 @@ export function WatchPageClient({
       >
         <Box
           className="watch-page-chrome"
-          sx={{ px: { xs: 2, sm: 0 }, pt: { xs: 1, sm: 0 } }}
+          sx={{
+            pt: { xs: 1, sm: 0 },
+            pl: {
+              xs: "max(16px, env(safe-area-inset-left, 0px))",
+              sm: "env(safe-area-inset-left, 0px)",
+            },
+            pr: {
+              xs: "max(16px, env(safe-area-inset-right, 0px))",
+              sm: "env(safe-area-inset-right, 0px)",
+            },
+          }}
         >
           <WatchLaterBanner videoId={videoId} />
         </Box>

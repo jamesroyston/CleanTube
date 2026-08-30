@@ -188,6 +188,7 @@ export async function fetchForYouCandidates(
   recentSearches: RecentSearchEntry[],
   limits: ForYouFeedLimits = DEFAULT_FOR_YOU_LIMITS,
   dayKey: string = forYouDayKey(),
+  mutedSearchQueries: string[] = [],
 ): Promise<ForYouCandidate[]> {
   const savedChannels = snapshot.savedChannels;
   const channelEntries = selectSavedChannelsForFeed(
@@ -205,9 +206,11 @@ export async function fetchForYouCandidates(
     limits.maxHistorySeeds,
   );
 
-  const recentQueries = recentSearchesForFeed(recentSearches).map(
-    (entry) => entry.query,
-  );
+  const recentQueries = recentSearchesForFeed(
+    recentSearches,
+    undefined,
+    mutedSearchQueries,
+  ).map((entry) => entry.query);
 
   const batches = await Promise.all([
     mapWithBoundedConcurrency(channelEntries, FETCH_CONCURRENCY, (ch) =>

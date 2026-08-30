@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 import { fetchCloudSnapshotServer } from "@/lib/cloudLibrary/serverSnapshot";
 import { fetchCloudRecentSearchesServer } from "@/lib/cloudRecentSearches/serverStore";
+import { fetchForYouMutedSearches } from "@/lib/forYouMutedSearches/cloudStore";
 import { entriesToQueryList } from "@/lib/cloudRecentSearches/sync";
 import type { RecentSearchEntry } from "@/lib/cloudRecentSearches/types";
 import type { CloudSnapshot } from "@/lib/cloudLibrary/cloudStore";
@@ -14,6 +15,7 @@ export type ForYouLibrarySignals = {
   snapshot: CloudSnapshot;
   recentSearches: RecentSearchEntry[];
   recentSearchQueries: string[];
+  mutedSearchQueries: string[];
 };
 
 /** Auth-only check for home shell (avoids library snapshot reads on SSR). */
@@ -65,9 +67,10 @@ export async function loadForYouLibrarySignals(): Promise<ForYouLibrarySignals |
   const user = await resolveAuthenticatedUser(supabase);
   if (!user) return null;
 
-  const [snapshot, recentSearches] = await Promise.all([
+  const [snapshot, recentSearches, mutedSearches] = await Promise.all([
     fetchCloudSnapshotServer(supabase),
     fetchCloudRecentSearchesServer(supabase),
+    fetchForYouMutedSearches(supabase).catch(() => []),
   ]);
 
   return {
@@ -75,5 +78,6 @@ export async function loadForYouLibrarySignals(): Promise<ForYouLibrarySignals |
     snapshot,
     recentSearches,
     recentSearchQueries: entriesToQueryList(recentSearches),
+    mutedSearchQueries: mutedSearches.map((entry) => entry.queryKey),
   };
 }

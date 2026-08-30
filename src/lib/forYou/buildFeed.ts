@@ -177,8 +177,13 @@ function buildRecentSearchSections(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
   recentSearches: ForYouLibrarySignals["recentSearches"],
+  mutedSearchQueries: string[],
 ): ForYouSection[] {
-  const queries = recentSearchesForFeed(recentSearches);
+  const queries = recentSearchesForFeed(
+    recentSearches,
+    undefined,
+    mutedSearchQueries,
+  );
   const sections: ForYouSection[] = [];
 
   for (const entry of queries) {
@@ -194,6 +199,7 @@ function buildRecentSearchSections(
     sections.push({
       id: `recent-search-${hashSectionId(entry.query)}`,
       title: `From search: ${entry.query}`,
+      seedSearchQuery: entry.query,
       videos,
     });
   }
@@ -227,7 +233,8 @@ function buildMoreForYouSection(
 export async function buildForYouFeed(
   signals: ForYouLibrarySignals,
 ): Promise<ForYouFeedResult> {
-  const { snapshot, recentSearches, recentSearchQueries } = signals;
+  const { snapshot, recentSearches, recentSearchQueries, mutedSearchQueries } =
+    signals;
   const limits = DEFAULT_FOR_YOU_LIMITS;
   const dayKey = forYouDayKey();
 
@@ -246,6 +253,7 @@ export async function buildForYouFeed(
     recentSearches,
     limits,
     dayKey,
+    mutedSearchQueries,
   );
 
   const channelSections = buildChannelSections(snapshot, pool, limits, dayKey);
@@ -259,6 +267,7 @@ export async function buildForYouFeed(
     snapshot,
     pool,
     recentSearches,
+    mutedSearchQueries,
   );
   const moreSection = buildMoreForYouSection(snapshot, pool, limits);
 

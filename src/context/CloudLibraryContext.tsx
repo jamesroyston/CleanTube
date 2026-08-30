@@ -20,6 +20,8 @@ import {
   upsertRecentSearch,
 } from "@/lib/cloudRecentSearches/cloudStore";
 import { clearForYouFeedCache } from "@/hooks/useForYouFeed";
+import { deleteForYouMutedSearch } from "@/lib/forYouMutedSearches/cloudStore";
+import { unmuteForYouSearchLocal } from "@/lib/forYouMutedSearches/localStore";
 import { entriesToQueryList } from "@/lib/cloudRecentSearches/sync";
 import { RECENT_SEARCHES_MAX_ITEMS } from "@/lib/cloudRecentSearches/types";
 import {
@@ -1110,6 +1112,8 @@ export function CloudLibraryProvider({
       try {
         await upsertRecentSearch(supabase, user.id, normalizeRecentSearchQuery(query));
         await trimRecentSearchesToCap(supabase, user.id, RECENT_SEARCHES_MAX_ITEMS);
+        unmuteForYouSearchLocal(user.id, query);
+        await deleteForYouMutedSearch(supabase, user.id, query);
       } catch {
         setRecentSearches(recentSearches);
       }

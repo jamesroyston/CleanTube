@@ -99,6 +99,15 @@ export function isLiteYoutubeElementActivated(root: HTMLElement | null): boolean
   return Boolean(el && el.classList.contains("lyt-activated"));
 }
 
+/**
+ * Same-document Picture-in-Picture (including Document PiP). YouTube's iframe
+ * PiP is cross-origin, so the parent page cannot see it.
+ */
+export function isDocumentPictureInPictureActive(): boolean {
+  if (typeof document === "undefined") return false;
+  return Boolean(document.pictureInPictureElement);
+}
+
 /** Safe read of duration; returns undefined if player is not ready / attached. */
 export function readPlayerDuration(player: YT.Player): number | undefined {
   if (!isYoutubePlayerAttached(player)) return undefined;

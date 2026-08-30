@@ -44,12 +44,20 @@ async function WatchPageContent({ params }: PageProps) {
   const commentsEnabled = parseWatchCommentsVisibleCookie(
     cookieStore.get(WATCH_COMMENTS_VISIBLE_COOKIE)?.value,
   );
+  const initialVideo = await getWatchVideoDetails(id);
 
-  return <WatchPageClient videoId={id} commentsEnabled={commentsEnabled} />;
+  return (
+    <WatchPageClient
+      videoId={id}
+      commentsEnabled={commentsEnabled}
+      initialVideo={initialVideo}
+    />
+  );
 }
 
 /**
- * Shell renders immediately; video metadata loads client-side via SWR + `/api/videos/[id]`.
+ * Video metadata is fetched on the server (deduped with `generateMetadata`) so
+ * refresh can mount the player immediately instead of waiting on a client fetch.
  */
 export default function WatchPage(props: PageProps) {
   return (
