@@ -1,7 +1,9 @@
 import type { LiteYoutubeElement } from "@/types/lite-youtube-element";
 
 /** True when the iframe is still in the document (player not destroyed). */
-export function isYoutubePlayerAttached(player: YT.Player | null | undefined): boolean {
+export function isYoutubePlayerAttached(
+  player: YT.Player | null | undefined,
+): player is YT.Player {
   if (!player) return false;
   try {
     const iframe = player.getIframe?.();

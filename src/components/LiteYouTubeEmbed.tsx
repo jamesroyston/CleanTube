@@ -294,12 +294,13 @@ export function LiteYouTubeEmbed({
     }, REMOUNT_PAUSE_HOLD_MS);
 
     const onStateChange = (event: YT.OnStateChangeEvent) => {
-      if (!isYoutubePlayerAttached(attachedPlayer)) return;
+      const player = attachedPlayer;
+      if (!isYoutubePlayerAttached(player)) return;
       const state = event.data;
       if (state === YT.PlayerState.PLAYING) {
         if (holdPause) {
           try {
-            attachedPlayer.pauseVideo();
+            player.pauseVideo();
           } catch {
             /* not ready */
           }
