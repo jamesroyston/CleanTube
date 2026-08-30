@@ -44,7 +44,7 @@ html[data-mobile-experience="1"] [data-desktop-header-rail-inset] {
 }
 
 html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
-  justify-content: center !important;
+  justify-content: flex-start !important;
 }
 
 /**
@@ -69,7 +69,7 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
     }
 
     html [data-browse-header] .MuiToolbar-root {
-      justify-content: center !important;
+      justify-content: flex-start !important;
     }
   }
 }
@@ -92,6 +92,20 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
   }
 
   html [data-browse-header] .MuiToolbar-root {
-    justify-content: center !important;
+    justify-content: flex-start !important;
+  }
+}
+
+/**
+ * Phone landscape: top app bar and bottom nav give way to the right-edge rail
+ * (see mobileLandscape.ts). Mirrored here so a cold load or a wrong SSR layout
+ * hint never paints portrait chrome. Keep the query in sync.
+ */
+@media (orientation: landscape) and (max-height: 599.95px) and (pointer: coarse),
+  (orientation: landscape) and (max-height: 599.95px) and (hover: none),
+  (orientation: landscape) and (max-height: 599.95px) and (display-mode: standalone) {
+  html[data-mobile-experience="1"] [data-browse-header],
+  html[data-mobile-experience="1"] [data-mobile-chrome] {
+    display: none !important;
   }
 }

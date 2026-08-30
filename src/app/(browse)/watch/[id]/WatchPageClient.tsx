@@ -27,6 +27,7 @@ import {
   watchPlayerShellSx,
   watchSidebarPadSx,
 } from "@/lib/watchLayoutSx";
+import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
 import type { WatchVideoDetails } from "@/lib/youtubeTypes";
 import {
@@ -212,7 +213,13 @@ export function WatchPageClient({
   const channelPageHref = channelHrefForWatchVideo(video);
 
   return (
-    <Box component="main" sx={{ pb: { xs: 4, sm: 6 } }}>
+    <Box
+      component="main"
+      sx={{
+        pb: { xs: 4, sm: 6 },
+        [MOBILE_LANDSCAPE]: { pb: 0 },
+      }}
+    >
       <Container
         maxWidth="lg"
         disableGutters
@@ -230,6 +237,8 @@ export function WatchPageClient({
               xs: "max(16px, env(safe-area-inset-right, 0px))",
               sm: "env(safe-area-inset-right, 0px)",
             },
+            /** Landscape shows the video only. */
+            [MOBILE_LANDSCAPE]: { display: "none" },
           }}
         >
           <WatchLaterBanner videoId={videoId} />

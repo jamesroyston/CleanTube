@@ -45,6 +45,7 @@ import {
   extractVideoIdFromUrl,
   isLikelyYouTubeUrl,
 } from "@/lib/youtube";
+import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { extractStartSecondsFromYoutubeInput } from "@/lib/youtubeTime";
 import {
   normalizeResultSortParam,
@@ -340,6 +341,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                   position: "sticky",
                   top: 0,
                 },
+            /** Landscape phones: nav lives in the right-edge rail instead. */
+            showBottomNav ? { [MOBILE_LANDSCAPE]: { display: "none" } } : null,
           ]}
         >
           <Toolbar
@@ -363,6 +366,8 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
                   alignItems: "center",
                   gap: 0.5,
                   minWidth: 0,
+                  /** Back + logo stay pinned to the left edge of the bar. */
+                  mr: "auto",
                 }}
               >
                 {showWatchBack && watchBack ? (

@@ -35,6 +35,12 @@ import {
   useShowBottomNav,
 } from "@/hooks/useCompactViewport";
 import { useMobileExperience } from "@/hooks/useMobileExperience";
+import {
+  LANDSCAPE_RAIL_INSET,
+  MOBILE_LANDSCAPE,
+  SAFE_BOTTOM,
+  SAFE_LEFT,
+} from "@/lib/mobileLandscape";
 import { registerScrollElementGetter } from "@/lib/watchReturnNavigation";
 
 function HeaderFallback() {
@@ -211,6 +217,15 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         flex: 1,
         minHeight: 0,
         pb: mobileMainPaddingBottom,
+        /**
+         * Landscape: bottom nav is gone, so content only clears the right-edge rail
+         * and whichever side the notch is on.
+         */
+        [MOBILE_LANDSCAPE]: {
+          pb: SAFE_BOTTOM,
+          pl: SAFE_LEFT,
+          pr: LANDSCAPE_RAIL_INSET,
+        },
       }}
     >
       <Suspense fallback={null}>

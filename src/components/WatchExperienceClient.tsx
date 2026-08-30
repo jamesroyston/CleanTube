@@ -30,6 +30,7 @@ import { WatchNextSidebar } from "@/components/WatchNextSidebar";
 import type { VideoSummary } from "@/components/VideoSummary";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { readFetchJson } from "@/lib/fetchJson";
+import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import {
   watchBelowPlayerPadSx,
   watchPageGridSx,
@@ -245,11 +246,14 @@ export function WatchExperienceClient({
             </Box>
 
             {showBottomNav && canMountPlayer ? (
-              <WatchPlayerToolbar
-                videoId={videoId}
-                playerShellRef={playerShellRef}
-                playerApiReady={playerApiReady}
-              />
+              /** Landscape uses the YouTube overlay controls inside the iframe. */
+              <Box sx={{ [MOBILE_LANDSCAPE]: { display: "none" } }}>
+                <WatchPlayerToolbar
+                  videoId={videoId}
+                  playerShellRef={playerShellRef}
+                  playerApiReady={playerApiReady}
+                />
+              </Box>
             ) : null}
 
             <Stack spacing={1.5} sx={watchBelowPlayerPadSx}>

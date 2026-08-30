@@ -27,6 +27,11 @@ import {
   stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
+import {
+  LANDSCAPE_VIDEO_HEIGHT,
+  MOBILE_LANDSCAPE,
+} from "@/lib/mobileLandscape";
+import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
 
@@ -67,8 +72,18 @@ export function preloadLiteYoutubeEmbed() {
 
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
-const MOBILE_PORTRAIT =
-  "@media (max-width: 599.95px) and (orientation: portrait)";
+/**
+ * Landscape phones: fit the largest 16:9 box inside the pinned shell. `width: 100%`
+ * with `aspect-ratio` plus `max-width` resolves to the smaller of the available
+ * width and the height-derived width, so it fills the screen height when
+ * height-limited and never distorts when width-limited.
+ */
+const LANDSCAPE_FIT_SX = {
+  width: "100%",
+  maxWidth: `calc(${LANDSCAPE_VIDEO_HEIGHT} * 16 / 9)`,
+  maxHeight: LANDSCAPE_VIDEO_HEIGHT,
+  aspectRatio: "16 / 9",
+} as const;
 
 type LiteYouTubeEmbedProps = {
   videoId: string;
@@ -594,7 +609,9 @@ export function LiteYouTubeEmbed({
           borderRadius: 1,
           overflow: "hidden",
           [MOBILE_PORTRAIT]: { borderRadius: 0 },
+          [MOBILE_LANDSCAPE]: { borderRadius: 0 },
         },
+        [MOBILE_LANDSCAPE]: LANDSCAPE_FIT_SX,
       };
 
   if (!ready) {
@@ -606,6 +623,7 @@ export function LiteYouTubeEmbed({
           borderRadius: 1,
           bgcolor: "action.hover",
           [MOBILE_PORTRAIT]: { borderRadius: 0 },
+          [MOBILE_LANDSCAPE]: { ...LANDSCAPE_FIT_SX, borderRadius: 0 },
         }}
       />
     );
@@ -640,6 +658,7 @@ export function LiteYouTubeEmbed({
             backgroundSize: "cover",
             backgroundPosition: "center",
             [MOBILE_PORTRAIT]: { borderRadius: 0 },
+            [MOBILE_LANDSCAPE]: { height: "100%", borderRadius: 0 },
           }}
         />
       ) : (
