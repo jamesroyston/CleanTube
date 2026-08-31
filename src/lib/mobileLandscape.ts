@@ -46,3 +46,61 @@ export function readSafeAreaInset(side: "left" | "right" | "top" | "bottom"): nu
   probe.remove();
   return value;
 }
+
+function readCssPx(expr: string): number {
+  if (typeof document === "undefined") return 0;
+  const probe = document.createElement("div");
+  probe.style.cssText = `position:absolute;visibility:hidden;height:${expr}`;
+  document.body.appendChild(probe);
+  const value = probe.getBoundingClientRect().height;
+  probe.remove();
+  return value || 0;
+}
+
+function isStandaloneDisplay(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.matchMedia("(display-mode: fullscreen)").matches ||
+    (navigator as { standalone?: boolean }).standalone === true
+  );
+}
+
+/**
+ * Landscape player box: iOS PWA sometimes reports `innerHeight` as the screen
+ * minus one safe-area band (59px), which leaves a gap above a `top:0;bottom:0`
+ * shell. Prefer the large viewport / physical short side in standalone.
+ */
+export function readLandscapeViewportBox(): { top: number; height: number } {
+  if (typeof window === "undefined") return { top: 0, height: 0 };
+  const inner = window.innerHeight;
+  const vv = window.visualViewport;
+  const vvH = vv?.height ?? 0;
+  const vvTop = vv?.offsetTop ?? 0;
+  const lvh = readCssPx("100lvh");
+  const dvh = readCssPx("100dvh");
+  const screenShort = Math.min(window.screen.width, window.screen.height);
+
+  let height = Math.max(
+    inner,
+    vvH,
+    dvh,
+    document.documentElement.clientHeight,
+  );
+  let top = 0;
+
+  if (isStandaloneDisplay()) {
+    height = Math.max(height, lvh);
+    if (screenShort > height + 1 && screenShort - height <= 80) {
+      top = height - screenShort;
+      height = screenShort;
+    }
+  }
+
+  if (vvTop > 0 && vvTop < 100) {
+    top -= vvTop;
+    height += vvTop;
+  }
+
+  return { top, height };
+}

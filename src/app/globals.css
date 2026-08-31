@@ -122,4 +122,10 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
     max-width: 100%;
     max-height: 100%;
   }
+
+  [data-watch-player-shell],
+  [data-landscape-rail] {
+    height: 100lvh;
+    bottom: auto;
+  }
 }

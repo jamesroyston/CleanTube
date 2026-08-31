@@ -55,7 +55,8 @@ export function LandscapeNavRail() {
           position: "fixed",
           top: 0,
           right: 0,
-          bottom: 0,
+          height: "100lvh",
+          bottom: "auto",
           /** Notch on the right: rail widens so icons clear it, background still reaches the edge. */
           width: LANDSCAPE_RAIL_INSET,
           pr: SAFE_RIGHT,

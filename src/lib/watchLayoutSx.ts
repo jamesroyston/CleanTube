@@ -16,11 +16,12 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Flush to the physical left edge. The 16:9 player is inset from the notch
-     * in JS (`margin-left`); leftover width sits toward the rail.
+     * Flush to the physical left edge. The 16:9 picture starts at x=0 (YouTube
+     * chrome clears the notch). Extra width sits toward the rail.
      */
     top: 0,
-    bottom: 0,
+    height: "100lvh",
+    bottom: "auto",
     left: 0,
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
@@ -31,7 +32,6 @@ export const watchPlayerShellSx = {
     aspectRatio: "auto",
     display: "flex",
     alignItems: "center",
-    /** 16:9 box is placed at the notch via measured `margin-left`; leftover goes toward the rail. */
     justifyContent: "flex-start",
     overflow: "hidden",
     bgcolor: "background.default",

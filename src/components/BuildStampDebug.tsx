@@ -3,7 +3,7 @@
 import Box from "@mui/material/Box";
 import { useEffect, useState } from "react";
 
-import { readSafeAreaInset } from "@/lib/mobileLandscape";
+import { readLandscapeViewportBox, readSafeAreaInset } from "@/lib/mobileLandscape";
 
 /**
  * TEMPORARY debug aid for the landscape work: shows which deploy is loaded so a
@@ -11,8 +11,8 @@ import { readSafeAreaInset } from "@/lib/mobileLandscape";
  * that is meant to be tested. Remove this component and its mount in `AppShell`,
  * plus `NEXT_PUBLIC_BUILD_SHA` in `next.config.ts`, once landscape is signed off.
  */
-const ITERATION = 11;
-const NOTE = "16:9 at notch";
+const ITERATION = 12;
+const NOTE = "edge + fill lvh";
 
 export function BuildStampDebug() {
   const sha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "unknown";
@@ -25,14 +25,17 @@ export function BuildStampDebug() {
       const ir = iframe?.getBoundingClientRect();
       const sr = shell?.getBoundingClientRect();
       const h = ir?.height ?? 0;
+      const box = readLandscapeViewportBox();
+      const screenShort = Math.min(window.screen.width, window.screen.height);
       const bits = [
         `${Math.round(window.innerWidth)}x${Math.round(window.innerHeight)}`,
-        `saL${readSafeAreaInset("left")}/R${readSafeAreaInset("right")}`,
+        `scr${Math.round(screenShort)} lvhBox${Math.round(box.height)}@${Math.round(box.top)}`,
+        `saL${readSafeAreaInset("left")}/R${readSafeAreaInset("right")} T${readSafeAreaInset("top")}/B${readSafeAreaInset("bottom")}`,
         sr
-          ? `shell x${Math.round(sr.x)} w${Math.round(sr.width)} h${Math.round(sr.height)}`
+          ? `shell x${Math.round(sr.x)} y${Math.round(sr.y)} w${Math.round(sr.width)} h${Math.round(sr.height)}`
           : "shell -",
         ir
-          ? `iframe x${Math.round(ir.x)} ${Math.round(ir.width)}x${Math.round(ir.height)} vidW${Math.round((h * 16) / 9)}`
+          ? `iframe x${Math.round(ir.x)} y${Math.round(ir.y)} ${Math.round(ir.width)}x${Math.round(ir.height)} vidW${Math.round((h * 16) / 9)}`
           : "iframe -",
       ];
       setGeo(bits.join(" · "));
@@ -53,8 +56,8 @@ export function BuildStampDebug() {
       aria-hidden
       sx={{
         position: "fixed",
-        top: "env(safe-area-inset-top, 0px)",
-        left: "env(safe-area-inset-left, 0px)",
+        top: 0,
+        left: 0,
         px: 0.75,
         py: 0.25,
         pointerEvents: "none",
