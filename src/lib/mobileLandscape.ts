@@ -35,6 +35,13 @@ export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
  */
 export const LANDSCAPE_RAIL_INSET = `calc(${LANDSCAPE_RAIL_WIDTH_PX}px + ${SAFE_RIGHT})`;
 
+/**
+ * Breathing room around the landscape player so it is not true full-bleed.
+ * Small enough to stay close to the screen; the home indicator uses the bottom
+ * safe-area instead of this value.
+ */
+export const LANDSCAPE_VIDEO_INSET_PX = 8;
+
 /** Pixel value of `env(safe-area-inset-*)` (0 when the inset is unset). */
 export function readSafeAreaInset(side: "left" | "right" | "top" | "bottom"): number {
   if (typeof document === "undefined") return 0;

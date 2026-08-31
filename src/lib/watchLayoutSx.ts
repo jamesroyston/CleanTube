@@ -1,4 +1,9 @@
-import { LANDSCAPE_RAIL_INSET, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import {
+  LANDSCAPE_RAIL_INSET,
+  LANDSCAPE_VIDEO_INSET_PX,
+  MOBILE_LANDSCAPE,
+  SAFE_BOTTOM,
+} from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
@@ -16,8 +21,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Flush to the left edge. Overflow clips the iframe's left overscan so
-     * YouTube's inner safe-area pad sits off-screen.
+     * Near full-bleed: a few pixels of pad so the player is not the screen
+     * edge. YouTube's inner safe-area is clipped inside the 16:9 box.
      */
     top: 0,
     bottom: 0,
@@ -25,8 +30,8 @@ export const watchPlayerShellSx = {
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    pl: 0,
-    pr: 0,
+    p: `${LANDSCAPE_VIDEO_INSET_PX}px`,
+    pb: `max(${LANDSCAPE_VIDEO_INSET_PX}px, ${SAFE_BOTTOM})`,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",

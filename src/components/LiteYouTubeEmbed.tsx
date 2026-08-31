@@ -83,6 +83,7 @@ const LANDSCAPE_FIT_SX = {
   aspectRatio: "16 / 9",
   maxWidth: "100%",
   maxHeight: "100%",
+  overflow: "hidden",
 } as const;
 
 /** Give up on a hung `getYTPlayer()` (iOS after background) and remount. */
@@ -208,10 +209,9 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Size a 16:9 box to the shell, then overscan left by iOS safe-area-inset-left.
-   * YouTube pads the picture by that inset inside the iframe; shifting the box
-   * left and clipping on the shell makes the picture fill the visible hole.
-   * Do not change the shell's viewport height here — that is what broke #13.
+   * Visible hole is 16:9 of the padded shell. The iframe is wider by saL and
+   * shifted left so YouTube's inner notch pad is clipped inside that hole —
+   * not by rewriting the shell size (#13).
    */
   useEffect(() => {
     if (!ready) return;
@@ -226,11 +226,14 @@ export function LiteYouTubeEmbed({
       box.style.removeProperty("height");
       box.style.removeProperty("margin-left");
       box.style.removeProperty("max-width");
+      box.style.removeProperty("overflow");
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.removeProperty("width");
         embed.style.removeProperty("height");
         embed.style.removeProperty("max-width");
+        embed.style.removeProperty("margin-left");
+        embed.style.removeProperty("overflow");
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
@@ -238,6 +241,7 @@ export function LiteYouTubeEmbed({
         iframe.removeAttribute("height");
         iframe.style.removeProperty("width");
         iframe.style.removeProperty("height");
+        iframe.style.removeProperty("margin-left");
       }
     };
 
@@ -263,26 +267,29 @@ export function LiteYouTubeEmbed({
         picH = Math.floor((picW * 9) / 16);
       }
       const overscanL = Math.round(readSafeAreaInset("left"));
-      const width = picW + overscanL;
-      const height = picH;
+      const iframeW = picW + overscanL;
+      box.style.overflow = "hidden";
       box.style.maxWidth = "none";
-      box.style.width = `${width}px`;
-      box.style.height = `${height}px`;
-      box.style.marginLeft = `${-overscanL}px`;
+      box.style.width = `${picW}px`;
+      box.style.height = `${picH}px`;
+      box.style.marginLeft = "0px";
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.width = "100%";
         embed.style.height = "100%";
         embed.style.maxWidth = "none";
+        embed.style.overflow = "hidden";
+        embed.style.marginLeft = "0px";
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
-        iframe.setAttribute("width", String(width));
-        iframe.setAttribute("height", String(height));
-        iframe.style.width = "100%";
-        iframe.style.height = "100%";
+        iframe.setAttribute("width", String(iframeW));
+        iframe.setAttribute("height", String(picH));
+        iframe.style.width = `${iframeW}px`;
+        iframe.style.height = `${picH}px`;
+        iframe.style.marginLeft = `${-overscanL}px`;
       }
-      resyncPlayerSize(ytPlayerRef.current, { width, height });
+      resyncPlayerSize(ytPlayerRef.current, { width: iframeW, height: picH });
     };
 
     applyFit();

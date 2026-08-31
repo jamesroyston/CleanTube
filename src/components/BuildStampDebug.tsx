@@ -11,8 +11,8 @@ import { readSafeAreaInset } from "@/lib/mobileLandscape";
  * that is meant to be tested. Remove this component and its mount in `AppShell`,
  * plus `NEXT_PUBLIC_BUILD_SHA` in `next.config.ts`, once landscape is signed off.
  */
-const ITERATION = 16;
-const NOTE = "clip YT saL";
+const ITERATION = 17;
+const NOTE = "near-bleed 8px";
 
 export function BuildStampDebug() {
   const sha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "unknown";
