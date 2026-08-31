@@ -16,8 +16,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Flush to the physical left edge. The 16:9 picture starts at x=0 (YouTube
-     * chrome clears the notch). Extra width sits toward the rail.
+     * Flush to the physical left edge. The iframe is overscanned left in JS so
+     * YouTube's internal safe-area bar is clipped off-screen.
      */
     top: 0,
     height: "100lvh",

@@ -81,19 +81,23 @@ export function readLandscapeViewportBox(): { top: number; height: number } {
   const dvh = readCssPx("100dvh");
   const screenShort = Math.min(window.screen.width, window.screen.height);
 
-  let height = Math.max(
+  const layoutH = Math.max(
     inner,
     vvH,
     dvh,
     document.documentElement.clientHeight,
   );
+  let height = layoutH;
   let top = 0;
 
   if (isStandaloneDisplay()) {
-    height = Math.max(height, lvh);
-    if (screenShort > height + 1 && screenShort - height <= 80) {
-      top = height - screenShort;
-      height = screenShort;
+    const target = Math.max(layoutH, lvh, screenShort);
+    if (target > layoutH + 1 && target - layoutH <= 80) {
+      /** ICB starts below the status-bar band; pull the shell up into it. */
+      top = layoutH - target;
+      height = target;
+    } else {
+      height = target;
     }
   }
 

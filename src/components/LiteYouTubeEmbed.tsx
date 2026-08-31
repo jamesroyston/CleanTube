@@ -32,6 +32,7 @@ import {
   MOBILE_LANDSCAPE,
   MOBILE_LANDSCAPE_QUERY,
   readLandscapeViewportBox,
+  readSafeAreaInset,
 } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
@@ -288,25 +289,29 @@ export function LiteYouTubeEmbed({
       );
       if (!(available > 0) || !(availableHeight > 0)) return;
       /**
-       * Size the iframe to the 16:9 picture and pin it to the left edge.
-       * Extra iframe width is what iOS YouTube shoves left (looks like
-       * flex-end). The notch is painted over; YouTube's chrome insets itself.
+       * Visible 16:9 picture. iOS YouTube still applies `safe-area-inset-left`
+       * inside the iframe (iframe x=0 still shows a 59px bar). Overscan left
+       * by that inset and clip on the shell so the picture starts at the
+       * screen edge.
        */
       const maxW = Math.max(1, available);
       const maxH = availableHeight;
       const widthIfFullHeight = (maxH * 16) / 9;
-      let width: number;
-      let height: number;
+      let picW: number;
+      let picH: number;
       if (widthIfFullHeight <= maxW) {
-        height = Math.floor(maxH);
-        width = Math.floor((height * 16) / 9);
+        picH = Math.floor(maxH);
+        picW = Math.floor((picH * 16) / 9);
       } else {
-        width = Math.floor(maxW);
-        height = Math.floor((width * 9) / 16);
+        picW = Math.floor(maxW);
+        picH = Math.floor((picW * 9) / 16);
       }
+      const overscanL = Math.round(readSafeAreaInset("left"));
+      const width = picW + overscanL;
+      const height = picH;
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
-      box.style.marginLeft = "0px";
+      box.style.marginLeft = `${-overscanL}px`;
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.width = `${width}px`;
@@ -315,8 +320,7 @@ export function LiteYouTubeEmbed({
       }
       /**
        * iOS sizes `iframe { width: 100% }` to the *window*, not the parent.
-       * YouTube then letterboxes for that too-wide player; overflow:hidden
-       * clips the right. Pin the iframe to the measured box in pixels.
+       * Pin the iframe to the overscanned box in pixels.
        */
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
@@ -324,8 +328,8 @@ export function LiteYouTubeEmbed({
         iframe.setAttribute("height", String(height));
         iframe.style.width = `${width}px`;
         iframe.style.height = `${height}px`;
-        iframe.style.maxWidth = "100%";
-        iframe.style.maxHeight = "100%";
+        iframe.style.maxWidth = "none";
+        iframe.style.maxHeight = "none";
       }
       resyncPlayerSize(ytPlayerRef.current, { width, height });
     };

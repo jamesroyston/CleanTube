@@ -11,8 +11,8 @@ import { readLandscapeViewportBox, readSafeAreaInset } from "@/lib/mobileLandsca
  * that is meant to be tested. Remove this component and its mount in `AppShell`,
  * plus `NEXT_PUBLIC_BUILD_SHA` in `next.config.ts`, once landscape is signed off.
  */
-const ITERATION = 12;
-const NOTE = "edge + fill lvh";
+const ITERATION = 13;
+const NOTE = "overscan saL";
 
 export function BuildStampDebug() {
   const sha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "unknown";
@@ -29,7 +29,7 @@ export function BuildStampDebug() {
       const screenShort = Math.min(window.screen.width, window.screen.height);
       const bits = [
         `${Math.round(window.innerWidth)}x${Math.round(window.innerHeight)}`,
-        `scr${Math.round(screenShort)} lvhBox${Math.round(box.height)}@${Math.round(box.top)}`,
+        `scr${Math.round(screenShort)} box${Math.round(box.height)}@${Math.round(box.top)}`,
         `saL${readSafeAreaInset("left")}/R${readSafeAreaInset("right")} T${readSafeAreaInset("top")}/B${readSafeAreaInset("bottom")}`,
         sr
           ? `shell x${Math.round(sr.x)} y${Math.round(sr.y)} w${Math.round(sr.width)} h${Math.round(sr.height)}`
