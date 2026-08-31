@@ -291,19 +291,34 @@ export function setPlaybackQuality(
  * cropped. `setSize` writes the new dimensions through the API; the element is
  * then handed back to CSS so it stays responsive.
  */
-export function resyncPlayerSize(player: YT.Player | null | undefined): void {
+export function resyncPlayerSize(
+  player: YT.Player | null | undefined,
+  size?: { width: number; height: number },
+): void {
   if (!isYoutubePlayerAttached(player)) return;
   const iframe = player.getIframe?.();
   if (!iframe) return;
-  const { width, height } = iframe.getBoundingClientRect();
+  /**
+   * Do not trust the iframe's own rect: iOS often reports (and paints) it as
+   * wide as the window. Size from the caller or the parent box instead.
+   */
+  const parent = iframe.parentElement;
+  const width = size?.width ?? parent?.clientWidth ?? 0;
+  const height = size?.height ?? parent?.clientHeight ?? 0;
   if (width < 1 || height < 1) return;
+  const w = Math.round(width);
+  const h = Math.round(height);
+  iframe.setAttribute("width", String(w));
+  iframe.setAttribute("height", String(h));
+  iframe.style.width = `${w}px`;
+  iframe.style.height = `${h}px`;
+  iframe.style.maxWidth = "100%";
+  iframe.style.maxHeight = "100%";
   try {
-    player.setSize(Math.round(width), Math.round(height));
+    player.setSize(w, h);
   } catch {
     /* not ready */
   }
-  iframe.style.width = "100%";
-  iframe.style.height = "100%";
 }
 
 export async function toggleFullscreen(player: YT.Player): Promise<void> {

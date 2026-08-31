@@ -223,10 +223,29 @@ export function LiteYouTubeEmbed({
 
     const orientation = window.matchMedia(MOBILE_LANDSCAPE_QUERY);
 
+    const clearFit = () => {
+      box.style.removeProperty("width");
+      box.style.removeProperty("height");
+      const embed = box.querySelector("lite-youtube");
+      if (embed instanceof HTMLElement) {
+        embed.style.removeProperty("width");
+        embed.style.removeProperty("height");
+        embed.style.removeProperty("max-width");
+      }
+      const iframe = box.querySelector("iframe");
+      if (iframe instanceof HTMLIFrameElement) {
+        iframe.removeAttribute("width");
+        iframe.removeAttribute("height");
+        iframe.style.removeProperty("width");
+        iframe.style.removeProperty("height");
+        iframe.style.removeProperty("max-width");
+        iframe.style.removeProperty("max-height");
+      }
+    };
+
     const applyFit = () => {
       if (!orientation.matches) {
-        box.style.removeProperty("width");
-        box.style.removeProperty("height");
+        clearFit();
         return;
       }
       const style = getComputedStyle(container);
@@ -239,21 +258,45 @@ export function LiteYouTubeEmbed({
         parseFloat(style.paddingTop) -
         parseFloat(style.paddingBottom);
       if (!(available > 0) || !(availableHeight > 0)) return;
-      const width = Math.min(available, (availableHeight * 16) / 9);
-      box.style.width = `${Math.floor(width)}px`;
-      box.style.height = `${Math.floor((width * 9) / 16)}px`;
+      const width = Math.floor(Math.min(available, (availableHeight * 16) / 9));
+      const height = Math.floor((width * 9) / 16);
+      box.style.width = `${width}px`;
+      box.style.height = `${height}px`;
+      const embed = box.querySelector("lite-youtube");
+      if (embed instanceof HTMLElement) {
+        embed.style.width = `${width}px`;
+        embed.style.height = `${height}px`;
+        embed.style.maxWidth = "none";
+      }
+      /**
+       * iOS sizes `iframe { width: 100% }` to the *window*, not the parent.
+       * YouTube then letterboxes for that too-wide player; overflow:hidden
+       * clips the right. Pin the iframe to the measured box in pixels.
+       */
+      const iframe = box.querySelector("iframe");
+      if (iframe instanceof HTMLIFrameElement) {
+        iframe.setAttribute("width", String(width));
+        iframe.setAttribute("height", String(height));
+        iframe.style.width = `${width}px`;
+        iframe.style.height = `${height}px`;
+        iframe.style.maxWidth = "100%";
+        iframe.style.maxHeight = "100%";
+      }
+      resyncPlayerSize(ytPlayerRef.current, { width, height });
     };
 
     applyFit();
     const observer = new ResizeObserver(applyFit);
     observer.observe(container);
+    const mutations = new MutationObserver(applyFit);
+    mutations.observe(box, { childList: true, subtree: true });
     orientation.addEventListener("change", applyFit);
 
     return () => {
       observer.disconnect();
+      mutations.disconnect();
       orientation.removeEventListener("change", applyFit);
-      box.style.removeProperty("width");
-      box.style.removeProperty("height");
+      clearFit();
     };
   }, [ready, parked]);
 
