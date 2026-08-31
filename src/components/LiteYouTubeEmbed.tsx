@@ -28,7 +28,10 @@ import {
   stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
-import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import {
+  MOBILE_LANDSCAPE,
+  MOBILE_LANDSCAPE_QUERY,
+} from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
@@ -202,6 +205,57 @@ export function LiteYouTubeEmbed({
     enableGlobalShortcuts && ready && !parked,
     playerApiReadyRef,
   );
+
+  /**
+   * Landscape sizing is measured rather than derived in CSS.
+   *
+   * The box has to be the largest 16:9 rectangle inside the pinned shell. Expressing
+   * that in CSS needs `aspect-ratio` on an auto-width flex item that is itself a flex
+   * container, which Safari resolves inconsistently, and the box came out wider than
+   * the shell, so the player was cropped on the right. Measuring sidesteps it; the
+   * CSS rules stay as the pre-hydration fallback.
+   */
+  useEffect(() => {
+    if (!ready) return;
+    const box = shellRef.current;
+    const container = box?.parentElement;
+    if (!box || !container) return;
+
+    const orientation = window.matchMedia(MOBILE_LANDSCAPE_QUERY);
+
+    const applyFit = () => {
+      if (!orientation.matches) {
+        box.style.removeProperty("width");
+        box.style.removeProperty("height");
+        return;
+      }
+      const style = getComputedStyle(container);
+      const available =
+        container.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      const availableHeight =
+        container.clientHeight -
+        parseFloat(style.paddingTop) -
+        parseFloat(style.paddingBottom);
+      if (!(available > 0) || !(availableHeight > 0)) return;
+      const width = Math.min(available, (availableHeight * 16) / 9);
+      box.style.width = `${Math.floor(width)}px`;
+      box.style.height = `${Math.floor((width * 9) / 16)}px`;
+    };
+
+    applyFit();
+    const observer = new ResizeObserver(applyFit);
+    observer.observe(container);
+    orientation.addEventListener("change", applyFit);
+
+    return () => {
+      observer.disconnect();
+      orientation.removeEventListener("change", applyFit);
+      box.style.removeProperty("width");
+      box.style.removeProperty("height");
+    };
+  }, [ready, parked]);
 
   /** Rotation resizes the iframe in place; make the player re-measure itself. */
   useEffect(() => {

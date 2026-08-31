@@ -14,12 +14,15 @@ export const LANDSCAPE_RAIL_WIDTH_PX = 56;
 
 const SHAPE = "(orientation: landscape) and (max-height: 599.95px)";
 
-/** `sx` key for phone landscape. `globals.css` mirrors this query — keep both in sync. */
-export const MOBILE_LANDSCAPE = `@media ${[
+/** Raw query for `matchMedia`. `globals.css` mirrors it too — keep all three in sync. */
+export const MOBILE_LANDSCAPE_QUERY = [
   `${SHAPE} and (pointer: coarse)`,
   `${SHAPE} and (hover: none)`,
   `${SHAPE} and (display-mode: standalone)`,
-].join(", ")}`;
+].join(", ");
+
+/** `sx` key for phone landscape. */
+export const MOBILE_LANDSCAPE = `@media ${MOBILE_LANDSCAPE_QUERY}`;
 
 export const SAFE_LEFT = "env(safe-area-inset-left, 0px)";
 export const SAFE_RIGHT = "env(safe-area-inset-right, 0px)";
