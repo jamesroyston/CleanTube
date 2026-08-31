@@ -42,3 +42,15 @@ export const LANDSCAPE_RAIL_INSET = `calc(${LANDSCAPE_RAIL_WIDTH_PX}px + ${SAFE_
  * since that is the edge where crowding is visible.
  */
 export const LANDSCAPE_VIDEO_GUTTER_PX = 8;
+
+/** Pixel value of `env(safe-area-inset-*)` (0 when the inset is unset). */
+export function readSafeAreaInset(side: "left" | "right" | "top" | "bottom"): number {
+  if (typeof document === "undefined") return 0;
+  const probe = document.createElement("div");
+  probe.style.cssText = `position:absolute;visibility:hidden;padding-${side}:env(safe-area-inset-${side},0px)`;
+  document.body.appendChild(probe);
+  const value =
+    parseFloat(getComputedStyle(probe).getPropertyValue(`padding-${side}`)) || 0;
+  probe.remove();
+  return value;
+}

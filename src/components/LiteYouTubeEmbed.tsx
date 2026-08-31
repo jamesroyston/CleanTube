@@ -31,6 +31,7 @@ import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
 import {
   MOBILE_LANDSCAPE,
   MOBILE_LANDSCAPE_QUERY,
+  readSafeAreaInset,
 } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
@@ -82,10 +83,10 @@ const THEATRE_VIEWPORT_RESERVE = "152px";
  * letting it collect at the bottom.
  */
 const LANDSCAPE_FIT_SX = {
+  width: "100%",
   height: "100%",
-  width: "auto",
   maxWidth: "100%",
-  aspectRatio: "16 / 9",
+  maxHeight: "100%",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -259,12 +260,19 @@ export function LiteYouTubeEmbed({
         parseFloat(style.paddingBottom);
       if (!(available > 0) || !(availableHeight > 0)) return;
       /**
-       * Fill the shell. Do not shrink to 16:9 here — YouTube letterboxes inside
-       * the iframe and also applies the notch safe-area. A second 16:9 fit on an
-       * already-inset box is what cropped the right edge on iPhone.
+       * iOS YouTube ignores iframe width and paints the picture as
+       * `height * 16/9`, then applies the page safe-area on both sides inside
+       * the iframe. Taller landscape (PWA 393) therefore produces a wider
+       * picture that clips on the right; shorter Safari chrome shrinks it.
+       * Cap height so that 16:9 plus those insets fits in the shell width.
        */
+      const youtubeInnerPad =
+        readSafeAreaInset("left") + readSafeAreaInset("right");
+      const maxHeightFromWidth = ((available - youtubeInnerPad) * 9) / 16;
+      const height = Math.floor(
+        Math.max(1, Math.min(availableHeight, maxHeightFromWidth)),
+      );
       const width = Math.floor(available);
-      const height = Math.floor(availableHeight);
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
       const embed = box.querySelector("lite-youtube");
