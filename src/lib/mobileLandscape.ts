@@ -42,4 +42,4 @@ export const LANDSCAPE_RAIL_INSET = `calc(${LANDSCAPE_RAIL_WIDTH_PX}px + ${SAFE_
  * since that is the edge where crowding is visible.
  */
 export const LANDSCAPE_VIDEO_GUTTER_PX = 8;
-export const LANDSCAPE_VIDEO_RIGHT_GUTTER_PX = 24;
+export const LANDSCAPE_VIDEO_RIGHT_GUTTER_PX = 40;
