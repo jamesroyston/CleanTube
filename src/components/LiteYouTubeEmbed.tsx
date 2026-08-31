@@ -27,10 +27,7 @@ import {
   stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
-import {
-  LANDSCAPE_VIDEO_HEIGHT,
-  MOBILE_LANDSCAPE,
-} from "@/lib/mobileLandscape";
+import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
@@ -73,15 +70,15 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape phones: fit the largest 16:9 box inside the pinned shell. `width: 100%`
- * with `aspect-ratio` plus `max-width` resolves to the smaller of the available
- * width and the height-derived width, so it fills the screen height when
- * height-limited and never distorts when width-limited.
+ * Landscape phones: largest 16:9 box that fits the pinned shell. `cqh` measures the
+ * shell's real height (a viewport unit can disagree with it on iOS), and leaving the
+ * height to `aspect-ratio` keeps the box equal to the video, so the letterbox stays
+ * centered instead of collecting at the bottom when width is the binding constraint.
  */
 const LANDSCAPE_FIT_SX = {
   width: "100%",
-  maxWidth: `calc(${LANDSCAPE_VIDEO_HEIGHT} * 16 / 9)`,
-  maxHeight: LANDSCAPE_VIDEO_HEIGHT,
+  maxWidth: "calc(100cqh * 16 / 9)",
+  maxHeight: "100cqh",
   aspectRatio: "16 / 9",
 } as const;
 

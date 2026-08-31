@@ -33,10 +33,8 @@ export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
 export const LANDSCAPE_RAIL_INSET = `calc(${LANDSCAPE_RAIL_WIDTH_PX}px + ${SAFE_RIGHT})`;
 
 /**
- * Height of the pinned video, shared by its container and its fit math so the two
- * cannot drift. Full-bleed under the home indicator; subtract `SAFE_BOTTOM` here
- * to clear it instead.
+ * Breathing room between the video and the rail / notch edge. Without it the video
+ * sits flush against the rail's border whenever the usable width is narrower than
+ * 16:9 of the height, which reads as the video slipping underneath the rail.
  */
-export const LANDSCAPE_VIDEO_HEIGHT_VAR = "--ct-landscape-video-h";
-export const LANDSCAPE_VIDEO_HEIGHT = `var(${LANDSCAPE_VIDEO_HEIGHT_VAR})`;
-export const LANDSCAPE_VIDEO_HEIGHT_VALUE = "100dvh";
+export const LANDSCAPE_VIDEO_GUTTER_PX = 8;

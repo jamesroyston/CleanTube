@@ -15,7 +15,6 @@ import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useWatchBackTarget } from "@/hooks/useWatchBackTarget";
 import {
   LANDSCAPE_RAIL_INSET,
-  LANDSCAPE_RAIL_WIDTH_PX,
   MOBILE_LANDSCAPE,
   SAFE_BOTTOM,
   SAFE_RIGHT,
@@ -77,7 +76,8 @@ export function LandscapeNavRail() {
     >
       <Box
         sx={{
-          width: LANDSCAPE_RAIL_WIDTH_PX,
+          /** Fill the icon column exactly; a fixed 56px overflows the 1px left border. */
+          width: "100%",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",

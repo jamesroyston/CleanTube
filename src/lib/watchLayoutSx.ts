@@ -1,8 +1,6 @@
 import {
   LANDSCAPE_RAIL_INSET,
-  LANDSCAPE_VIDEO_HEIGHT,
-  LANDSCAPE_VIDEO_HEIGHT_VALUE,
-  LANDSCAPE_VIDEO_HEIGHT_VAR,
+  LANDSCAPE_VIDEO_GUTTER_PX,
   MOBILE_LANDSCAPE,
   SAFE_LEFT,
 } from "@/lib/mobileLandscape";
@@ -21,20 +19,27 @@ export const watchPlayerShellSx = {
   width: "100%",
   aspectRatio: "16 / 9",
   [MOBILE_LANDSCAPE]: {
-    [LANDSCAPE_VIDEO_HEIGHT_VAR]: LANDSCAPE_VIDEO_HEIGHT_VALUE,
     position: "fixed",
+    /**
+     * Sized by insets rather than `100dvh`: on iOS the dynamic viewport unit can
+     * disagree with the fixed element's real height, and the video derives its
+     * width from that height, which pushed it under the rail.
+     */
     top: 0,
+    bottom: 0,
     left: SAFE_LEFT,
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    height: LANDSCAPE_VIDEO_HEIGHT,
+    px: `${LANDSCAPE_VIDEO_GUTTER_PX}px`,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    bgcolor: "common.black",
+    /** Lets the player size against this box's real height via `cqh`. */
+    containerType: "size",
+    bgcolor: "background.default",
     zIndex: 1,
   },
 } as const;
