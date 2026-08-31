@@ -14,17 +14,29 @@ export function isYoutubePlayerAttached(
 }
 
 /**
- * Resolve YT.Player from lite-youtube after onReady; returns null if detached or unavailable.
+ * Resolve YT.Player from lite-youtube after onReady; returns null if detached
+ * or unavailable. Pass `timeoutMs` so a hung `getYTPlayer()` (iOS after the
+ * page was backgrounded) cannot block forever.
  */
 export async function getAttachedLiteYoutubePlayer(
   root: HTMLElement | null,
+  timeoutMs = 0,
 ): Promise<YT.Player | null> {
   if (!root) return null;
   const el = root.querySelector("lite-youtube") as LiteYoutubeElement | null;
   if (!el || typeof el.getYTPlayer !== "function") return null;
   try {
-    const player = await el.getYTPlayer();
-    if (!isYoutubePlayerAttached(player)) return null;
+    const pending = el.getYTPlayer();
+    const player =
+      timeoutMs > 0
+        ? await Promise.race([
+            pending,
+            new Promise<null>((resolve) => {
+              window.setTimeout(() => resolve(null), timeoutMs);
+            }),
+          ])
+        : await pending;
+    if (!player || !isYoutubePlayerAttached(player)) return null;
     return player;
   } catch {
     return null;

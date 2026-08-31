@@ -75,12 +75,9 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape phones: fill the pinned shell's height and let `aspect-ratio` derive the
- * width, measured against the box actually occupied rather than a viewport unit,
- * which can disagree with it on iOS. Centering here matters when `max-width` binds
- * (viewport narrower than 16:9 of its height): the box then keeps the shell's height
- * while the player inside stays 16:9, and this splits the letterbox evenly instead of
- * letting it collect at the bottom.
+ * Landscape phones: measured 16:9 box is applied in JS. This is the
+ * pre-hydration fallback; `justify-content` stays start so leftover width
+ * sits toward the rail instead of looking like a left letterbox.
  */
 const LANDSCAPE_FIT_SX = {
   width: "100%",
@@ -89,8 +86,12 @@ const LANDSCAPE_FIT_SX = {
   maxHeight: "100%",
   display: "flex",
   alignItems: "center",
-  justifyContent: "center",
+  justifyContent: "flex-start",
 } as const;
+
+/** Give up on a hung `getYTPlayer()` (iOS after background) and remount. */
+const ATTACH_PLAYER_TIMEOUT_MS = 4_000;
+const ATTACH_REMOUNT_LIMIT = 2;
 
 type LiteYouTubeEmbedProps = {
   videoId: string;
@@ -154,6 +155,8 @@ export function LiteYouTubeEmbed({
   );
   const parkedRef = useRef(false);
   const resumeSecondsRef = useRef<number | undefined>(undefined);
+  const unparkRef = useRef<() => void>(() => {});
+  const attachFailRef = useRef(0);
   const shellRef = useRef<HTMLDivElement>(null);
   const assignShellRef = useCallback(
     (node: HTMLDivElement | null) => {
@@ -196,6 +199,7 @@ export function LiteYouTubeEmbed({
     lastRecordedSecondsRef.current = -1;
     resumeSecondsRef.current = undefined;
     parkedRef.current = false;
+    attachFailRef.current = 0;
     setParked(false);
     setResumeSeconds(undefined);
   }, [videoId]);
@@ -227,6 +231,7 @@ export function LiteYouTubeEmbed({
     const clearFit = () => {
       box.style.removeProperty("width");
       box.style.removeProperty("height");
+      box.style.removeProperty("margin-left");
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.removeProperty("width");
@@ -260,21 +265,27 @@ export function LiteYouTubeEmbed({
         parseFloat(style.paddingBottom);
       if (!(available > 0) || !(availableHeight > 0)) return;
       /**
-       * iOS YouTube ignores iframe width and paints the picture as
-       * `height * 16/9`, then applies the page safe-area on both sides inside
-       * the iframe. Taller landscape (PWA 393) therefore produces a wider
-       * picture that clips on the right; shorter Safari chrome shrinks it.
-       * Cap height so that 16:9 plus those insets fits in the shell width.
+       * Size the iframe to the 16:9 picture, not the full shell. Extra width
+       * inside the iframe is what iOS YouTube shoves to the left (looks like
+       * flex-end). Place that box just after the notch; the rail already owns
+       * the right safe-area, so do not subtract saR again.
        */
-      const youtubeInnerPad =
-        readSafeAreaInset("left") + readSafeAreaInset("right");
-      const maxHeightFromWidth = ((available - youtubeInnerPad) * 9) / 16;
-      const height = Math.floor(
-        Math.max(1, Math.min(availableHeight, maxHeightFromWidth)),
-      );
-      const width = Math.floor(available);
+      const saL = readSafeAreaInset("left");
+      const maxW = Math.max(1, available - saL);
+      const maxH = availableHeight;
+      const widthIfFullHeight = (maxH * 16) / 9;
+      let width: number;
+      let height: number;
+      if (widthIfFullHeight <= maxW) {
+        height = Math.floor(maxH);
+        width = Math.floor((height * 16) / 9);
+      } else {
+        width = Math.floor(maxW);
+        height = Math.floor((width * 9) / 16);
+      }
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
+      box.style.marginLeft = `${Math.round(saL)}px`;
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.width = `${width}px`;
@@ -495,14 +506,29 @@ export function LiteYouTubeEmbed({
       const root = shellRef.current;
       if (!root) return;
       for (let i = 0; i < 80 && !cancelled; i++) {
-        const player = await getAttachedLiteYoutubePlayer(root);
-        if (cancelled || !player) {
+        const el = root.querySelector("lite-youtube");
+        if (
+          !el ||
+          typeof (el as { getYTPlayer?: unknown }).getYTPlayer !== "function"
+        ) {
           await new Promise((r) => setTimeout(r, 100));
           continue;
+        }
+        const player = await getAttachedLiteYoutubePlayer(
+          root,
+          ATTACH_PLAYER_TIMEOUT_MS,
+        );
+        if (cancelled) return;
+        if (!player) {
+          if (attachFailRef.current >= ATTACH_REMOUNT_LIMIT) return;
+          attachFailRef.current += 1;
+          setPlayerGeneration((g) => g + 1);
+          return;
         }
         attachedPlayer = player;
         ytPlayerRef.current = player;
         playerApiReadyRef.current = true;
+        attachFailRef.current = 0;
         ensurePlayerVolume100(player);
         primeCaptionsModule(player);
         if (userPausedRef.current) {
@@ -566,13 +592,13 @@ export function LiteYouTubeEmbed({
         setResumeSeconds(captured);
       }
       parkedRef.current = false;
+      attachFailRef.current = 0;
       setParked(false);
-      // pagehide may have destroyed the player before React committed parked
-      // (bfcache freeze). The activated element is then a dead iframe.
-      if (isLiteYoutubeElementActivated(shellRef.current)) {
-        setPlayerGeneration((g) => g + 1);
-      }
+      // Always remount. A reused <lite-youtube> after background often has a
+      // hung getYTPlayer() promise; a fresh element can activate again.
+      setPlayerGeneration((g) => g + 1);
     };
+    unparkRef.current = unparkPlayer;
 
     let parkTimer: number | null = null;
     const cancelPark = () => {
@@ -618,6 +644,15 @@ export function LiteYouTubeEmbed({
     };
 
     const onPageHide = () => {
+      captureResumeSeconds();
+      void recordProgressRef.current({ force: true, syncCloud: true });
+      // iOS fires pagehide for app-switch and Control Center. Tearing down
+      // immediately is what left a dead poster until refresh; wait the same
+      // grace as visibilitychange unless the page actually freezes.
+      schedulePark();
+    };
+
+    const onFreeze = () => {
       cancelPark();
       parkPlayer();
     };
@@ -647,11 +682,15 @@ export function LiteYouTubeEmbed({
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("focus", onVisible);
     if ("onresume" in document) {
       document.addEventListener("resume", onResume);
     }
     if ("onfreeze" in document) {
-      document.addEventListener("freeze", onPageHide);
+      document.addEventListener("freeze", onFreeze);
+    }
+    if (document.visibilityState === "visible" && parkedRef.current) {
+      unparkPlayer();
     }
 
     return () => {
@@ -659,11 +698,12 @@ export function LiteYouTubeEmbed({
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("focus", onVisible);
       if ("onresume" in document) {
         document.removeEventListener("resume", onResume);
       }
       if ("onfreeze" in document) {
-        document.removeEventListener("freeze", onPageHide);
+        document.removeEventListener("freeze", onFreeze);
       }
     };
   }, [ready, videoId, onPlayerApiReady, releasePlayer]);
@@ -787,7 +827,16 @@ export function LiteYouTubeEmbed({
     <Box ref={assignShellRef} sx={shellSx}>
       {parked ? (
         <Box
-          aria-hidden
+          role="button"
+          tabIndex={0}
+          aria-label="Resume video"
+          onClick={() => unparkRef.current()}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              unparkRef.current();
+            }
+          }}
           sx={{
             width: "100%",
             aspectRatio: "16 / 9",
@@ -798,6 +847,7 @@ export function LiteYouTubeEmbed({
               : undefined,
             backgroundSize: "cover",
             backgroundPosition: "center",
+            cursor: "pointer",
             [MOBILE_PORTRAIT]: { borderRadius: 0 },
             [MOBILE_LANDSCAPE]: { height: "100%", borderRadius: 0 },
           }}

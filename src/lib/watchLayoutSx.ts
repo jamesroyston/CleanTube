@@ -1,8 +1,4 @@
-import {
-  LANDSCAPE_RAIL_INSET,
-  LANDSCAPE_VIDEO_GUTTER_PX,
-  MOBILE_LANDSCAPE,
-} from "@/lib/mobileLandscape";
+import { LANDSCAPE_RAIL_INSET, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
@@ -20,9 +16,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Flush to the physical left edge. YouTube's player already applies
-     * `env(safe-area-inset-left)` inside the iframe; if we also inset the
-     * shell, the picture shifts right by one notch and the right edge clips.
+     * Flush to the physical left edge. The 16:9 player is inset from the notch
+     * in JS (`margin-left`); leftover width sits toward the rail.
      */
     top: 0,
     bottom: 0,
@@ -31,12 +26,13 @@ export const watchPlayerShellSx = {
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
     pl: 0,
-    pr: `${LANDSCAPE_VIDEO_GUTTER_PX}px`,
+    pr: 0,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
     alignItems: "center",
-    justifyContent: "center",
+    /** 16:9 box is placed at the notch via measured `margin-left`; leftover goes toward the rail. */
+    justifyContent: "flex-start",
     overflow: "hidden",
     bgcolor: "background.default",
     zIndex: 1,

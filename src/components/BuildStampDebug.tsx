@@ -11,8 +11,8 @@ import { readSafeAreaInset } from "@/lib/mobileLandscape";
  * that is meant to be tested. Remove this component and its mount in `AppShell`,
  * plus `NEXT_PUBLIC_BUILD_SHA` in `next.config.ts`, once landscape is signed off.
  */
-const ITERATION = 10;
-const NOTE = "cap height to 16:9";
+const ITERATION = 11;
+const NOTE = "16:9 at notch";
 
 export function BuildStampDebug() {
   const sha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "unknown";
@@ -32,7 +32,7 @@ export function BuildStampDebug() {
           ? `shell x${Math.round(sr.x)} w${Math.round(sr.width)} h${Math.round(sr.height)}`
           : "shell -",
         ir
-          ? `iframe ${Math.round(ir.width)}x${Math.round(ir.height)} vidW${Math.round((h * 16) / 9)}`
+          ? `iframe x${Math.round(ir.x)} ${Math.round(ir.width)}x${Math.round(ir.height)} vidW${Math.round((h * 16) / 9)}`
           : "iframe -",
       ];
       setGeo(bits.join(" · "));
