@@ -282,6 +282,30 @@ export function setPlaybackQuality(
   }
 }
 
+/**
+ * Tell the player to re-measure itself.
+ *
+ * Rotating a phone resizes the iframe via CSS without remounting it (a remount
+ * restarts playback), and iOS does not reliably deliver that resize to the
+ * cross-origin player, which leaves the video laid out at its old size and
+ * cropped. `setSize` writes the new dimensions through the API; the element is
+ * then handed back to CSS so it stays responsive.
+ */
+export function resyncPlayerSize(player: YT.Player | null | undefined): void {
+  if (!isYoutubePlayerAttached(player)) return;
+  const iframe = player.getIframe?.();
+  if (!iframe) return;
+  const { width, height } = iframe.getBoundingClientRect();
+  if (width < 1 || height < 1) return;
+  try {
+    player.setSize(Math.round(width), Math.round(height));
+  } catch {
+    /* not ready */
+  }
+  iframe.style.width = "100%";
+  iframe.style.height = "100%";
+}
+
 export async function toggleFullscreen(player: YT.Player): Promise<void> {
   if (!isYoutubePlayerAttached(player)) return;
   const iframe = player.getIframe?.();

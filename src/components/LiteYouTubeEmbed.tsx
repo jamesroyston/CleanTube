@@ -15,6 +15,7 @@ import { useGlobalYoutubeShortcuts } from "@/hooks/useGlobalYoutubeShortcuts";
 import {
   ensurePlayerVolume100,
   primeCaptionsModule,
+  resyncPlayerSize,
 } from "@/lib/youtubePlayerControls";
 import {
   getAttachedLiteYoutubePlayer,
@@ -201,6 +202,34 @@ export function LiteYouTubeEmbed({
     enableGlobalShortcuts && ready && !parked,
     playerApiReadyRef,
   );
+
+  /** Rotation resizes the iframe in place; make the player re-measure itself. */
+  useEffect(() => {
+    if (!ready || parked) return;
+
+    let raf = 0;
+    const timers: number[] = [];
+    const resync = () => resyncPlayerSize(ytPlayerRef.current);
+    const scheduleResync = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(resync);
+      /** iOS settles orientation over a few frames; re-apply once it has. */
+      timers.push(window.setTimeout(resync, 300));
+    };
+
+    const orientation = window.matchMedia("(orientation: landscape)");
+    window.addEventListener("resize", scheduleResync);
+    window.addEventListener("orientationchange", scheduleResync);
+    orientation.addEventListener("change", scheduleResync);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      for (const t of timers) window.clearTimeout(t);
+      window.removeEventListener("resize", scheduleResync);
+      window.removeEventListener("orientationchange", scheduleResync);
+      orientation.removeEventListener("change", scheduleResync);
+    };
+  }, [ready, parked]);
 
   const iframeStart =
     resumeSeconds != null && resumeSeconds > 0 ? resumeSeconds : start;
