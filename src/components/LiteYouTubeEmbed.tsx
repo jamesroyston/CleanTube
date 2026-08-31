@@ -258,8 +258,13 @@ export function LiteYouTubeEmbed({
         parseFloat(style.paddingTop) -
         parseFloat(style.paddingBottom);
       if (!(available > 0) || !(availableHeight > 0)) return;
-      const width = Math.floor(Math.min(available, (availableHeight * 16) / 9));
-      const height = Math.floor((width * 9) / 16);
+      /**
+       * Fill the shell. Do not shrink to 16:9 here — YouTube letterboxes inside
+       * the iframe and also applies the notch safe-area. A second 16:9 fit on an
+       * already-inset box is what cropped the right edge on iPhone.
+       */
+      const width = Math.floor(available);
+      const height = Math.floor(availableHeight);
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
       const embed = box.querySelector("lite-youtube");

@@ -1,9 +1,7 @@
 import {
   LANDSCAPE_RAIL_INSET,
   LANDSCAPE_VIDEO_GUTTER_PX,
-  LANDSCAPE_VIDEO_RIGHT_GUTTER_PX,
   MOBILE_LANDSCAPE,
-  SAFE_LEFT,
 } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
@@ -22,24 +20,23 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Sized by insets rather than `100dvh`: on iOS the dynamic viewport unit can
-     * disagree with the fixed element's real height, and the video derives its
-     * width from that height, which pushed it under the rail.
+     * Flush to the physical left edge. YouTube's player already applies
+     * `env(safe-area-inset-left)` inside the iframe; if we also inset the
+     * shell, the picture shifts right by one notch and the right edge clips.
      */
     top: 0,
     bottom: 0,
-    left: SAFE_LEFT,
+    left: 0,
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    pl: `${LANDSCAPE_VIDEO_GUTTER_PX}px`,
-    pr: `${LANDSCAPE_VIDEO_RIGHT_GUTTER_PX}px`,
+    pl: 0,
+    pr: `${LANDSCAPE_VIDEO_GUTTER_PX}px`,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    /** Nothing may paint outside the video area, whatever the player reports. */
+    alignItems: "stretch",
+    justifyContent: "stretch",
     overflow: "hidden",
     bgcolor: "background.default",
     zIndex: 1,
