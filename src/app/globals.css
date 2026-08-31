@@ -114,12 +114,15 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
    * (it fights explicit pixel height) and cap the iframe to its parent.
    */
   lite-youtube {
+    width: 100%;
+    height: 100%;
     max-width: none;
+    aspect-ratio: auto;
     overflow: hidden;
   }
   lite-youtube > iframe {
+    width: 100%;
+    height: 100%;
     aspect-ratio: auto;
-    max-width: none;
-    max-height: none;
   }
 }

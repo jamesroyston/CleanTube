@@ -3,7 +3,7 @@
 import Box from "@mui/material/Box";
 import { useEffect, useState } from "react";
 
-import { readLandscapeViewportBox, readSafeAreaInset } from "@/lib/mobileLandscape";
+import { readSafeAreaInset } from "@/lib/mobileLandscape";
 
 /**
  * TEMPORARY debug aid for the landscape work: shows which deploy is loaded so a
@@ -11,8 +11,8 @@ import { readLandscapeViewportBox, readSafeAreaInset } from "@/lib/mobileLandsca
  * that is meant to be tested. Remove this component and its mount in `AppShell`,
  * plus `NEXT_PUBLIC_BUILD_SHA` in `next.config.ts`, once landscape is signed off.
  */
-const ITERATION = 13;
-const NOTE = "overscan saL";
+const ITERATION = 14;
+const NOTE = "outer pad, 16:9 height";
 
 export function BuildStampDebug() {
   const sha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "unknown";
@@ -24,18 +24,14 @@ export function BuildStampDebug() {
       const shell = document.querySelector("[data-watch-player-shell]");
       const ir = iframe?.getBoundingClientRect();
       const sr = shell?.getBoundingClientRect();
-      const h = ir?.height ?? 0;
-      const box = readLandscapeViewportBox();
-      const screenShort = Math.min(window.screen.width, window.screen.height);
       const bits = [
         `${Math.round(window.innerWidth)}x${Math.round(window.innerHeight)}`,
-        `scr${Math.round(screenShort)} box${Math.round(box.height)}@${Math.round(box.top)}`,
-        `saL${readSafeAreaInset("left")}/R${readSafeAreaInset("right")} T${readSafeAreaInset("top")}/B${readSafeAreaInset("bottom")}`,
+        `saL${readSafeAreaInset("left")}/R${readSafeAreaInset("right")}`,
         sr
           ? `shell x${Math.round(sr.x)} y${Math.round(sr.y)} w${Math.round(sr.width)} h${Math.round(sr.height)}`
           : "shell -",
         ir
-          ? `iframe x${Math.round(ir.x)} y${Math.round(ir.y)} ${Math.round(ir.width)}x${Math.round(ir.height)} vidW${Math.round((h * 16) / 9)}`
+          ? `iframe x${Math.round(ir.x)} y${Math.round(ir.y)} ${Math.round(ir.width)}x${Math.round(ir.height)}`
           : "iframe -",
       ];
       setGeo(bits.join(" · "));

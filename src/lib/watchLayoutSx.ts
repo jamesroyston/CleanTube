@@ -1,4 +1,8 @@
-import { LANDSCAPE_RAIL_INSET, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import {
+  LANDSCAPE_RAIL_INSET,
+  MOBILE_LANDSCAPE,
+  SAFE_LEFT,
+} from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
@@ -16,17 +20,16 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Flush to the physical left edge. The iframe is overscanned left in JS so
-     * YouTube's internal safe-area bar is clipped off-screen.
+     * Notch is padding on this outer shell only. The inner 16:9 box has no
+     * offset — it just fills the padded content height.
      */
     top: 0,
-    height: "100lvh",
-    bottom: "auto",
+    bottom: 0,
     left: 0,
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    pl: 0,
+    pl: SAFE_LEFT,
     pr: 0,
     mb: 0,
     aspectRatio: "auto",

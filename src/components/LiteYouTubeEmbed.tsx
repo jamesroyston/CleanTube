@@ -31,8 +31,6 @@ import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
 import {
   MOBILE_LANDSCAPE,
   MOBILE_LANDSCAPE_QUERY,
-  readLandscapeViewportBox,
-  readSafeAreaInset,
 } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
@@ -76,18 +74,15 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape phones: measured 16:9 box is applied in JS. This is the
- * pre-hydration fallback; `justify-content` stays start so leftover width
- * sits toward the rail instead of looking like a left letterbox.
+ * Landscape: 16:9 of the outer shell's content height. Notch padding lives on
+ * the outer shell, not here.
  */
 const LANDSCAPE_FIT_SX = {
-  width: "100%",
   height: "100%",
+  width: "auto",
+  aspectRatio: "16 / 9",
   maxWidth: "100%",
   maxHeight: "100%",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "flex-start",
 } as const;
 
 /** Give up on a hung `getYTPlayer()` (iOS after background) and remount. */
@@ -213,13 +208,9 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Landscape sizing is measured rather than derived in CSS.
-   *
-   * The box has to be the largest 16:9 rectangle inside the pinned shell. Expressing
-   * that in CSS needs `aspect-ratio` on an auto-width flex item that is itself a flex
-   * container, which Safari resolves inconsistently, and the box came out wider than
-   * the shell, so the player was cropped on the right. Measuring sidesteps it; the
-   * CSS rules stay as the pre-hydration fallback.
+   * Size the inner box to 16:9 of the outer shell's content height. The shell
+   * owns notch padding; this box has no extra offset. Safari is unreliable at
+   * `aspect-ratio` on a flex child, so the pixels are measured.
    */
   useEffect(() => {
     if (!ready) return;
@@ -233,15 +224,6 @@ export function LiteYouTubeEmbed({
       box.style.removeProperty("width");
       box.style.removeProperty("height");
       box.style.removeProperty("margin-left");
-      container.style.removeProperty("top");
-      container.style.removeProperty("height");
-      container.style.removeProperty("bottom");
-      const rail = document.querySelector("[data-landscape-rail]");
-      if (rail instanceof HTMLElement) {
-        rail.style.removeProperty("top");
-        rail.style.removeProperty("height");
-        rail.style.removeProperty("bottom");
-      }
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.removeProperty("width");
@@ -254,8 +236,6 @@ export function LiteYouTubeEmbed({
         iframe.removeAttribute("height");
         iframe.style.removeProperty("width");
         iframe.style.removeProperty("height");
-        iframe.style.removeProperty("max-width");
-        iframe.style.removeProperty("max-height");
       }
     };
 
@@ -264,72 +244,35 @@ export function LiteYouTubeEmbed({
         clearFit();
         return;
       }
-      const viewport = readLandscapeViewportBox();
-      if (viewport.height > 0) {
-        container.style.top = `${viewport.top}px`;
-        container.style.height = `${Math.round(viewport.height)}px`;
-        container.style.bottom = "auto";
-        const rail = document.querySelector("[data-landscape-rail]");
-        if (rail instanceof HTMLElement) {
-          rail.style.top = `${viewport.top}px`;
-          rail.style.height = `${Math.round(viewport.height)}px`;
-          rail.style.bottom = "auto";
-        }
-      }
       const style = getComputedStyle(container);
-      const available =
+      const maxW =
         container.clientWidth -
         parseFloat(style.paddingLeft) -
         parseFloat(style.paddingRight);
-      const availableHeight = Math.max(
-        viewport.height,
+      const maxH =
         container.clientHeight -
-          parseFloat(style.paddingTop) -
-          parseFloat(style.paddingBottom),
-      );
-      if (!(available > 0) || !(availableHeight > 0)) return;
-      /**
-       * Visible 16:9 picture. iOS YouTube still applies `safe-area-inset-left`
-       * inside the iframe (iframe x=0 still shows a 59px bar). Overscan left
-       * by that inset and clip on the shell so the picture starts at the
-       * screen edge.
-       */
-      const maxW = Math.max(1, available);
-      const maxH = availableHeight;
-      const widthIfFullHeight = (maxH * 16) / 9;
-      let picW: number;
-      let picH: number;
-      if (widthIfFullHeight <= maxW) {
-        picH = Math.floor(maxH);
-        picW = Math.floor((picH * 16) / 9);
-      } else {
-        picW = Math.floor(maxW);
-        picH = Math.floor((picW * 9) / 16);
+        parseFloat(style.paddingTop) -
+        parseFloat(style.paddingBottom);
+      if (!(maxW > 0) || !(maxH > 0)) return;
+      let height = Math.floor(maxH);
+      let width = Math.floor((height * 16) / 9);
+      if (width > maxW) {
+        width = Math.floor(maxW);
+        height = Math.floor((width * 9) / 16);
       }
-      const overscanL = Math.round(readSafeAreaInset("left"));
-      const width = picW + overscanL;
-      const height = picH;
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
-      box.style.marginLeft = `${-overscanL}px`;
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
-        embed.style.width = `${width}px`;
-        embed.style.height = `${height}px`;
-        embed.style.maxWidth = "none";
+        embed.style.width = "100%";
+        embed.style.height = "100%";
       }
-      /**
-       * iOS sizes `iframe { width: 100% }` to the *window*, not the parent.
-       * Pin the iframe to the overscanned box in pixels.
-       */
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
         iframe.setAttribute("width", String(width));
         iframe.setAttribute("height", String(height));
-        iframe.style.width = `${width}px`;
-        iframe.style.height = `${height}px`;
-        iframe.style.maxWidth = "none";
-        iframe.style.maxHeight = "none";
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
       }
       resyncPlayerSize(ytPlayerRef.current, { width, height });
     };
