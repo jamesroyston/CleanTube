@@ -31,6 +31,7 @@ import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
 import {
   MOBILE_LANDSCAPE,
   MOBILE_LANDSCAPE_QUERY,
+  readSafeAreaInset,
 } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
@@ -207,9 +208,10 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Size the inner box to 16:9 of the outer shell's content height. The shell
-   * owns notch padding; this box has no extra offset. Safari is unreliable at
-   * `aspect-ratio` on a flex child, so the pixels are measured.
+   * Size a 16:9 box to the shell, then overscan left by iOS safe-area-inset-left.
+   * YouTube pads the picture by that inset inside the iframe; shifting the box
+   * left and clipping on the shell makes the picture fill the visible hole.
+   * Do not change the shell's viewport height here — that is what broke #13.
    */
   useEffect(() => {
     if (!ready) return;
@@ -223,6 +225,7 @@ export function LiteYouTubeEmbed({
       box.style.removeProperty("width");
       box.style.removeProperty("height");
       box.style.removeProperty("margin-left");
+      box.style.removeProperty("max-width");
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.removeProperty("width");
@@ -253,18 +256,24 @@ export function LiteYouTubeEmbed({
         parseFloat(style.paddingTop) -
         parseFloat(style.paddingBottom);
       if (!(maxW > 0) || !(maxH > 0)) return;
-      let height = Math.floor(maxH);
-      let width = Math.floor((height * 16) / 9);
-      if (width > maxW) {
-        width = Math.floor(maxW);
-        height = Math.floor((width * 9) / 16);
+      let picH = Math.floor(maxH);
+      let picW = Math.floor((picH * 16) / 9);
+      if (picW > maxW) {
+        picW = Math.floor(maxW);
+        picH = Math.floor((picW * 9) / 16);
       }
+      const overscanL = Math.round(readSafeAreaInset("left"));
+      const width = picW + overscanL;
+      const height = picH;
+      box.style.maxWidth = "none";
       box.style.width = `${width}px`;
       box.style.height = `${height}px`;
+      box.style.marginLeft = `${-overscanL}px`;
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.width = "100%";
         embed.style.height = "100%";
+        embed.style.maxWidth = "none";
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {

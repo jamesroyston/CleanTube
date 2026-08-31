@@ -16,8 +16,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Flush to the left edge. YouTube's player already insets for the notch
-     * inside the iframe; a second pad here stacks another black bar.
+     * Flush to the left edge. Overflow clips the iframe's left overscan so
+     * YouTube's inner safe-area pad sits off-screen.
      */
     top: 0,
     bottom: 0,
