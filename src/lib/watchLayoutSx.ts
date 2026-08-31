@@ -37,8 +37,8 @@ export const watchPlayerShellSx = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    /** Lets the player size against this box's real height via `cqh`. */
-    containerType: "size",
+    /** Nothing may paint outside the video area, whatever the player reports. */
+    overflow: "hidden",
     bgcolor: "background.default",
     zIndex: 1,
   },

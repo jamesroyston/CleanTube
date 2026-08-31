@@ -70,16 +70,21 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape phones: largest 16:9 box that fits the pinned shell. `cqh` measures the
- * shell's real height (a viewport unit can disagree with it on iOS), and leaving the
- * height to `aspect-ratio` keeps the box equal to the video, so the letterbox stays
- * centered instead of collecting at the bottom when width is the binding constraint.
+ * Landscape phones: fill the pinned shell's height and let `aspect-ratio` derive the
+ * width, measured against the box actually occupied rather than a viewport unit,
+ * which can disagree with it on iOS. Centering here matters when `max-width` binds
+ * (viewport narrower than 16:9 of its height): the box then keeps the shell's height
+ * while the player inside stays 16:9, and this splits the letterbox evenly instead of
+ * letting it collect at the bottom.
  */
 const LANDSCAPE_FIT_SX = {
-  width: "100%",
-  maxWidth: "calc(100cqh * 16 / 9)",
-  maxHeight: "100cqh",
+  height: "100%",
+  width: "auto",
+  maxWidth: "100%",
   aspectRatio: "16 / 9",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
 } as const;
 
 type LiteYouTubeEmbedProps = {
