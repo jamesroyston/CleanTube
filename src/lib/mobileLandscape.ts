@@ -36,8 +36,10 @@ export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
 export const LANDSCAPE_RAIL_INSET = `calc(${LANDSCAPE_RAIL_WIDTH_PX}px + ${SAFE_RIGHT})`;
 
 /**
- * Breathing room between the video and the rail / notch edge. Without it the video
- * sits flush against the rail's border whenever the usable width is narrower than
- * 16:9 of the height, which reads as the video slipping underneath the rail.
+ * Breathing room around the video. Without it the video sits flush against the
+ * rail's border whenever the usable width is narrower than 16:9 of the height,
+ * which reads as the video slipping underneath the rail. The rail side gets more,
+ * since that is the edge where crowding is visible.
  */
 export const LANDSCAPE_VIDEO_GUTTER_PX = 8;
+export const LANDSCAPE_VIDEO_RIGHT_GUTTER_PX = 24;

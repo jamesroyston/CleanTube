@@ -1,6 +1,7 @@
 import {
   LANDSCAPE_RAIL_INSET,
   LANDSCAPE_VIDEO_GUTTER_PX,
+  LANDSCAPE_VIDEO_RIGHT_GUTTER_PX,
   MOBILE_LANDSCAPE,
   SAFE_LEFT,
 } from "@/lib/mobileLandscape";
@@ -31,7 +32,8 @@ export const watchPlayerShellSx = {
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    px: `${LANDSCAPE_VIDEO_GUTTER_PX}px`,
+    pl: `${LANDSCAPE_VIDEO_GUTTER_PX}px`,
+    pr: `${LANDSCAPE_VIDEO_RIGHT_GUTTER_PX}px`,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",

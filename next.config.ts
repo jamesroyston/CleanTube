@@ -14,6 +14,14 @@ const withSerwist = withSerwistInit({
 const nextConfig: NextConfig = {
   cacheComponents: true,
   serverExternalPackages: ["youtubei.js"],
+  env: {
+    /** Temporary: lets the on-screen build stamp identify which deploy is loaded. */
+    NEXT_PUBLIC_BUILD_SHA: (
+      process.env.VERCEL_GIT_COMMIT_SHA ??
+      process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA ??
+      "local"
+    ).slice(0, 7),
+  },
   images: {
     // Disable Next.js Image Optimization API so Vercel does not bill image cache usage.
     unoptimized: true,
