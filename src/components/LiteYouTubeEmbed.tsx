@@ -74,8 +74,7 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape: 16:9 of the outer shell's content height. Notch padding lives on
- * the outer shell, not here.
+ * Landscape: 16:9 of the outer shell's content height. No extra inset here.
  */
 const LANDSCAPE_FIT_SX = {
   height: "100%",

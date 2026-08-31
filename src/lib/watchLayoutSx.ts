@@ -1,8 +1,4 @@
-import {
-  LANDSCAPE_RAIL_INSET,
-  MOBILE_LANDSCAPE,
-  SAFE_LEFT,
-} from "@/lib/mobileLandscape";
+import { LANDSCAPE_RAIL_INSET, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
@@ -20,8 +16,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Notch is padding on this outer shell only. The inner 16:9 box has no
-     * offset — it just fills the padded content height.
+     * Flush to the left edge. YouTube's player already insets for the notch
+     * inside the iframe; a second pad here stacks another black bar.
      */
     top: 0,
     bottom: 0,
@@ -29,7 +25,7 @@ export const watchPlayerShellSx = {
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    pl: SAFE_LEFT,
+    pl: 0,
     pr: 0,
     mb: 0,
     aspectRatio: "auto",
