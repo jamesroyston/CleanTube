@@ -9,7 +9,7 @@
  * in `useCompactViewport.ts` and `globals.css`.
  */
 
-/** Icon column of the rail, before the notch inset is added. */
+/** Icon column of the rail. The island, when it is on the right, is extra. */
 export const LANDSCAPE_RAIL_WIDTH_PX = 56;
 
 const SHAPE = "(orientation: landscape) and (max-height: 599.95px)";
@@ -29,11 +29,16 @@ export const SAFE_RIGHT = "env(safe-area-inset-right, 0px)";
 export const SAFE_TOP = "env(safe-area-inset-top, 0px)";
 export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
 
+/** 56px icon column — video's right edge and default rail width. */
+export const LANDSCAPE_RAIL_CONTENT = `${LANDSCAPE_RAIL_WIDTH_PX}px`;
+
 /**
- * Rail keeps its icon column and swallows whatever the notch claims on the right
- * edge, so a right-side notch costs the video the same width a left-side one does.
+ * Rail when the island is on the right: icon column plus the island band.
+ * Do not use this as the default — iOS reports saR on both landscape sides.
  */
 export const LANDSCAPE_RAIL_INSET = `calc(${LANDSCAPE_RAIL_WIDTH_PX}px + ${SAFE_RIGHT})`;
+
+export const ISLAND_SIDE_ATTR = "data-island-side";
 
 /** Pixel value of `env(safe-area-inset-*)` (0 when the inset is unset). */
 export function readSafeAreaInset(side: "left" | "right" | "top" | "bottom"): number {
@@ -45,4 +50,35 @@ export function readSafeAreaInset(side: "left" | "right" | "top" | "bottom"): nu
     parseFloat(getComputedStyle(probe).getPropertyValue(`padding-${side}`)) || 0;
   probe.remove();
   return value;
+}
+
+/**
+ * Which long edge has the Dynamic Island. iOS often reports saL and saR as the
+ * same value in both landscape directions, so insets alone cannot tell.
+ * `90` = island on the left; `-90` / `270` = island on the right.
+ */
+export function landscapeIslandSide(): "left" | "right" {
+  if (typeof window === "undefined") return "left";
+  const left = readSafeAreaInset("left");
+  const right = readSafeAreaInset("right");
+  if (left > right + 10) return "left";
+  if (right > left + 10) return "right";
+  const angle =
+    window.screen?.orientation?.angle ??
+    (window as Window & { orientation?: number }).orientation ??
+    0;
+  return angle === -90 || angle === 270 ? "right" : "left";
+}
+
+export function syncLandscapeIslandSide(): void {
+  if (typeof document === "undefined") return;
+  const landscape = window.matchMedia("(orientation: landscape)").matches;
+  if (!landscape) {
+    document.documentElement.removeAttribute(ISLAND_SIDE_ATTR);
+    return;
+  }
+  document.documentElement.setAttribute(
+    ISLAND_SIDE_ATTR,
+    landscapeIslandSide(),
+  );
 }

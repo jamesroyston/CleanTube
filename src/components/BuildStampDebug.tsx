@@ -8,7 +8,7 @@ import Box from "@mui/material/Box";
  * that is meant to be tested. Remove this component and its mount in the landscape
  * rail, plus `NEXT_PUBLIC_BUILD_SHA` in `next.config.ts`, once landscape is signed off.
  */
-const ITERATION = 23;
+const ITERATION = 24;
 
 export function BuildStampDebug() {
   const sha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "local";

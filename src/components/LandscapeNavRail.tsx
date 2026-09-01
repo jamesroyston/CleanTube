@@ -15,10 +15,9 @@ import { WatchHeaderBackButton } from "@/components/WatchHeaderBackButton";
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useWatchBackTarget } from "@/hooks/useWatchBackTarget";
 import {
-  LANDSCAPE_RAIL_INSET,
+  LANDSCAPE_RAIL_CONTENT,
   MOBILE_LANDSCAPE,
   SAFE_BOTTOM,
-  SAFE_RIGHT,
   SAFE_TOP,
 } from "@/lib/mobileLandscape";
 import { bottomNavValueFromPathname } from "@/lib/mobileNavRoutes";
@@ -57,9 +56,8 @@ export function LandscapeNavRail() {
           top: 0,
           right: 0,
           bottom: 0,
-          /** Notch on the right: rail widens so icons clear it, background still reaches the edge. */
-          width: LANDSCAPE_RAIL_INSET,
-          pr: SAFE_RIGHT,
+          /** 56px icon column. Widens only when `data-island-side=right`. */
+          width: LANDSCAPE_RAIL_CONTENT,
           pt: `max(3px, ${SAFE_TOP})`,
           pb: `max(3px, ${SAFE_BOTTOM})`,
           boxSizing: "border-box",

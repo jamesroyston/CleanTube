@@ -1,6 +1,7 @@
 import {
-  LANDSCAPE_RAIL_INSET,
+  LANDSCAPE_RAIL_CONTENT,
   MOBILE_LANDSCAPE,
+  SAFE_LEFT,
 } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
@@ -19,13 +20,13 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Fill the area from the island edge to the rail. The player covers that
-     * box (16:9, cropped) so leftover app chrome does not sit beside it.
+     * Island inner edge to the 56px icon column. No overscan. Island-on-right
+     * overrides live in globals.css (`data-island-side`).
      */
     top: 0,
     bottom: 0,
-    left: 0,
-    right: LANDSCAPE_RAIL_INSET,
+    left: SAFE_LEFT,
+    right: LANDSCAPE_RAIL_CONTENT,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
     p: 0,

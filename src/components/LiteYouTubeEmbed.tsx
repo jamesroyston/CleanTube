@@ -32,7 +32,6 @@ import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
 import {
   MOBILE_LANDSCAPE,
   MOBILE_LANDSCAPE_QUERY,
-  readSafeAreaInset,
 } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
@@ -77,8 +76,7 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape: fill the shell. JS then 16:9-covers that box and clips YouTube's
- * inner safe-area pad.
+ * Landscape: fill the shell. iOS still needs pixel iframe size (100% = window).
  */
 const LANDSCAPE_FIT_SX = {
   height: "100%",
@@ -211,9 +209,8 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Visible hole fills the shell (island edge to rail). The iframe is a 16:9
-   * cover of that hole, shifted left by the safe-area so YouTube's inner black
-   * bar is clipped — not by rewriting the shell size (#13).
+   * Pin the iframe to the shell's pixel size. Do not overscan or cover-crop —
+   * the shell already runs from the island to the 56px rail.
    */
   useEffect(() => {
     if (!ready) return;
@@ -271,48 +268,31 @@ export function LiteYouTubeEmbed({
       const holeW = Math.floor(maxW);
       const holeH = Math.floor(maxH);
       if (!(holeW > 0) || !(holeH > 0)) return;
-      /** 16:9 cover: fill both axes, crop the overflow. */
-      let coverH = holeH;
-      let coverW = Math.ceil((coverH * 16) / 9);
-      if (coverW < holeW) {
-        coverW = holeW;
-        coverH = Math.ceil((coverW * 9) / 16);
-      }
-      const overscanL = Math.max(
-        Math.round(readSafeAreaInset("left")),
-        Math.round(readSafeAreaInset("right")),
-      );
-      const iframeW = coverW + overscanL;
-      const iframeH = coverH;
-      const shiftY = Math.round((holeH - iframeH) / 2);
       box.style.overflow = "hidden";
-      box.style.clipPath = "inset(0)";
       box.style.maxWidth = "none";
       box.style.width = `${holeW}px`;
       box.style.height = `${holeH}px`;
-      box.style.marginLeft = "0px";
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.contain = "none";
         embed.style.maxWidth = "none";
-        embed.style.overflow = "hidden";
-        embed.style.width = `${iframeW}px`;
-        embed.style.height = `${iframeH}px`;
-        embed.style.marginLeft = `${-overscanL}px`;
-        embed.style.marginTop = `${shiftY}px`;
+        embed.style.width = "100%";
+        embed.style.height = "100%";
+        embed.style.marginLeft = "0px";
+        embed.style.marginTop = "0px";
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
-        iframe.setAttribute("width", String(iframeW));
-        iframe.setAttribute("height", String(iframeH));
-        iframe.style.width = "100%";
-        iframe.style.height = "100%";
+        iframe.setAttribute("width", String(holeW));
+        iframe.setAttribute("height", String(holeH));
+        iframe.style.width = `${holeW}px`;
+        iframe.style.height = `${holeH}px`;
         iframe.style.left = "0px";
         iframe.style.marginLeft = "0px";
         iframe.style.top = "0px";
         iframe.style.marginTop = "0px";
       }
-      resyncPlayerSize(ytPlayerRef.current, { width: iframeW, height: iframeH });
+      resyncPlayerSize(ytPlayerRef.current, { width: holeW, height: holeH });
     };
 
     applyFit();

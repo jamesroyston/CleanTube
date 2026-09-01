@@ -126,4 +126,22 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
     height: 100%;
     aspect-ratio: auto;
   }
+
+  /**
+   * iOS reports the island inset on both sides. Put the 56px icon column on the
+   * island when it is actually on the right; otherwise the video runs to that
+   * column and the island is the video's left edge.
+   */
+  html[data-island-side="right"] [data-watch-player-shell] {
+    left: 0 !important;
+    right: calc(56px + env(safe-area-inset-right, 0px)) !important;
+  }
+  html[data-island-side="right"] [data-landscape-rail] {
+    width: calc(56px + env(safe-area-inset-right, 0px)) !important;
+    padding-right: env(safe-area-inset-right, 0px) !important;
+  }
+  html[data-island-side="right"] [data-landscape-main] {
+    padding-left: 0 !important;
+    padding-right: calc(56px + env(safe-area-inset-right, 0px)) !important;
+  }
 }

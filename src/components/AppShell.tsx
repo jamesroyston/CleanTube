@@ -36,7 +36,7 @@ import {
 } from "@/hooks/useCompactViewport";
 import { useMobileExperience } from "@/hooks/useMobileExperience";
 import {
-  LANDSCAPE_RAIL_INSET,
+  LANDSCAPE_RAIL_CONTENT,
   MOBILE_LANDSCAPE,
   SAFE_BOTTOM,
   SAFE_LEFT,
@@ -213,18 +213,19 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
     </Box>
   ) : (
     <Box
+      data-landscape-main
       sx={{
         flex: 1,
         minHeight: 0,
         pb: mobileMainPaddingBottom,
         /**
-         * Landscape: bottom nav is gone, so content only clears the right-edge rail
-         * and whichever side the notch is on.
+         * Landscape: bottom nav is gone, so content only clears the 56px rail
+         * and the island when it is on the left. Island-on-right is in CSS.
          */
         [MOBILE_LANDSCAPE]: {
           pb: SAFE_BOTTOM,
           pl: SAFE_LEFT,
-          pr: LANDSCAPE_RAIL_INSET,
+          pr: LANDSCAPE_RAIL_CONTENT,
         },
       }}
     >
