@@ -227,6 +227,7 @@ export function LiteYouTubeEmbed({
       box.style.removeProperty("margin-left");
       box.style.removeProperty("max-width");
       box.style.removeProperty("overflow");
+      box.style.removeProperty("clip-path");
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.removeProperty("width");
@@ -234,6 +235,7 @@ export function LiteYouTubeEmbed({
         embed.style.removeProperty("max-width");
         embed.style.removeProperty("margin-left");
         embed.style.removeProperty("overflow");
+        embed.style.removeProperty("contain");
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
@@ -242,6 +244,7 @@ export function LiteYouTubeEmbed({
         iframe.style.removeProperty("width");
         iframe.style.removeProperty("height");
         iframe.style.removeProperty("margin-left");
+        iframe.style.removeProperty("left");
       }
     };
 
@@ -269,25 +272,28 @@ export function LiteYouTubeEmbed({
       const overscanL = Math.round(readSafeAreaInset("left"));
       const iframeW = picW + overscanL;
       box.style.overflow = "hidden";
+      box.style.clipPath = "inset(0)";
       box.style.maxWidth = "none";
       box.style.width = `${picW}px`;
       box.style.height = `${picH}px`;
       box.style.marginLeft = "0px";
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
-        embed.style.width = "100%";
-        embed.style.height = "100%";
+        embed.style.contain = "none";
         embed.style.maxWidth = "none";
         embed.style.overflow = "hidden";
-        embed.style.marginLeft = "0px";
+        embed.style.width = `${iframeW}px`;
+        embed.style.height = `${picH}px`;
+        embed.style.marginLeft = `${-overscanL}px`;
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
         iframe.setAttribute("width", String(iframeW));
         iframe.setAttribute("height", String(picH));
-        iframe.style.width = `${iframeW}px`;
-        iframe.style.height = `${picH}px`;
-        iframe.style.marginLeft = `${-overscanL}px`;
+        iframe.style.width = "100%";
+        iframe.style.height = "100%";
+        iframe.style.left = "0px";
+        iframe.style.marginLeft = "0px";
       }
       resyncPlayerSize(ytPlayerRef.current, { width: iframeW, height: picH });
     };

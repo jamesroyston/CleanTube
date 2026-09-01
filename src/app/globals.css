@@ -119,6 +119,7 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
     max-width: none;
     aspect-ratio: auto;
     overflow: hidden;
+    contain: none;
   }
   lite-youtube > iframe {
     width: 100%;
