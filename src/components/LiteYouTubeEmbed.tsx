@@ -271,14 +271,7 @@ export function LiteYouTubeEmbed({
         picW = Math.floor(maxW);
         picH = Math.floor((picW * 9) / 16);
       }
-      /**
-       * iOS YouTube sizes the picture against the window, not the iframe, so a
-       * right-aligned hole still has a centered inner video. Overscan left by
-       * the safe-area plus 25% of leftover width to pull it into the hole.
-       */
-      const leftover = Math.max(0, maxW - picW);
-      const overscanL =
-        Math.round(readSafeAreaInset("left")) + Math.round(leftover * 0.25);
+      const overscanL = Math.round(readSafeAreaInset("left"));
       const iframeW = picW + overscanL;
       box.style.overflow = "hidden";
       box.style.clipPath = "inset(0)";

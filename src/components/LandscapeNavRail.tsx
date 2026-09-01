@@ -59,13 +59,12 @@ export function LandscapeNavRail() {
           /** Notch on the right: rail widens so icons clear it, background still reaches the edge. */
           width: LANDSCAPE_RAIL_INSET,
           pr: SAFE_RIGHT,
-          pt: SAFE_TOP,
-          pb: SAFE_BOTTOM,
+          pt: `max(3px, ${SAFE_TOP})`,
+          pb: `max(3px, ${SAFE_BOTTOM})`,
           boxSizing: "border-box",
           flexDirection: "column",
           alignItems: "center",
-          gap: 0.5,
-          py: 0.5,
+          gap: 0.375,
           bgcolor: "background.paper",
           borderLeft: (t) => `1px solid ${t.palette.divider}`,
           zIndex: (t) => t.zIndex.drawer + 2,
@@ -81,7 +80,7 @@ export function LandscapeNavRail() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 0.5,
+          gap: 0.375,
         }}
       >
         {watchBack ? (
