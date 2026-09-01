@@ -113,42 +113,6 @@ export function isLiteYoutubeElementActivated(root: HTMLElement | null): boolean
   return Boolean(el && el.classList.contains("lyt-activated"));
 }
 
-/**
- * Same-document Picture-in-Picture (including Document PiP). YouTube's iframe
- * PiP is cross-origin, so the parent page cannot see it.
- */
-export function isDocumentPictureInPictureActive(): boolean {
-  if (typeof document === "undefined") return false;
-  return Boolean(document.pictureInPictureElement);
-}
-
-const YT_PLAYING = 1;
-const YT_BUFFERING = 3;
-
-/**
- * Keep the youtube.com iframe in the tree. iOS standalone fullscreen / PiP
- * hides the page; tearing the player down is what kills those modes.
- */
-export function shouldKeepYoutubeIframeAlive(
-  player: YT.Player | null | undefined,
-  playing: boolean,
-): boolean {
-  if (typeof document === "undefined") return false;
-  if (isDocumentPictureInPictureActive()) return true;
-  if (playing) return true;
-  const doc = document as Document & {
-    webkitFullscreenElement?: Element | null;
-  };
-  if (document.fullscreenElement || doc.webkitFullscreenElement) return true;
-  if (!isYoutubePlayerAttached(player)) return false;
-  try {
-    const state = player.getPlayerState();
-    return state === YT_PLAYING || state === YT_BUFFERING;
-  } catch {
-    return false;
-  }
-}
-
 /** YouTube's IFrame API iframe sometimes omits PiP from `allow`. */
 export function ensureYoutubeIframeAllowsPiP(player: YT.Player): void {
   if (!isYoutubePlayerAttached(player)) return;

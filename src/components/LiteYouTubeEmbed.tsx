@@ -25,7 +25,6 @@ import {
   readPlayerCurrentTime,
   readPlayerDuration,
   releaseLiteYoutubePlayer,
-  shouldKeepYoutubeIframeAlive,
   stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
@@ -40,12 +39,6 @@ import "lite-youtube-embed/src/lite-yt-embed.css";
 const PROGRESS_SAMPLE_INTERVAL_MS = 1_000;
 /** Default 15s; see docs/decisions/watch-progress-persistence.md (Hobby may use 30s). */
 const SIGNED_IN_CLOUD_SYNC_INTERVAL_MS = 15_000;
-/**
- * Ignore brief iOS hidden blips (Control Center, notification shade) before
- * tearing down the youtube.com iframe. Fullscreen / PiP also hide the PWA;
- * those stay alive via `shouldKeepYoutubeIframeAlive`.
- */
-const PARK_AFTER_HIDDEN_MS = 1_500;
 /** Swallow lite-youtube's remount autoplay long enough to re-apply a user pause. */
 const REMOUNT_PAUSE_HOLD_MS = 750;
 
@@ -145,14 +138,10 @@ export function LiteYouTubeEmbed({
   const { upsertWatchProgress, canPersistLibrary } = useCloudLibrary();
   const [ready, setReady] = useState(liteYtModuleReady);
   const [playerGeneration, setPlayerGeneration] = useState(0);
-  /** True while the youtube.com iframe is torn down (tab hidden / frozen). */
-  const [parked, setParked] = useState(false);
   const [resumeSeconds, setResumeSeconds] = useState<number | undefined>(
     undefined,
   );
-  const parkedRef = useRef(false);
   const resumeSecondsRef = useRef<number | undefined>(undefined);
-  const unparkRef = useRef<() => void>(() => {});
   const attachFailRef = useRef(0);
   const shellRef = useRef<HTMLDivElement>(null);
   const assignShellRef = useCallback(
@@ -195,16 +184,14 @@ export function LiteYouTubeEmbed({
     userPausedRef.current = false;
     lastRecordedSecondsRef.current = -1;
     resumeSecondsRef.current = undefined;
-    parkedRef.current = false;
     attachFailRef.current = 0;
-    setParked(false);
     setResumeSeconds(undefined);
   }, [videoId]);
 
   useGlobalYoutubeShortcuts(
     shellRef,
     videoId,
-    enableGlobalShortcuts && ready && !parked,
+    enableGlobalShortcuts && ready,
     playerApiReadyRef,
   );
 
@@ -308,11 +295,11 @@ export function LiteYouTubeEmbed({
       orientation.removeEventListener("change", applyFit);
       clearFit();
     };
-  }, [ready, parked]);
+  }, [ready]);
 
   /** Rotation resizes the iframe in place; make the player re-measure itself. */
   useEffect(() => {
-    if (!ready || parked) return;
+    if (!ready) return;
 
     let raf = 0;
     const timers: number[] = [];
@@ -336,7 +323,7 @@ export function LiteYouTubeEmbed({
       window.removeEventListener("orientationchange", scheduleResync);
       orientation.removeEventListener("change", scheduleResync);
     };
-  }, [ready, parked]);
+  }, [ready]);
 
   const iframeStart =
     resumeSeconds != null && resumeSeconds > 0 ? resumeSeconds : start;
@@ -437,7 +424,7 @@ export function LiteYouTubeEmbed({
   }, [stopPlayer, releasePlayer]);
 
   useEffect(() => {
-    if (!ready || parked) return;
+    if (!ready) return;
 
     let cancelled = false;
     let attachedPlayer: YT.Player | null = null;
@@ -548,7 +535,7 @@ export function LiteYouTubeEmbed({
         }
       }
     };
-  }, [ready, parked, videoId, playerGeneration, onPlayerApiReady]);
+  }, [ready, videoId, playerGeneration, onPlayerApiReady]);
 
   useEffect(() => {
     if (!ready) return;
@@ -567,167 +554,82 @@ export function LiteYouTubeEmbed({
       }
     };
 
-    const parkPlayer = () => {
-      if (parkedRef.current) return;
+    const flush = () => {
       captureResumeSeconds();
       void recordProgressRef.current({ force: true, syncCloud: true });
+    };
+
+    const playerLooksAlive = () => {
+      const player = ytPlayerRef.current;
+      if (!isYoutubePlayerAttached(player)) return false;
+      try {
+        player.getPlayerState();
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const recoverIfDead = () => {
+      if (playerLooksAlive()) return;
       if (
-        shouldKeepYoutubeIframeAlive(
-          ytPlayerRef.current,
-          playingRef.current,
-        )
+        !playerApiReadyRef.current &&
+        !isLiteYoutubeElementActivated(shellRef.current)
       ) {
         return;
       }
-      releasePlayer();
-      parkedRef.current = true;
-      setParked(true);
-    };
-
-    const unparkPlayer = () => {
-      if (!parkedRef.current) return;
+      captureResumeSeconds();
       const captured = resumeSecondsRef.current;
       if (captured != null && captured > 0) {
         setResumeSeconds(captured);
       }
-      parkedRef.current = false;
-      attachFailRef.current = 0;
-      setParked(false);
-      // Always remount. A reused <lite-youtube> after background often has a
-      // hung getYTPlayer() promise; a fresh element can activate again.
-      setPlayerGeneration((g) => g + 1);
-    };
-    unparkRef.current = unparkPlayer;
-
-    let parkTimer: number | null = null;
-    const cancelPark = () => {
-      if (parkTimer == null) return;
-      window.clearTimeout(parkTimer);
-      parkTimer = null;
-    };
-    const schedulePark = () => {
-      cancelPark();
-      parkTimer = window.setTimeout(() => {
-        parkTimer = null;
-        parkPlayer();
-      }, PARK_AFTER_HIDDEN_MS);
-    };
-
-    const recoverPlayer = () => {
-      captureResumeSeconds();
       ytPlayerRef.current = null;
       playerApiReadyRef.current = false;
       onPlayerApiReady?.(false);
       playingRef.current = false;
+      attachFailRef.current = 0;
       setPlayerGeneration((g) => g + 1);
-    };
-
-    const onVisible = () => {
-      cancelPark();
-      if (parkedRef.current) {
-        unparkPlayer();
-        return;
-      }
-      if (playerApiReadyRef.current) return;
-      // Fresh poster / remount in progress — the attach effect owns activation.
-      if (!isLiteYoutubeElementActivated(shellRef.current)) return;
-      recoverPlayer();
     };
 
     const onVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        schedulePark();
+        flush();
         return;
       }
-      onVisible();
+      recoverIfDead();
     };
 
     const onPageHide = () => {
-      captureResumeSeconds();
-      void recordProgressRef.current({ force: true, syncCloud: true });
-      // iOS fires pagehide for app-switch, Control Center, and native
-      // fullscreen. Wait the same grace as visibilitychange; parkPlayer
-      // refuses to tear down while the video is still playing / in PiP.
-      schedulePark();
-    };
-
-    const onFullscreenChange = () => {
-      const doc = document as Document & {
-        webkitFullscreenElement?: Element | null;
-      };
-      if (document.fullscreenElement || doc.webkitFullscreenElement) {
-        cancelPark();
-      }
-    };
-
-    const onFreeze = () => {
-      cancelPark();
-      parkPlayer();
+      flush();
     };
 
     const onPageShow = (event: PageTransitionEvent) => {
-      cancelPark();
-      if (event.persisted) {
-        if (parkedRef.current) {
-          unparkPlayer();
-          return;
-        }
-        recoverPlayer();
-        return;
+      if (event.persisted || !playerLooksAlive()) {
+        recoverIfDead();
       }
-      onVisible();
-    };
-
-    const onResume = () => {
-      cancelPark();
-      if (parkedRef.current) {
-        unparkPlayer();
-        return;
-      }
-      if (!playerApiReadyRef.current) recoverPlayer();
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
-    document.addEventListener("fullscreenchange", onFullscreenChange);
-    document.addEventListener(
-      "webkitfullscreenchange",
-      onFullscreenChange,
-    );
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("focus", onVisible);
+    window.addEventListener("focus", recoverIfDead);
     if ("onresume" in document) {
-      document.addEventListener("resume", onResume);
-    }
-    if ("onfreeze" in document) {
-      document.addEventListener("freeze", onFreeze);
-    }
-    if (document.visibilityState === "visible" && parkedRef.current) {
-      unparkPlayer();
+      document.addEventListener("resume", recoverIfDead);
     }
 
     return () => {
-      cancelPark();
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      document.removeEventListener("fullscreenchange", onFullscreenChange);
-      document.removeEventListener(
-        "webkitfullscreenchange",
-        onFullscreenChange,
-      );
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
-      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("focus", recoverIfDead);
       if ("onresume" in document) {
-        document.removeEventListener("resume", onResume);
-      }
-      if ("onfreeze" in document) {
-        document.removeEventListener("freeze", onFreeze);
+        document.removeEventListener("resume", recoverIfDead);
       }
     };
-  }, [ready, videoId, onPlayerApiReady, releasePlayer]);
+  }, [ready, videoId, onPlayerApiReady]);
 
   useEffect(() => {
-    if (!ready || !canPersistLibrary || parked) return;
+    if (!ready || !canPersistLibrary) return;
 
     const sampleInterval = window.setInterval(() => {
       if (playingRef.current && playerApiReadyRef.current) {
@@ -788,7 +690,7 @@ export function LiteYouTubeEmbed({
       }
       flush();
     };
-  }, [canPersistLibrary, ready, parked]);
+  }, [canPersistLibrary, ready]);
 
   const shellSx = theatreMaximize
     ? {
@@ -843,52 +745,18 @@ export function LiteYouTubeEmbed({
 
   const player = (
     <Box ref={assignShellRef} sx={shellSx}>
-      {parked ? (
-        <Box
-          role="button"
-          tabIndex={0}
-          aria-label="Resume video"
-          onClick={() => unparkRef.current()}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              unparkRef.current();
-            }
-          }}
-          sx={{
-            width: "100%",
-            aspectRatio: "16 / 9",
-            borderRadius: 1,
-            bgcolor: "action.hover",
-            backgroundImage: thumbnailUrl
-              ? `url("${thumbnailUrl}")`
-              : undefined,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            cursor: "pointer",
-            [MOBILE_PORTRAIT]: { borderRadius: 0 },
-            [MOBILE_LANDSCAPE]: {
-              height: "100%",
-              width: "100%",
-              aspectRatio: "auto",
-              borderRadius: 0,
-            },
-          }}
-        />
-      ) : (
-        <lite-youtube
-          key={`${videoId}-${playerGeneration}`}
-          videoid={videoId}
-          title={title ?? ""}
-          params={params.toString()}
-          {...{ "js-api": "" }}
-          style={{
-            width: "100%",
-            maxWidth: "100%",
-            display: "block",
-          }}
-        />
-      )}
+      <lite-youtube
+        key={`${videoId}-${playerGeneration}`}
+        videoid={videoId}
+        title={title ?? ""}
+        params={params.toString()}
+        {...{ "js-api": "" }}
+        style={{
+          width: "100%",
+          maxWidth: "100%",
+          display: "block",
+        }}
+      />
     </Box>
   );
 
