@@ -40,7 +40,7 @@ export const LANDSCAPE_RAIL_INSET = `calc(${LANDSCAPE_RAIL_WIDTH_PX}px + ${SAFE_
  * Small enough to stay close to the screen; the home indicator uses the bottom
  * safe-area instead of this value.
  */
-export const LANDSCAPE_VIDEO_INSET_PX = 8;
+export const LANDSCAPE_VIDEO_INSET_PX = 6;
 
 /** Pixel value of `env(safe-area-inset-*)` (0 when the inset is unset). */
 export function readSafeAreaInset(side: "left" | "right" | "top" | "bottom"): number {

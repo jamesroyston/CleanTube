@@ -18,13 +18,14 @@ import {
   resyncPlayerSize,
 } from "@/lib/youtubePlayerControls";
 import {
+  ensureYoutubeIframeAllowsPiP,
   getAttachedLiteYoutubePlayer,
-  isDocumentPictureInPictureActive,
   isLiteYoutubeElementActivated,
   isYoutubePlayerAttached,
   readPlayerCurrentTime,
   readPlayerDuration,
   releaseLiteYoutubePlayer,
+  shouldKeepYoutubeIframeAlive,
   stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
@@ -42,7 +43,8 @@ const PROGRESS_SAMPLE_INTERVAL_MS = 1_000;
 const SIGNED_IN_CLOUD_SYNC_INTERVAL_MS = 15_000;
 /**
  * Ignore brief iOS hidden blips (Control Center, notification shade) before
- * tearing down the youtube.com iframe. `pagehide` / `freeze` park immediately.
+ * tearing down the youtube.com iframe. Fullscreen / PiP also hide the PWA;
+ * those stay alive via `shouldKeepYoutubeIframeAlive`.
  */
 const PARK_AFTER_HIDDEN_MS = 1_500;
 /** Swallow lite-youtube's remount autoplay long enough to re-apply a user pause. */
@@ -269,7 +271,14 @@ export function LiteYouTubeEmbed({
         picW = Math.floor(maxW);
         picH = Math.floor((picW * 9) / 16);
       }
-      const overscanL = Math.round(readSafeAreaInset("left"));
+      /**
+       * iOS YouTube sizes the picture against the window, not the iframe, so a
+       * right-aligned hole still has a centered inner video. Overscan left by
+       * the safe-area plus 25% of leftover width to pull it into the hole.
+       */
+      const leftover = Math.max(0, maxW - picW);
+      const overscanL =
+        Math.round(readSafeAreaInset("left")) + Math.round(leftover * 0.25);
       const iframeW = picW + overscanL;
       box.style.overflow = "hidden";
       box.style.clipPath = "inset(0)";
@@ -453,8 +462,11 @@ export function LiteYouTubeEmbed({
       const player = attachedPlayer;
       if (!isYoutubePlayerAttached(player)) return;
       const state = event.data;
-      if (state === YT.PlayerState.PLAYING) {
-        if (holdPause) {
+      if (
+        state === YT.PlayerState.PLAYING ||
+        state === YT.PlayerState.BUFFERING
+      ) {
+        if (holdPause && state === YT.PlayerState.PLAYING) {
           try {
             player.pauseVideo();
           } catch {
@@ -463,9 +475,11 @@ export function LiteYouTubeEmbed({
           playingRef.current = false;
           return;
         }
-        userPausedRef.current = false;
+        if (state === YT.PlayerState.PLAYING) {
+          userPausedRef.current = false;
+          void recordProgressRef.current();
+        }
         playingRef.current = true;
-        void recordProgressRef.current();
         return;
       }
       playingRef.current = false;
@@ -519,6 +533,7 @@ export function LiteYouTubeEmbed({
         playerApiReadyRef.current = true;
         attachFailRef.current = 0;
         ensurePlayerVolume100(player);
+        ensureYoutubeIframeAllowsPiP(player);
         primeCaptionsModule(player);
         if (userPausedRef.current) {
           try {
@@ -566,9 +581,16 @@ export function LiteYouTubeEmbed({
 
     const parkPlayer = () => {
       if (parkedRef.current) return;
-      if (isDocumentPictureInPictureActive()) return;
       captureResumeSeconds();
       void recordProgressRef.current({ force: true, syncCloud: true });
+      if (
+        shouldKeepYoutubeIframeAlive(
+          ytPlayerRef.current,
+          playingRef.current,
+        )
+      ) {
+        return;
+      }
       releasePlayer();
       parkedRef.current = true;
       setParked(true);
@@ -635,10 +657,19 @@ export function LiteYouTubeEmbed({
     const onPageHide = () => {
       captureResumeSeconds();
       void recordProgressRef.current({ force: true, syncCloud: true });
-      // iOS fires pagehide for app-switch and Control Center. Tearing down
-      // immediately is what left a dead poster until refresh; wait the same
-      // grace as visibilitychange unless the page actually freezes.
+      // iOS fires pagehide for app-switch, Control Center, and native
+      // fullscreen. Wait the same grace as visibilitychange; parkPlayer
+      // refuses to tear down while the video is still playing / in PiP.
       schedulePark();
+    };
+
+    const onFullscreenChange = () => {
+      const doc = document as Document & {
+        webkitFullscreenElement?: Element | null;
+      };
+      if (document.fullscreenElement || doc.webkitFullscreenElement) {
+        cancelPark();
+      }
     };
 
     const onFreeze = () => {
@@ -669,6 +700,11 @@ export function LiteYouTubeEmbed({
     };
 
     document.addEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener(
+      "webkitfullscreenchange",
+      onFullscreenChange,
+    );
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
     window.addEventListener("focus", onVisible);
@@ -685,6 +721,11 @@ export function LiteYouTubeEmbed({
     return () => {
       cancelPark();
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+      document.removeEventListener(
+        "webkitfullscreenchange",
+        onFullscreenChange,
+      );
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("focus", onVisible);

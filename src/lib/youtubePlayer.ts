@@ -122,6 +122,47 @@ export function isDocumentPictureInPictureActive(): boolean {
   return Boolean(document.pictureInPictureElement);
 }
 
+const YT_PLAYING = 1;
+const YT_BUFFERING = 3;
+
+/**
+ * Keep the youtube.com iframe in the tree. iOS standalone fullscreen / PiP
+ * hides the page; tearing the player down is what kills those modes.
+ */
+export function shouldKeepYoutubeIframeAlive(
+  player: YT.Player | null | undefined,
+  playing: boolean,
+): boolean {
+  if (typeof document === "undefined") return false;
+  if (isDocumentPictureInPictureActive()) return true;
+  if (playing) return true;
+  const doc = document as Document & {
+    webkitFullscreenElement?: Element | null;
+  };
+  if (document.fullscreenElement || doc.webkitFullscreenElement) return true;
+  if (!isYoutubePlayerAttached(player)) return false;
+  try {
+    const state = player.getPlayerState();
+    return state === YT_PLAYING || state === YT_BUFFERING;
+  } catch {
+    return false;
+  }
+}
+
+/** YouTube's IFrame API iframe sometimes omits PiP from `allow`. */
+export function ensureYoutubeIframeAllowsPiP(player: YT.Player): void {
+  if (!isYoutubePlayerAttached(player)) return;
+  const iframe = player.getIframe?.();
+  if (!iframe) return;
+  const allow = iframe.allow ?? "";
+  const extras = ["picture-in-picture", "fullscreen", "encrypted-media"];
+  const missing = extras.filter((token) => !allow.includes(token));
+  if (missing.length > 0) {
+    iframe.allow = [allow, ...missing].filter(Boolean).join("; ");
+  }
+  iframe.allowFullscreen = true;
+}
+
 /** Safe read of duration; returns undefined if player is not ready / attached. */
 export function readPlayerDuration(player: YT.Player): number | undefined {
   if (!isYoutubePlayerAttached(player)) return undefined;
