@@ -69,12 +69,11 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape: 16:9 of the shell height, packed to the island. JS pins pixel size.
+ * Landscape: fill the shell. JS pins the iframe to that pixel size.
  */
 const LANDSCAPE_FIT_SX = {
   height: "100%",
-  width: "auto",
-  aspectRatio: "16 / 9",
+  width: "100%",
   maxWidth: "100%",
   maxHeight: "100%",
   overflow: "hidden",
@@ -198,8 +197,8 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * 16:9 of the shell, flush to the island. Same pixel size as the visible box
-   * so the control bar stays on-screen — no overscan.
+   * Fill the shell (island to rail). Same pixel size as the visible box so the
+   * control bar stays on-screen — no overscan.
    */
   useEffect(() => {
     if (!ready) return;
@@ -259,16 +258,10 @@ export function LiteYouTubeEmbed({
       const holeW = Math.floor(maxW);
       const holeH = Math.floor(maxH);
       if (!(holeW > 0) || !(holeH > 0)) return;
-      let picH = holeH;
-      let picW = Math.floor((picH * 16) / 9);
-      if (picW > holeW) {
-        picW = holeW;
-        picH = Math.floor((picW * 9) / 16);
-      }
       box.style.overflow = "hidden";
       box.style.maxWidth = "none";
-      box.style.width = `${picW}px`;
-      box.style.height = `${picH}px`;
+      box.style.width = `${holeW}px`;
+      box.style.height = `${holeH}px`;
       box.style.transform = "translate3d(0, 0, 0)";
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
@@ -282,17 +275,17 @@ export function LiteYouTubeEmbed({
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
-        iframe.setAttribute("width", String(picW));
-        iframe.setAttribute("height", String(picH));
-        iframe.style.width = `${picW}px`;
-        iframe.style.height = `${picH}px`;
+        iframe.setAttribute("width", String(holeW));
+        iframe.setAttribute("height", String(holeH));
+        iframe.style.width = `${holeW}px`;
+        iframe.style.height = `${holeH}px`;
         iframe.style.left = "0px";
         iframe.style.marginLeft = "0px";
         iframe.style.top = "0px";
         iframe.style.marginTop = "0px";
         iframe.style.transform = "translate3d(0, 0, 0)";
       }
-      resyncPlayerSize(ytPlayerRef.current, { width: picW, height: picH });
+      resyncPlayerSize(ytPlayerRef.current, { width: holeW, height: holeH });
     };
 
     applyFit();
