@@ -9,6 +9,7 @@ import Tooltip from "@mui/material/Tooltip";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
+import { BuildStampDebug } from "@/components/BuildStampDebug";
 import { CleanTubeLogo } from "@/components/CleanTubeLogo";
 import { WatchHeaderBackButton } from "@/components/WatchHeaderBackButton";
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
@@ -70,6 +71,8 @@ export function LandscapeNavRail() {
           zIndex: (t) => t.zIndex.drawer + 2,
           overflowY: "auto",
           overscrollBehavior: "contain",
+          /** Stamp sits at the bottom of this column. */
+          justifyContent: "flex-start",
         },
       }}
     >
@@ -77,6 +80,7 @@ export function LandscapeNavRail() {
         sx={{
           /** Fill the icon column exactly; a fixed 56px overflows the 1px left border. */
           width: "100%",
+          flexShrink: 0,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
@@ -147,6 +151,7 @@ export function LandscapeNavRail() {
           </IconButton>
         </Tooltip>
       </Box>
+      <BuildStampDebug />
     </Box>
   );
 }

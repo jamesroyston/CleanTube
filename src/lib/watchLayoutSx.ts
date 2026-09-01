@@ -1,8 +1,6 @@
 import {
   LANDSCAPE_RAIL_INSET,
-  LANDSCAPE_VIDEO_INSET_PX,
   MOBILE_LANDSCAPE,
-  SAFE_BOTTOM,
 } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
@@ -21,8 +19,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Near full-bleed, packed against the rail. Leftover width sits on the
-     * island side. YouTube's inner safe-area is clipped inside the 16:9 box.
+     * Fill the area from the island edge to the rail. The player covers that
+     * box (16:9, cropped) so leftover app chrome does not sit beside it.
      */
     top: 0,
     bottom: 0,
@@ -30,12 +28,11 @@ export const watchPlayerShellSx = {
     right: LANDSCAPE_RAIL_INSET,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    p: `${LANDSCAPE_VIDEO_INSET_PX}px`,
-    pb: `max(${LANDSCAPE_VIDEO_INSET_PX}px, ${SAFE_BOTTOM})`,
+    p: 0,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
-    alignItems: "center",
+    alignItems: "stretch",
     justifyContent: "flex-end",
     overflow: "hidden",
     bgcolor: "background.default",

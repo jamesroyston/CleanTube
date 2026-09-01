@@ -22,7 +22,6 @@ import {
   ChannelsRailContent,
   drawerRailTransition,
 } from "@/components/ChannelsSidebar";
-import { BuildStampDebug } from "@/components/BuildStampDebug";
 import { CompactLayoutChrome } from "@/components/CompactLayoutChrome";
 import { Header } from "@/components/Header";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
@@ -256,7 +255,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             }),
       }}
     >
-      <BuildStampDebug />
       <Suspense fallback={<HeaderFallback />}>
         <AppShellDrawerPathSync onPathChange={resetMobileDrawerOnNavigate} />
         <WatchReturnTracker />

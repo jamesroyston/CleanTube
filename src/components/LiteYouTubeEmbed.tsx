@@ -77,12 +77,12 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape: 16:9 of the outer shell's content height. No extra inset here.
+ * Landscape: fill the shell. JS then 16:9-covers that box and clips YouTube's
+ * inner safe-area pad.
  */
 const LANDSCAPE_FIT_SX = {
   height: "100%",
-  width: "auto",
-  aspectRatio: "16 / 9",
+  width: "100%",
   maxWidth: "100%",
   maxHeight: "100%",
   overflow: "hidden",
@@ -211,9 +211,9 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Visible hole is 16:9 of the padded shell. The iframe is wider by saL and
-   * shifted left so YouTube's inner notch pad is clipped inside that hole —
-   * not by rewriting the shell size (#13).
+   * Visible hole fills the shell (island edge to rail). The iframe is a 16:9
+   * cover of that hole, shifted left by the safe-area so YouTube's inner black
+   * bar is clipped — not by rewriting the shell size (#13).
    */
   useEffect(() => {
     if (!ready) return;
@@ -236,6 +236,7 @@ export function LiteYouTubeEmbed({
         embed.style.removeProperty("height");
         embed.style.removeProperty("max-width");
         embed.style.removeProperty("margin-left");
+        embed.style.removeProperty("margin-top");
         embed.style.removeProperty("overflow");
         embed.style.removeProperty("contain");
       }
@@ -247,6 +248,8 @@ export function LiteYouTubeEmbed({
         iframe.style.removeProperty("height");
         iframe.style.removeProperty("margin-left");
         iframe.style.removeProperty("left");
+        iframe.style.removeProperty("margin-top");
+        iframe.style.removeProperty("top");
       }
     };
 
@@ -265,19 +268,28 @@ export function LiteYouTubeEmbed({
         parseFloat(style.paddingTop) -
         parseFloat(style.paddingBottom);
       if (!(maxW > 0) || !(maxH > 0)) return;
-      let picH = Math.floor(maxH);
-      let picW = Math.floor((picH * 16) / 9);
-      if (picW > maxW) {
-        picW = Math.floor(maxW);
-        picH = Math.floor((picW * 9) / 16);
+      const holeW = Math.floor(maxW);
+      const holeH = Math.floor(maxH);
+      if (!(holeW > 0) || !(holeH > 0)) return;
+      /** 16:9 cover: fill both axes, crop the overflow. */
+      let coverH = holeH;
+      let coverW = Math.ceil((coverH * 16) / 9);
+      if (coverW < holeW) {
+        coverW = holeW;
+        coverH = Math.ceil((coverW * 9) / 16);
       }
-      const overscanL = Math.round(readSafeAreaInset("left"));
-      const iframeW = picW + overscanL;
+      const overscanL = Math.max(
+        Math.round(readSafeAreaInset("left")),
+        Math.round(readSafeAreaInset("right")),
+      );
+      const iframeW = coverW + overscanL;
+      const iframeH = coverH;
+      const shiftY = Math.round((holeH - iframeH) / 2);
       box.style.overflow = "hidden";
       box.style.clipPath = "inset(0)";
       box.style.maxWidth = "none";
-      box.style.width = `${picW}px`;
-      box.style.height = `${picH}px`;
+      box.style.width = `${holeW}px`;
+      box.style.height = `${holeH}px`;
       box.style.marginLeft = "0px";
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
@@ -285,19 +297,22 @@ export function LiteYouTubeEmbed({
         embed.style.maxWidth = "none";
         embed.style.overflow = "hidden";
         embed.style.width = `${iframeW}px`;
-        embed.style.height = `${picH}px`;
+        embed.style.height = `${iframeH}px`;
         embed.style.marginLeft = `${-overscanL}px`;
+        embed.style.marginTop = `${shiftY}px`;
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
         iframe.setAttribute("width", String(iframeW));
-        iframe.setAttribute("height", String(picH));
+        iframe.setAttribute("height", String(iframeH));
         iframe.style.width = "100%";
         iframe.style.height = "100%";
         iframe.style.left = "0px";
         iframe.style.marginLeft = "0px";
+        iframe.style.top = "0px";
+        iframe.style.marginTop = "0px";
       }
-      resyncPlayerSize(ytPlayerRef.current, { width: iframeW, height: picH });
+      resyncPlayerSize(ytPlayerRef.current, { width: iframeW, height: iframeH });
     };
 
     applyFit();
@@ -872,7 +887,12 @@ export function LiteYouTubeEmbed({
             backgroundPosition: "center",
             cursor: "pointer",
             [MOBILE_PORTRAIT]: { borderRadius: 0 },
-            [MOBILE_LANDSCAPE]: { height: "100%", borderRadius: 0 },
+            [MOBILE_LANDSCAPE]: {
+              height: "100%",
+              width: "100%",
+              aspectRatio: "auto",
+              borderRadius: 0,
+            },
           }}
         />
       ) : (
