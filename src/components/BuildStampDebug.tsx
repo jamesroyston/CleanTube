@@ -11,8 +11,8 @@ import { LANDSCAPE_RAIL_INSET, readSafeAreaInset } from "@/lib/mobileLandscape";
  * that is meant to be tested. Remove this component and its mount in `AppShell`,
  * plus `NEXT_PUBLIC_BUILD_SHA` in `next.config.ts`, once landscape is signed off.
  */
-const ITERATION = 18;
-const NOTE = "clip-path hole";
+const ITERATION = 19;
+const NOTE = "flex-end at rail";
 
 export function BuildStampDebug() {
   const sha = process.env.NEXT_PUBLIC_BUILD_SHA ?? "unknown";

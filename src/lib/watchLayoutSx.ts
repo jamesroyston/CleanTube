@@ -21,8 +21,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Near full-bleed: a few pixels of pad so the player is not the screen
-     * edge. YouTube's inner safe-area is clipped inside the 16:9 box.
+     * Near full-bleed, packed against the rail. Leftover width sits on the
+     * island side. YouTube's inner safe-area is clipped inside the 16:9 box.
      */
     top: 0,
     bottom: 0,
@@ -36,7 +36,7 @@ export const watchPlayerShellSx = {
     aspectRatio: "auto",
     display: "flex",
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "flex-end",
     overflow: "hidden",
     bgcolor: "background.default",
     zIndex: 1,
