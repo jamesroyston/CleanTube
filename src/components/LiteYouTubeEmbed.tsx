@@ -69,14 +69,16 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape: fill the shell. iOS still needs pixel iframe size (100% = window).
+ * Landscape: 16:9 of the shell height, packed to the island. JS pins pixel size.
  */
 const LANDSCAPE_FIT_SX = {
   height: "100%",
-  width: "100%",
+  width: "auto",
+  aspectRatio: "16 / 9",
   maxWidth: "100%",
   maxHeight: "100%",
   overflow: "hidden",
+  transform: "translate3d(0, 0, 0)",
 } as const;
 
 /** Give up on a hung `getYTPlayer()` (iOS after background) and remount. */
@@ -196,8 +198,8 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Pin the iframe to the shell's pixel size. Do not overscan or cover-crop —
-   * the shell already runs from the island to the 56px rail.
+   * 16:9 of the shell, flush to the island. Same pixel size as the visible box
+   * so the control bar stays on-screen — no overscan.
    */
   useEffect(() => {
     if (!ready) return;
@@ -213,7 +215,7 @@ export function LiteYouTubeEmbed({
       box.style.removeProperty("margin-left");
       box.style.removeProperty("max-width");
       box.style.removeProperty("overflow");
-      box.style.removeProperty("clip-path");
+      box.style.removeProperty("transform");
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.removeProperty("width");
@@ -223,6 +225,7 @@ export function LiteYouTubeEmbed({
         embed.style.removeProperty("margin-top");
         embed.style.removeProperty("overflow");
         embed.style.removeProperty("contain");
+        embed.style.removeProperty("transform");
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
@@ -234,6 +237,7 @@ export function LiteYouTubeEmbed({
         iframe.style.removeProperty("left");
         iframe.style.removeProperty("margin-top");
         iframe.style.removeProperty("top");
+        iframe.style.removeProperty("transform");
       }
     };
 
@@ -255,10 +259,17 @@ export function LiteYouTubeEmbed({
       const holeW = Math.floor(maxW);
       const holeH = Math.floor(maxH);
       if (!(holeW > 0) || !(holeH > 0)) return;
+      let picH = holeH;
+      let picW = Math.floor((picH * 16) / 9);
+      if (picW > holeW) {
+        picW = holeW;
+        picH = Math.floor((picW * 9) / 16);
+      }
       box.style.overflow = "hidden";
       box.style.maxWidth = "none";
-      box.style.width = `${holeW}px`;
-      box.style.height = `${holeH}px`;
+      box.style.width = `${picW}px`;
+      box.style.height = `${picH}px`;
+      box.style.transform = "translate3d(0, 0, 0)";
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.contain = "none";
@@ -267,19 +278,21 @@ export function LiteYouTubeEmbed({
         embed.style.height = "100%";
         embed.style.marginLeft = "0px";
         embed.style.marginTop = "0px";
+        embed.style.transform = "translate3d(0, 0, 0)";
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
-        iframe.setAttribute("width", String(holeW));
-        iframe.setAttribute("height", String(holeH));
-        iframe.style.width = `${holeW}px`;
-        iframe.style.height = `${holeH}px`;
+        iframe.setAttribute("width", String(picW));
+        iframe.setAttribute("height", String(picH));
+        iframe.style.width = `${picW}px`;
+        iframe.style.height = `${picH}px`;
         iframe.style.left = "0px";
         iframe.style.marginLeft = "0px";
         iframe.style.top = "0px";
         iframe.style.marginTop = "0px";
+        iframe.style.transform = "translate3d(0, 0, 0)";
       }
-      resyncPlayerSize(ytPlayerRef.current, { width: holeW, height: holeH });
+      resyncPlayerSize(ytPlayerRef.current, { width: picW, height: picH });
     };
 
     applyFit();

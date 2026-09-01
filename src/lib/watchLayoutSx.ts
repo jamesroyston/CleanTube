@@ -20,8 +20,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Island inner edge to the 56px icon column. No overscan. Island-on-right
-     * overrides live in globals.css (`data-island-side`).
+     * Island inner edge to the 56px icon column. The iframe is a 16:9 box
+     * packed to the island so YouTube is not letterboxing a too-wide player.
      */
     top: 0,
     bottom: 0,
@@ -33,8 +33,8 @@ export const watchPlayerShellSx = {
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
-    alignItems: "stretch",
-    justifyContent: "flex-end",
+    alignItems: "center",
+    justifyContent: "flex-start",
     overflow: "hidden",
     bgcolor: "background.default",
     zIndex: 1,
