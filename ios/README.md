@@ -7,6 +7,7 @@ Its purpose is to test whether a native shell keeps app state alive in the backg
 - **Start URL:** `AppConfig.startURL` in `CleanTube/AppConfig.swift` (`https://cleantubething.vercel.app/`). Change it if production moves to a custom domain.
 - **Bundle id:** `com.example.cleantube` is a placeholder. Sideloadly and AltStore re-sign the app with your own id anyway.
 - **Minimum iOS:** 17. Supports iPhone only.
+- **Home Screen name:** `CT Native` (`CFBundleDisplayName` in `Info.plist`). The icon has an amber "N" badge so you can tell it apart from the CleanTube PWA. The bundle name and id stay `CleanTube`, so a new build installs over the old one.
 
 ## What the shell does
 
