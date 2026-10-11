@@ -70,6 +70,34 @@ export function landscapeIslandSide(): "left" | "right" {
   return angle === -90 || angle === 270 ? "right" : "left";
 }
 
+/**
+ * Largest 16:9 rect centered in the window. iOS YouTube sizes the picture to
+ * the window, not the iframe, so the iframe must be this window size with its
+ * origin at (0, 0) and the visible clip must be this centered rect.
+ */
+export function landscapeWindowVideoRect(): {
+  vw: number;
+  vh: number;
+  fitW: number;
+  fitH: number;
+  left: number;
+  top: number;
+} {
+  const viewport = window.visualViewport;
+  const vw = Math.round(viewport?.width ?? window.innerWidth);
+  const vh = Math.round(viewport?.height ?? window.innerHeight);
+  const fitW = Math.round(Math.min(vw, (vh * 16) / 9));
+  const fitH = Math.round(Math.min(vh, (fitW * 9) / 16));
+  return {
+    vw,
+    vh,
+    fitW,
+    fitH,
+    left: Math.round((vw - fitW) / 2),
+    top: Math.round((vh - fitH) / 2),
+  };
+}
+
 export function syncLandscapeIslandSide(): void {
   if (typeof document === "undefined") return;
   const landscape = window.matchMedia("(orientation: landscape)").matches;

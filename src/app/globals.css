@@ -135,21 +135,16 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
     width: 100%;
     height: 100%;
     aspect-ratio: auto;
-    /**
-     * Make the iframe its own containing block so iOS YouTube lays out against
-     * this box instead of the window (window-centering is the huge left bar).
-     */
-    transform: translate3d(0, 0, 0);
   }
 
   /**
    * iOS reports the island inset on both sides. Put the 56px icon column on the
-   * island when it is actually on the right; otherwise the video runs to that
-   * column and the island is the video's left edge.
+   * island when it is actually on the right. The player shell stays full-window
+   * so YouTube's picture stays window-centered; the rail stacks above it.
    */
   html[data-island-side="right"] [data-watch-player-shell] {
     left: 0 !important;
-    right: calc(56px + env(safe-area-inset-right, 0px)) !important;
+    right: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
   }
