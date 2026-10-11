@@ -20,9 +20,9 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Screen edge to the 56px icon column, padded by the island inset on both
-     * sides so the centered 16:9 player has even margins and never enters the
-     * inset. Island-on-right overrides live in globals.css.
+     * Screen edge to the 56px icon column, padded by the island inset. The
+     * embed is a normal 16:9 child centered in this leftover space.
+     * Island-on-right overrides live in globals.css.
      */
     top: 0,
     bottom: 0,
