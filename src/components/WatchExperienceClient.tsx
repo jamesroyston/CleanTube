@@ -30,6 +30,10 @@ import { WatchNextSidebar } from "@/components/WatchNextSidebar";
 import type { VideoSummary } from "@/components/VideoSummary";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { readFetchJson } from "@/lib/fetchJson";
+import {
+  getAttachedLiteYoutubePlayer,
+  readPlayerCurrentTime,
+} from "@/lib/youtubePlayer";
 import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import {
   watchBelowPlayerPadSx,
@@ -42,6 +46,11 @@ import {
   parseYouTubeTimeParam,
 } from "@/lib/youtubeTime";
 import type { WatchVideoComments, WatchVideoDetails } from "@/lib/youtubeTypes";
+
+/** Longest the player waits for cloud progress before mounting anyway. */
+const RESUME_SYNC_WAIT_MS = 4_000;
+/** Late resume only jumps if playback has not really started yet. */
+const LATE_RESUME_MAX_PLAYED_SECONDS = 5;
 
 type WatchNextApiResponse = {
   videos?: VideoSummary[];
@@ -82,9 +91,11 @@ export function WatchExperienceClient({
   const searchParams = useSearchParams();
   const {
     getResumeSeconds,
+    getProgressByVideoId,
     authStatus,
     localLibraryHydrated,
     canPersistLibrary,
+    libraryCloudSyncState,
   } = useCloudLibrary();
   const { visible: upNextVisible } = useWatchUpNextVisible();
   const { enabled: narrowPlayerLayout } = useWatchNarrowPlayerLayout();
@@ -100,12 +111,31 @@ export function WatchExperienceClient({
   const libraryBootstrapComplete =
     localLibraryHydrated && authStatus === "ready";
 
+  const librarySyncSettled =
+    libraryCloudSyncState === "synced" || libraryCloudSyncState === "error";
+
+  const [resumeWaitExpired, setResumeWaitExpired] = useState(false);
+  useEffect(() => {
+    setResumeWaitExpired(false);
+    const t = window.setTimeout(
+      () => setResumeWaitExpired(true),
+      RESUME_SYNC_WAIT_MS,
+    );
+    return () => window.clearTimeout(t);
+  }, [videoId]);
+
   /**
-   * Local library is enough to freeze resume for this device. Waiting on cloud
-   * sync delayed the iframe on refresh; cross-device catch-up still happens on
-   * the next visit once IndexedDB has the snapshot.
+   * Auth reports ready before the cloud progress sync lands, so freezing start
+   * then mounts at 0 after a cold launch. Wait for the sync, an on-device
+   * mirror entry for this video, or the cap (offline / hung sync).
    */
-  const canResolveResume = libraryBootstrapComplete;
+  const canResolveResume =
+    libraryBootstrapComplete &&
+    (hasUrlStart ||
+      !canPersistLibrary ||
+      librarySyncSettled ||
+      getProgressByVideoId(videoId) != null ||
+      resumeWaitExpired);
 
   const effectiveStartSeconds = useMemo(() => {
     if (hasUrlStart) return urlStartSeconds!;
@@ -182,6 +212,45 @@ export function WatchExperienceClient({
   useEffect(() => {
     setPlayerApiReady(false);
   }, [videoId]);
+
+  const libraryResumeSeconds =
+    !hasUrlStart && canPersistLibrary ? getResumeSeconds(videoId) : undefined;
+  const lateResumeCheckedRef = useRef<string | null>(null);
+
+  /** Progress that lands after the player froze its start (sync cap hit) seeks once. */
+  useEffect(() => {
+    if (!playerApiReady || !canMountPlayer) return;
+    if (lateResumeCheckedRef.current === videoId) return;
+    if (canPersistLibrary && !librarySyncSettled) return;
+    lateResumeCheckedRef.current = videoId;
+    const target = libraryResumeSeconds;
+    const startedAt = playerMountRef.current?.startSeconds ?? 0;
+    if (
+      target == null ||
+      target <= startedAt + LATE_RESUME_MAX_PLAYED_SECONDS
+    ) {
+      return;
+    }
+    void getAttachedLiteYoutubePlayer(playerShellRef.current, 2_000).then(
+      (player) => {
+        if (!player) return;
+        const current = readPlayerCurrentTime(player) ?? 0;
+        if (current > startedAt + LATE_RESUME_MAX_PLAYED_SECONDS) return;
+        try {
+          player.seekTo(target, true);
+        } catch {
+          /* player not ready */
+        }
+      },
+    );
+  }, [
+    playerApiReady,
+    canMountPlayer,
+    videoId,
+    canPersistLibrary,
+    librarySyncSettled,
+    libraryResumeSeconds,
+  ]);
 
   const fetchWatchNext = useCallback(async () => {
     const response = await fetch(

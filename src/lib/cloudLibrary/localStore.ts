@@ -192,6 +192,74 @@ export function writeLocalLibraryMirror(snapshot: Snapshot) {
   writeLocalWatchProgress(snapshot.watchProgress);
 }
 
+const USER_WATCH_PROGRESS_KEY_PREFIX = "cleantube-watch-progress:";
+const USER_WATCH_PROGRESS_SYNCED_AT_KEY_PREFIX =
+  "cleantube-watch-progress-synced-at:";
+
+function userWatchProgressKey(userId: string): string {
+  return `${USER_WATCH_PROGRESS_KEY_PREFIX}${userId}`;
+}
+
+/** Epoch ms of the last successful cloud sync for this user (0 if never). */
+export function readLocalWatchProgressSyncedAt(userId: string): number {
+  const raw = readLocalStorage(
+    `${USER_WATCH_PROGRESS_SYNCED_AT_KEY_PREFIX}${userId}`,
+  );
+  const n = raw ? Number(raw) : 0;
+  return Number.isFinite(n) ? n : 0;
+}
+
+export function writeLocalWatchProgressSyncedAt(userId: string, at: number) {
+  writeLocalStorage(
+    `${USER_WATCH_PROGRESS_SYNCED_AT_KEY_PREFIX}${userId}`,
+    String(at),
+  );
+}
+
+/** Signed-in progress mirror, so resume does not wait on the cloud sync after iOS kills the app. */
+export function readLocalWatchProgressForUser(
+  userId: string,
+): WatchProgressEntry[] {
+  return parseWatchProgress(readLocalStorage(userWatchProgressKey(userId)));
+}
+
+export function writeLocalWatchProgressForUser(
+  userId: string,
+  entries: WatchProgressEntry[],
+) {
+  writeLocalStorage(userWatchProgressKey(userId), JSON.stringify(entries));
+}
+
+/** Merge one entry into the user mirror synchronously (safe to call from `pagehide`). */
+export function upsertLocalWatchProgressForUser(
+  userId: string,
+  entry: WatchProgressEntry,
+) {
+  const rest = readLocalWatchProgressForUser(userId).filter(
+    (existing) => existing.videoId !== entry.videoId,
+  );
+  writeLocalWatchProgressForUser(userId, [entry, ...rest]);
+}
+
+export function clearLocalWatchProgressMirrors() {
+  if (typeof window === "undefined") return;
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const key = window.localStorage.key(i);
+      if (
+        key?.startsWith(USER_WATCH_PROGRESS_KEY_PREFIX) ||
+        key?.startsWith(USER_WATCH_PROGRESS_SYNCED_AT_KEY_PREFIX)
+      ) {
+        keys.push(key);
+      }
+    }
+    for (const key of keys) window.localStorage.removeItem(key);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Clears mirrored library data (e.g. after sign-out so the next anonymous session does not keep another account's library). */
 export function clearLocalLibraryStorage() {
   if (typeof window === "undefined") return;

@@ -60,6 +60,14 @@ import {
   type PasskeySignInResult,
 } from "@/lib/cloudLibrary/webauthnClient";
 import {
+  clearLocalWatchProgressMirrors,
+  readLocalWatchProgressForUser,
+  readLocalWatchProgressSyncedAt,
+  upsertLocalWatchProgressForUser,
+  writeLocalWatchProgressForUser,
+  writeLocalWatchProgressSyncedAt,
+} from "@/lib/cloudLibrary/localStore";
+import {
   deriveResumeSeconds,
   isFreshInProgress,
   mergeSavedChannels,
@@ -282,6 +290,41 @@ function mergeWatchProgressLivePatch(
   };
 }
 
+function entryTimestamp(entry: WatchProgressEntry): number {
+  const t = Date.parse(entry.updatedAt);
+  return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Per video, keep whichever copy was updated last. The local mirror wins when the
+ * last `pagehide` flush reached disk but its cloud upsert died with the process.
+ * Rows missing remotely survive only if written after the last sync; older ones
+ * were deleted on another device.
+ */
+function mergeWatchProgressByRecency(
+  remote: WatchProgressEntry[],
+  local: WatchProgressEntry[],
+  lastSyncedAt: number,
+): { merged: WatchProgressEntry[]; localNewer: WatchProgressEntry[] } {
+  const byVideoId = new Map<string, WatchProgressEntry>();
+  for (const entry of remote) byVideoId.set(entry.videoId, entry);
+  const localNewer: WatchProgressEntry[] = [];
+  for (const entry of local) {
+    const existing = byVideoId.get(entry.videoId);
+    const isNewer = existing
+      ? entryTimestamp(entry) > entryTimestamp(existing)
+      : entryTimestamp(entry) > lastSyncedAt;
+    if (isNewer) {
+      byVideoId.set(entry.videoId, entry);
+      localNewer.push(entry);
+    }
+  }
+  const merged = [...byVideoId.values()].sort(
+    (a, b) => entryTimestamp(b) - entryTimestamp(a),
+  );
+  return { merged, localNewer };
+}
+
 function normalizeRecentSearchQuery(query: string): string {
   return query.trim();
 }
@@ -420,10 +463,28 @@ export function CloudLibraryProvider({
             fetchCloudRecentSearches(supabase),
           ]);
 
+          const { merged: mergedProgress, localNewer } =
+            mergeWatchProgressByRecency(
+              remote.watchProgress,
+              readLocalWatchProgressForUser(nextUser.id),
+              readLocalWatchProgressSyncedAt(nextUser.id),
+            );
+          writeLocalWatchProgressForUser(nextUser.id, mergedProgress);
+          writeLocalWatchProgressSyncedAt(nextUser.id, Date.now());
+          if (localNewer.length > 0) {
+            void upsertWatchProgressEntries(
+              supabase,
+              nextUser.id,
+              localNewer,
+            ).catch(() => {
+              /* retried on the next lifecycle flush */
+            });
+          }
+
           setWatchProgressLivePatches(new Map());
           setWatchLaterEntries(remote.watchLater);
           setSavedChannels(remote.savedChannels);
-          setWatchProgress(remote.watchProgress);
+          setWatchProgress(mergedProgress);
           setRecentSearches(entriesToQueryList(remoteRecent));
           lastSyncedUserIdRef.current = nextUser.id;
           setLibraryCloudSyncState("synced");
@@ -454,6 +515,15 @@ export function CloudLibraryProvider({
 
   const clearAuthDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /** Seed progress from the on-device mirror before the cloud sync returns. */
+  const hydrateLocalWatchProgress = useCallback((userId: string) => {
+    if (lastSyncedUserIdRef.current === userId) return;
+    if (watchProgressRef.current.length > 0) return;
+    const local = readLocalWatchProgressForUser(userId);
+    if (local.length === 0) return;
+    setWatchProgress(sortWatchProgressByRecency(local));
+  }, []);
+
   const applyAuthenticatedState = useCallback(
     (nextSession: Session) => {
       if (clearAuthDebounceRef.current) {
@@ -462,13 +532,14 @@ export function CloudLibraryProvider({
       }
       setSession(nextSession);
       setUser(nextSession.user);
+      hydrateLocalWatchProgress(nextSession.user.id);
       void syncFromCloud(nextSession.user).catch(() => {
         setLibraryCloudSyncState("error");
       });
       setAuthStatus("ready");
       setLocalLibraryHydrated(true);
     },
-    [syncFromCloud],
+    [hydrateLocalWatchProgress, syncFromCloud],
   );
 
   const applySignedOutState = useCallback(() => {
@@ -479,6 +550,7 @@ export function CloudLibraryProvider({
     setSession(null);
     setUser(null);
     clearLibraryState();
+    clearLocalWatchProgressMirrors();
     setLibraryCloudSyncState(supabase ? "signed_out" : "unavailable");
     clearForYouFeedCache();
     setAuthStatus("ready");
@@ -496,6 +568,7 @@ export function CloudLibraryProvider({
       setSession(initial.session);
       setUser(initial.user);
       if (initial.user) {
+        hydrateLocalWatchProgress(initial.user.id);
         try {
           await syncFromCloud(initial.user);
         } catch {
@@ -555,6 +628,7 @@ export function CloudLibraryProvider({
     applyAuthenticatedState,
     applySignedOutState,
     clearLibraryState,
+    hydrateLocalWatchProgress,
     supabase,
     syncFromCloud,
   ]);
@@ -640,6 +714,7 @@ export function CloudLibraryProvider({
     await signOut(supabase);
     clearForYouFeedCache();
     clearLibraryState();
+    clearLocalWatchProgressMirrors();
     setLibraryCloudSyncState("signed_out");
   }, [clearLibraryState, supabase]);
 
@@ -1042,6 +1117,10 @@ export function CloudLibraryProvider({
         });
       }
 
+      if (snapshotForCloud) {
+        upsertLocalWatchProgressForUser(user.id, snapshotForCloud);
+      }
+
       if (syncCloud && snapshotForCloud) {
         void upsertWatchProgressEntries(supabase, user.id, [snapshotForCloud]).catch(
           () => {
@@ -1064,6 +1143,12 @@ export function CloudLibraryProvider({
       });
       const updated = watchProgress.filter((entry) => entry.videoId !== videoId);
       setWatchProgress(updated);
+      writeLocalWatchProgressForUser(
+        user.id,
+        readLocalWatchProgressForUser(user.id).filter(
+          (entry) => entry.videoId !== videoId,
+        ),
+      );
       try {
         await deleteWatchProgressByVideoId(supabase, user.id, videoId);
       } catch {
@@ -1077,6 +1162,7 @@ export function CloudLibraryProvider({
     if (!supabase || !user) return;
     setWatchProgressLivePatches(new Map());
     setWatchProgress([]);
+    writeLocalWatchProgressForUser(user.id, []);
     try {
       await deleteAllWatchProgress(supabase, user.id);
     } catch {
