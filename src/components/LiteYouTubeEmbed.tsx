@@ -75,6 +75,9 @@ const LANDSCAPE_FIT_SX = {
   height: "auto",
   aspectRatio: "16 / 9",
   overflow: "hidden",
+  boxSizing: "border-box",
+  border: "2px solid",
+  borderColor: "primary.main",
 } as const;
 
 /** Give up on a hung `getYTPlayer()` (iOS after background) and remount. */
