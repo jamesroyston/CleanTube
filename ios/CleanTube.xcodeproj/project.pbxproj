@@ -1,0 +1,252 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		C70000000000000000000101 /* CleanTubeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000201 /* CleanTubeApp.swift */; };
+		C70000000000000000000102 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000202 /* AppConfig.swift */; };
+		C70000000000000000000103 /* WebViewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000203 /* WebViewStore.swift */; };
+		C70000000000000000000104 /* DebugStats.swift in Sources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000204 /* DebugStats.swift */; };
+		C70000000000000000000105 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C70000000000000000000205 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		C70000000000000000000201 /* CleanTubeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CleanTubeApp.swift; sourceTree = "<group>"; };
+		C70000000000000000000202 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		C70000000000000000000203 /* WebViewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebViewStore.swift; sourceTree = "<group>"; };
+		C70000000000000000000204 /* DebugStats.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugStats.swift; sourceTree = "<group>"; };
+		C70000000000000000000205 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C70000000000000000000206 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C70000000000000000000207 /* CleanTube.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CleanTube.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C70000000000000000000401 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C70000000000000000000301 = {
+			isa = PBXGroup;
+			children = (
+				C70000000000000000000302 /* CleanTube */,
+				C70000000000000000000303 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		C70000000000000000000302 /* CleanTube */ = {
+			isa = PBXGroup;
+			children = (
+				C70000000000000000000201 /* CleanTubeApp.swift */,
+				C70000000000000000000202 /* AppConfig.swift */,
+				C70000000000000000000203 /* WebViewStore.swift */,
+				C70000000000000000000204 /* DebugStats.swift */,
+				C70000000000000000000205 /* Assets.xcassets */,
+				C70000000000000000000206 /* Info.plist */,
+			);
+			path = CleanTube;
+			sourceTree = "<group>";
+		};
+		C70000000000000000000303 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C70000000000000000000207 /* CleanTube.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C70000000000000000000501 /* CleanTube */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C70000000000000000000702 /* Build configuration list for PBXNativeTarget "CleanTube" */;
+			buildPhases = (
+				C70000000000000000000402 /* Sources */,
+				C70000000000000000000401 /* Frameworks */,
+				C70000000000000000000403 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = CleanTube;
+			productName = CleanTube;
+			productReference = C70000000000000000000207 /* CleanTube.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C70000000000000000000601 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+				TargetAttributes = {
+					C70000000000000000000501 = {
+						CreatedOnToolsVersion = 15.0;
+					};
+				};
+			};
+			buildConfigurationList = C70000000000000000000701 /* Build configuration list for PBXProject "CleanTube" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = C70000000000000000000301;
+			productRefGroup = C70000000000000000000303 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C70000000000000000000501 /* CleanTube */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C70000000000000000000403 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C70000000000000000000105 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C70000000000000000000402 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C70000000000000000000101 /* CleanTubeApp.swift in Sources */,
+				C70000000000000000000102 /* AppConfig.swift in Sources */,
+				C70000000000000000000103 /* WebViewStore.swift in Sources */,
+				C70000000000000000000104 /* DebugStats.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		C70000000000000000000801 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C70000000000000000000802 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C70000000000000000000803 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CleanTube/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.cleantube;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		C70000000000000000000804 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = CleanTube/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.cleantube;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C70000000000000000000701 /* Build configuration list for PBXProject "CleanTube" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C70000000000000000000801 /* Debug */,
+				C70000000000000000000802 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C70000000000000000000702 /* Build configuration list for PBXNativeTarget "CleanTube" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C70000000000000000000803 /* Debug */,
+				C70000000000000000000804 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C70000000000000000000601 /* Project object */;
+}
