@@ -2,7 +2,7 @@
 
 import useSWR, { mutate as globalMutate } from "swr";
 
-import { useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
+import { useSwrIdbHydrated, useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
 import { readFetchJson } from "@/lib/fetchJson";
 import { clearSwrIdbCache } from "@/lib/swrIdbProvider";
 import type { ForYouFeedResult } from "@/lib/forYou/types";
@@ -47,8 +47,13 @@ type UseForYouFeedOptions = {
 };
 
 export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
+  // Hold the key until IDB hydration lands so a persisted feed is read from
+  // cache instead of racing a cold /api/for-you rebuild.
+  const idbHydrated = useSwrIdbHydrated();
   const swrKey: ForYouFeedKey | null =
-    userId && enabled ? (["for-you-feed", userId] as const) : null;
+    userId && enabled && idbHydrated
+      ? (["for-you-feed", userId] as const)
+      : null;
 
   const { data, error, isLoading, isValidating, mutate } = useSWR(
     swrKey,

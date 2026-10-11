@@ -83,10 +83,21 @@ export function getSwrIdbHydrationPromise(): Promise<void> {
   return hydrationPromise;
 }
 
+/** Cap on how long keys gated on hydration wait if IndexedDB stalls (iOS). */
+const HYDRATION_TIMEOUT_MS = 1_500;
+
+function markHydrated(): void {
+  if (hydrationDone) return;
+  hydrationDone = true;
+  hydrationResolve?.();
+}
+
 function hydrateFromIdb(map: Cache): void {
   if (hydrationStarted || typeof window === "undefined") return;
   hydrationStarted = true;
+  const timeout = window.setTimeout(markHydrated, HYDRATION_TIMEOUT_MS);
   void (async () => {
+    const stale: string[] = [];
     try {
       const all = await entries(IDB_STORE);
       const valid: { storageKey: string; serializedKey: string; envelope: PersistedEnvelope }[] =
@@ -97,30 +108,38 @@ function hydrateFromIdb(map: Cache): void {
         const envelope = raw as PersistedEnvelope;
         const serializedKey = storageKey.slice(IDB_KEY_PREFIX.length);
         if (!envelope?.savedAt || isExpired(envelope, serializedKey)) {
-          await del(storageKey, IDB_STORE);
+          stale.push(storageKey);
           continue;
         }
         valid.push({ storageKey, serializedKey, envelope });
       }
       valid.sort((a, b) => b.envelope.savedAt - a.envelope.savedAt);
-      if (valid.length > MAX_ENTRIES) {
-        await Promise.all(
-          valid.slice(MAX_ENTRIES).map(({ storageKey }) => del(storageKey, IDB_STORE)),
-        );
+      for (const { storageKey } of valid.slice(MAX_ENTRIES)) {
+        stale.push(storageKey);
       }
       for (const { serializedKey, envelope } of valid.slice(0, MAX_ENTRIES)) {
-        if (!map.get(serializedKey)) {
+        // A key can already hold a data-less loading entry if SWR ran before
+        // IDB resolved; the persisted payload must still win there.
+        const existing = map.get(serializedKey);
+        if (!existing) {
           map.set(serializedKey, {
             data: envelope.data,
             isValidating: false,
           });
+        } else if (existing.data === undefined) {
+          map.set(serializedKey, { ...existing, data: envelope.data });
         }
       }
     } catch {
       /* ignore IDB read errors */
     } finally {
-      hydrationDone = true;
-      hydrationResolve?.();
+      window.clearTimeout(timeout);
+      markHydrated();
+    }
+    if (stale.length > 0) {
+      await Promise.all(
+        stale.map((storageKey) => del(storageKey, IDB_STORE).catch(() => {})),
+      );
     }
   })();
 }

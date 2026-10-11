@@ -19,6 +19,56 @@ import { DEFAULT_FOR_YOU_LIMITS } from "./types";
 
 const FETCH_CONCURRENCY = 4;
 
+/** Per-source budget; a slow InnerTube/search call must not hold the whole feed. */
+const SOURCE_FETCH_TIMEOUT_MS = 3_000;
+
+/** Watch-next (`getInfo`) is often bot-challenged from datacenter IPs. */
+const WATCH_NEXT_FAILURE_THRESHOLD = 2;
+const WATCH_NEXT_COOLDOWN_MS = 15 * 60 * 1000;
+
+/** Per warm server instance. */
+const watchNextBreaker = {
+  consecutiveFailures: 0,
+  openUntil: 0,
+  probeInFlight: false,
+};
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number,
+  fallback: T,
+): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise
+      .then(resolve, () => resolve(fallback))
+      .finally(() => clearTimeout(timer));
+  });
+}
+
+/** After the cooldown, a single probe call decides whether to close the breaker. */
+function acquireWatchNextSlot(): boolean {
+  const b = watchNextBreaker;
+  if (b.consecutiveFailures < WATCH_NEXT_FAILURE_THRESHOLD) return true;
+  if (b.probeInFlight || Date.now() < b.openUntil) return false;
+  b.probeInFlight = true;
+  return true;
+}
+
+function recordWatchNextResult(ok: boolean): void {
+  const b = watchNextBreaker;
+  b.probeInFlight = false;
+  if (ok) {
+    b.consecutiveFailures = 0;
+    b.openUntil = 0;
+    return;
+  }
+  b.consecutiveFailures += 1;
+  if (b.consecutiveFailures >= WATCH_NEXT_FAILURE_THRESHOLD) {
+    b.openUntil = Date.now() + WATCH_NEXT_COOLDOWN_MS;
+  }
+}
+
 async function mapWithBoundedConcurrency<T, R>(
   items: readonly T[],
   concurrency: number,
@@ -147,8 +197,14 @@ export async function fetchFromHistorySeed(
   entry: WatchProgressEntry,
   limits: ForYouFeedLimits,
 ): Promise<ForYouCandidate[]> {
+  if (!acquireWatchNextSlot()) return [];
   try {
-    const related = await getWatchNextRelatedVideos(entry.videoId);
+    const related = await withTimeout(
+      getWatchNextRelatedVideos(entry.videoId),
+      SOURCE_FETCH_TIMEOUT_MS,
+      [],
+    );
+    recordWatchNextResult(related.length > 0);
     return related.slice(0, limits.maxVideosPerWatchNext).map((video) => ({
       video,
       source: "watch_next" as const,
@@ -157,6 +213,7 @@ export async function fetchFromHistorySeed(
       seedHistoryTitle: entry.title,
     }));
   } catch {
+    recordWatchNextResult(false);
     return [];
   }
 }
@@ -212,18 +269,22 @@ export async function fetchForYouCandidates(
     mutedSearchQueries,
   ).map((entry) => entry.query);
 
+  const bounded = (request: Promise<ForYouCandidate[]>) =>
+    withTimeout(request, SOURCE_FETCH_TIMEOUT_MS, []);
+
   const batches = await Promise.all([
     mapWithBoundedConcurrency(channelEntries, FETCH_CONCURRENCY, (ch) =>
-      fetchFromSavedChannel(ch, limits),
+      bounded(fetchFromSavedChannel(ch, limits)),
     ),
     mapWithBoundedConcurrency(pinnedSearches, FETCH_CONCURRENCY, (ch) =>
-      fetchFromPinnedSearch(ch, limits),
+      bounded(fetchFromPinnedSearch(ch, limits)),
     ),
+    // Time-bounded internally so the breaker sees timeouts as failures.
     mapWithBoundedConcurrency(historySeeds, FETCH_CONCURRENCY, (entry) =>
       fetchFromHistorySeed(entry, limits),
     ),
     mapWithBoundedConcurrency(recentQueries, FETCH_CONCURRENCY, (q) =>
-      fetchFromRecentSearch(q, limits),
+      bounded(fetchFromRecentSearch(q, limits)),
     ),
   ]);
 

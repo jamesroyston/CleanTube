@@ -158,8 +158,6 @@ export function ForYouFeedView({
     !isRefreshing &&
     dismissedFeedDayKey !== feedDayKey;
   const resolvedFeedError = feedError ?? initialError ?? null;
-  const showContinueWatchingInSkeleton =
-    showLibrarySyncSkeleton && continueWatchingVideos.length > 0;
 
   return (
     <>
@@ -201,7 +199,7 @@ export function ForYouFeedView({
         />
       ) : (
         <>
-          {!showLibrarySyncSkeleton && continueWatchingVideos.length > 0 ? (
+          {continueWatchingVideos.length > 0 ? (
             <Box sx={{ mb: 4 }}>
               <Typography
                 variant="h6"
@@ -218,10 +216,7 @@ export function ForYouFeedView({
           ) : null}
 
           {showLibrarySyncSkeleton ? (
-            <FeedSectionsSkeleton
-              sectionCount={3}
-              showContinueWatching={showContinueWatchingInSkeleton}
-            />
+            <FeedSectionsSkeleton sectionCount={3} />
           ) : libraryCloudSyncState === "error" && !hasCachedFeed ? (
             <Alert severity="error" sx={{ mb: 2 }}>
               Your library could not be synced. Recommendations may be
@@ -331,23 +326,11 @@ const FOR_YOU_SKELETON_SECTION_COUNT = 3;
 
 function FeedSectionsSkeleton({
   sectionCount = FOR_YOU_SKELETON_SECTION_COUNT,
-  showContinueWatching = false,
 }: {
   sectionCount?: number;
-  showContinueWatching?: boolean;
 }) {
   return (
     <Stack spacing={4}>
-      {showContinueWatching ? (
-        <Box>
-          <Skeleton
-            variant="text"
-            height={32}
-            sx={{ mb: 2, width: { xs: 180, sm: 220 } }}
-          />
-          <VideoCarouselRowSkeleton cardCount={4} />
-        </Box>
-      ) : null}
       {Array.from({ length: sectionCount }, (_, sectionIndex) => (
         <Box key={sectionIndex}>
           <Skeleton
