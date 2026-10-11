@@ -20,8 +20,9 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Island inner edge to the 56px icon column. Iframe fills that box; YouTube
-     * letterboxes inside it. Island-on-right overrides live in globals.css.
+     * Island inner edge to the 56px icon column. The player is the largest
+     * 16:9 box inside and is centered here. Island-on-right overrides live in
+     * globals.css.
      */
     top: 0,
     bottom: 0,
@@ -33,7 +34,8 @@ export const watchPlayerShellSx = {
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
-    alignItems: "stretch",
+    alignItems: "center",
+    justifyContent: "center",
     overflow: "hidden",
     bgcolor: "background.default",
     zIndex: 1,
