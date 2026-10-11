@@ -114,6 +114,8 @@ type CloudLibraryContextValue = {
   /** True when the signed-in user can persist library data to the cloud. */
   canPersistLibrary: boolean;
   libraryCloudSyncState: LibraryCloudSyncState;
+  /** Re-pull the signed-in user's library from the cloud (no-op signed out). */
+  refreshLibrary: () => Promise<void>;
   session: Session | null;
   user: User | null;
   watchLaterEntries: WatchLaterEntry[];
@@ -508,6 +510,14 @@ export function CloudLibraryProvider({
     },
     [supabase],
   );
+
+  const refreshLibrary = useCallback(async () => {
+    const activeUser = userRef.current;
+    if (!activeUser) return;
+    await syncFromCloud(activeUser).catch(() => {
+      /* keep the in-memory library; the next lifecycle sync retries */
+    });
+  }, [syncFromCloud]);
 
   useLayoutEffect(() => {
     setPasskeysSupported(browserSupportsPasskeys());
@@ -1247,6 +1257,7 @@ export function CloudLibraryProvider({
       isCloudConfigured,
       canPersistLibrary,
       libraryCloudSyncState: effectiveLibraryCloudSyncState,
+      refreshLibrary,
       session,
       user,
       watchLaterEntries,
@@ -1307,6 +1318,7 @@ export function CloudLibraryProvider({
       listPasskeys,
       localLibraryHydrated,
       passkeysSupported,
+      refreshLibrary,
       registerPasskey,
       removeRecentSearch,
       removeSavedChannel,

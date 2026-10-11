@@ -19,6 +19,7 @@ import { useMemo, useState } from "react";
 
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import { MobilePageHeader } from "@/components/MobilePageHeader";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
@@ -47,7 +48,8 @@ function formatStartLabel(seconds: number): string {
 export function WatchLaterPageClient() {
   const showBottomNav = useShowBottomNav();
   const { entries, removeByVideoId, clearEntries } = useWatchLater();
-  const { canPersistLibrary, getResumeSeconds } = useCloudLibrary();
+  const { canPersistLibrary, getResumeSeconds, refreshLibrary } =
+    useCloudLibrary();
   const [sortMode, setSortMode] = useState<SortMode>("newest");
 
   const sortedEntries = useMemo(
@@ -69,172 +71,174 @@ export function WatchLaterPageClient() {
       component="main"
       sx={{ pb: compactMainPaddingBottom(showBottomNav, 24) ?? 6 }}
     >
-      <Container maxWidth="lg" sx={{ pt: 2, px: { xs: 2, sm: 3 } }}>
-        {showBottomNav ? (
-          <MobilePageHeader title="Watch Later" backHref="/library" />
-        ) : (
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={2}
-            sx={{ mb: 3 }}
-            alignItems={{ xs: "stretch", sm: "flex-start" }}
-          >
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 700 }}>
-                Watch Later
-              </Typography>
+      <PullToRefresh disabled={!canPersistLibrary} onRefresh={refreshLibrary}>
+        <Container maxWidth="lg" sx={{ pt: 2, px: { xs: 2, sm: 3 } }}>
+          {showBottomNav ? (
+            <MobilePageHeader title="Watch Later" backHref="/library" />
+          ) : (
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={2}
+              sx={{ mb: 3 }}
+              alignItems={{ xs: "stretch", sm: "flex-start" }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="h4" component="h1" sx={{ mb: 1, fontWeight: 700 }}>
+                  Watch Later
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Sort your queued videos by added date and remove anything you no longer need.
+                </Typography>
+              </Box>
+              {canPersistLibrary ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel id="watch-later-sort-label">Sort by</InputLabel>
+                    <Select
+                      labelId="watch-later-sort-label"
+                      value={sortMode}
+                      label="Sort by"
+                      onChange={handleSortChange}
+                    >
+                      <MenuItem value="newest">Newest added</MenuItem>
+                      <MenuItem value="oldest">Oldest added</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    disabled={entries.length === 0}
+                    onClick={clearEntries}
+                  >
+                    Clear all
+                  </Button>
+                </Stack>
+              ) : null}
+            </Stack>
+          )}
+          {showBottomNav ? (
+            <Stack spacing={2} sx={{ mb: 3 }}>
               <Typography variant="body2" color="text.secondary">
                 Sort your queued videos by added date and remove anything you no longer need.
               </Typography>
-            </Box>
-            {canPersistLibrary ? (
-              <Stack direction="row" spacing={1} alignItems="center">
-                <FormControl size="small" sx={{ minWidth: 180 }}>
-                  <InputLabel id="watch-later-sort-label">Sort by</InputLabel>
-                  <Select
-                    labelId="watch-later-sort-label"
-                    value={sortMode}
-                    label="Sort by"
-                    onChange={handleSortChange}
-                  >
-                    <MenuItem value="newest">Newest added</MenuItem>
-                    <MenuItem value="oldest">Oldest added</MenuItem>
-                  </Select>
-                </FormControl>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  disabled={entries.length === 0}
-                  onClick={clearEntries}
-                >
-                  Clear all
-                </Button>
-              </Stack>
-            ) : null}
-          </Stack>
-        )}
-        {showBottomNav ? (
-          <Stack spacing={2} sx={{ mb: 3 }}>
-            <Typography variant="body2" color="text.secondary">
-              Sort your queued videos by added date and remove anything you no longer need.
-            </Typography>
-            {canPersistLibrary ? (
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <FormControl size="small" sx={{ minWidth: 180 }}>
-                  <InputLabel id="watch-later-sort-label-mobile">Sort by</InputLabel>
-                  <Select
-                    labelId="watch-later-sort-label-mobile"
-                    value={sortMode}
-                    label="Sort by"
-                    onChange={handleSortChange}
-                  >
-                    <MenuItem value="newest">Newest added</MenuItem>
-                    <MenuItem value="oldest">Oldest added</MenuItem>
-                  </Select>
-                </FormControl>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  disabled={entries.length === 0}
-                  onClick={clearEntries}
-                >
-                  Clear all
-                </Button>
-              </Stack>
-            ) : null}
-          </Stack>
-        ) : null}
-
-        {!canPersistLibrary ? (
-          <LibrarySignInPrompt
-            title="Sign in to use Watch Later"
-            message="Save videos to your queue and pick up where you left off after you sign in."
-          />
-        ) : sortedEntries.length === 0 ? (
-          <Typography color="text.secondary">
-            Add videos from search results or the watch page and they will appear here.
-          </Typography>
-        ) : (
-          <Box sx={{ display: "grid", gap: 1.5 }}>
-            {sortedEntries.map((entry) => {
-              const resume = getResumeSeconds(entry.videoId, entry.startSeconds);
-              const href =
-                resume && resume > 0
-                  ? `/watch/${entry.videoId}?t=${encodeURIComponent(String(resume))}`
-                  : `/watch/${entry.videoId}`;
-
-              return (
-                <Card key={entry.entryId} variant="outlined">
-                  <Stack direction={{ xs: "column", sm: "row" }} alignItems="stretch">
-                    <Box
-                      component={Link}
-                      href={href}
-                      {...watchNavigationCaptureHandlers()}
-                      sx={{
-                        width: { xs: "100%", sm: 220 },
-                        minWidth: { sm: 220 },
-                        bgcolor: "action.hover",
-                      }}
+              {canPersistLibrary ? (
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                  <FormControl size="small" sx={{ minWidth: 180 }}>
+                    <InputLabel id="watch-later-sort-label-mobile">Sort by</InputLabel>
+                    <Select
+                      labelId="watch-later-sort-label-mobile"
+                      value={sortMode}
+                      label="Sort by"
+                      onChange={handleSortChange}
                     >
-                      <Box sx={{ position: "relative", width: "100%", aspectRatio: "16 / 9" }}>
-                        <YouTubeThumbnailImage
-                          src={entry.thumbnailUrl}
-                          fallbacks={youtubeThumbnailFallbackUrls(
-                            entry.videoId,
-                            undefined,
-                            entry.thumbnailUrl,
-                          )}
-                          alt=""
-                          fill
-                          sizes="220px"
-                          style={{ objectFit: "cover" }}
-                        />
-                      </Box>
-                    </Box>
-                    <CardContent sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography
+                      <MenuItem value="newest">Newest added</MenuItem>
+                      <MenuItem value="oldest">Oldest added</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <Button
+                    variant="outlined"
+                    color="error"
+                    disabled={entries.length === 0}
+                    onClick={clearEntries}
+                  >
+                    Clear all
+                  </Button>
+                </Stack>
+              ) : null}
+            </Stack>
+          ) : null}
+
+          {!canPersistLibrary ? (
+            <LibrarySignInPrompt
+              title="Sign in to use Watch Later"
+              message="Save videos to your queue and pick up where you left off after you sign in."
+            />
+          ) : sortedEntries.length === 0 ? (
+            <Typography color="text.secondary">
+              Add videos from search results or the watch page and they will appear here.
+            </Typography>
+          ) : (
+            <Box sx={{ display: "grid", gap: 1.5 }}>
+              {sortedEntries.map((entry) => {
+                const resume = getResumeSeconds(entry.videoId, entry.startSeconds);
+                const href =
+                  resume && resume > 0
+                    ? `/watch/${entry.videoId}?t=${encodeURIComponent(String(resume))}`
+                    : `/watch/${entry.videoId}`;
+
+                return (
+                  <Card key={entry.entryId} variant="outlined">
+                    <Stack direction={{ xs: "column", sm: "row" }} alignItems="stretch">
+                      <Box
                         component={Link}
                         href={href}
                         {...watchNavigationCaptureHandlers()}
-                        variant="h6"
-                        sx={{ color: "text.primary", fontWeight: 600, textDecoration: "none" }}
+                        sx={{
+                          width: { xs: "100%", sm: 220 },
+                          minWidth: { sm: 220 },
+                          bgcolor: "action.hover",
+                        }}
                       >
-                        {entry.title}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        {entry.channelName}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Added {new Date(entry.addedAt).toLocaleString()}
-                        {entry.startSeconds != null && entry.startSeconds > 0
-                          ? ` · Starts at ${formatStartLabel(entry.startSeconds)}`
-                          : ""}
-                      </Typography>
-                    </CardContent>
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      sx={{ p: 2, pt: { xs: 0, sm: 2 } }}
-                      alignItems="center"
-                    >
-                      <Button component={Link} href={href} startIcon={<PlayArrowIcon />}>
-                        Play
-                      </Button>
-                      <IconButton
-                        aria-label={`Remove ${entry.title}`}
-                        color="error"
-                        onClick={() => removeByVideoId(entry.videoId)}
+                        <Box sx={{ position: "relative", width: "100%", aspectRatio: "16 / 9" }}>
+                          <YouTubeThumbnailImage
+                            src={entry.thumbnailUrl}
+                            fallbacks={youtubeThumbnailFallbackUrls(
+                              entry.videoId,
+                              undefined,
+                              entry.thumbnailUrl,
+                            )}
+                            alt=""
+                            fill
+                            sizes="220px"
+                            style={{ objectFit: "cover" }}
+                          />
+                        </Box>
+                      </Box>
+                      <CardContent sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography
+                          component={Link}
+                          href={href}
+                          {...watchNavigationCaptureHandlers()}
+                          variant="h6"
+                          sx={{ color: "text.primary", fontWeight: 600, textDecoration: "none" }}
+                        >
+                          {entry.title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                          {entry.channelName}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Added {new Date(entry.addedAt).toLocaleString()}
+                          {entry.startSeconds != null && entry.startSeconds > 0
+                            ? ` · Starts at ${formatStartLabel(entry.startSeconds)}`
+                            : ""}
+                        </Typography>
+                      </CardContent>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{ p: 2, pt: { xs: 0, sm: 2 } }}
+                        alignItems="center"
                       >
-                        <DeleteOutlineIcon />
-                      </IconButton>
+                        <Button component={Link} href={href} startIcon={<PlayArrowIcon />}>
+                          Play
+                        </Button>
+                        <IconButton
+                          aria-label={`Remove ${entry.title}`}
+                          color="error"
+                          onClick={() => removeByVideoId(entry.videoId)}
+                        >
+                          <DeleteOutlineIcon />
+                        </IconButton>
+                      </Stack>
                     </Stack>
-                  </Stack>
-                </Card>
-              );
-            })}
-          </Box>
-        )}
-      </Container>
+                  </Card>
+                );
+              })}
+            </Box>
+          )}
+        </Container>
+      </PullToRefresh>
     </Box>
   );
 }

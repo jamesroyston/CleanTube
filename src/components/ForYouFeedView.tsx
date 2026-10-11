@@ -14,6 +14,7 @@ import { useMemo, useState } from "react";
 
 import { ForYouSearchSectionMenu } from "@/components/ForYouSearchSectionMenu";
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import type { VideoSummary } from "@/components/VideoSummary";
 import {
   VideoCarouselRow,
@@ -68,6 +69,7 @@ export function ForYouFeedView({
     watchLaterEntries,
     inProgressEntries,
     getRecentSearches,
+    refreshLibrary,
     user,
   } = useCloudLibrary();
 
@@ -158,9 +160,18 @@ export function ForYouFeedView({
     !isRefreshing &&
     dismissedFeedDayKey !== feedDayKey;
   const resolvedFeedError = feedError ?? initialError ?? null;
+  const feedEnabled = effectiveSignedIn && canPersistLibrary && libraryReady;
 
   return (
-    <>
+    <PullToRefresh
+      disabled={!canPersistLibrary}
+      onRefresh={() =>
+        Promise.all([
+          refreshLibrary(),
+          feedEnabled ? refreshFeed() : undefined,
+        ])
+      }
+    >
       <Stack spacing={1} sx={{ mb: 3 }}>
         <Stack direction="row" spacing={1} alignItems="center">
           <DynamicFeedOutlinedIcon color="primary" />
@@ -318,7 +329,7 @@ export function ForYouFeedView({
           ) : null}
         </>
       )}
-    </>
+    </PullToRefresh>
   );
 }
 

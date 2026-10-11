@@ -7,6 +7,7 @@ import Typography from "@mui/material/Typography";
 
 import { SearchResultsGrid } from "@/components/SearchResultsGrid";
 import { SearchSortBar } from "@/components/SearchSortBar";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { SaveSearchButton } from "@/components/SaveSearchButton";
 import { VideoCardGridSkeleton } from "@/components/skeletons/VideoCardGridSkeleton";
 import { useSearchResults } from "@/hooks/useSearchResults";
@@ -46,7 +47,7 @@ export function HomeSearchResultsClient({
   searchSort,
   resultSort,
 }: HomeSearchResultsClientProps) {
-  const { channels, videos, error, isInitialLoad } = useSearchResults({
+  const { channels, videos, error, isInitialLoad, refresh } = useSearchResults({
     query,
     searchSort,
     resultSort,
@@ -59,16 +60,18 @@ export function HomeSearchResultsClient({
 
   if (error) {
     return (
-      <Typography color="error" sx={{ py: 4 }}>
-        {error}
-      </Typography>
+      <PullToRefresh onRefresh={() => refresh()}>
+        <Typography color="error" sx={{ py: 4 }}>
+          {error}
+        </Typography>
+      </PullToRefresh>
     );
   }
 
   const total = channels.length + videos.length;
 
   return (
-    <>
+    <PullToRefresh onRefresh={() => refresh()}>
       <Box
         sx={{
           display: "flex",
@@ -99,6 +102,6 @@ export function HomeSearchResultsClient({
       ) : (
         <SearchResultsGrid channels={channels} videos={videos} />
       )}
-    </>
+    </PullToRefresh>
   );
 }
