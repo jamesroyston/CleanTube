@@ -8,7 +8,7 @@ import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 import {
@@ -27,6 +27,7 @@ import {
   watchPlayerShellSx,
   watchSidebarPadSx,
 } from "@/lib/watchLayoutSx";
+import { clearActiveWatch, markActiveWatch } from "@/lib/watchRestore";
 import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { startSecondsFromWatchPageQuery } from "@/lib/youtubeTime";
 import type { WatchVideoDetails } from "@/lib/youtubeTypes";
@@ -173,6 +174,23 @@ export function WatchPageClient({
   useEffect(() => {
     preloadLiteYoutubeEmbed();
   }, []);
+
+  // Cleanup runs on in-app navigation (unmount or Activity hide) but not when
+  // iOS kills the process or the page enters BFCache, so the marker survives those.
+  useLayoutEffect(() => {
+    markActiveWatch(videoId);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") markActiveWatch(videoId);
+    };
+    const onPageHide = () => markActiveWatch(videoId);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pagehide", onPageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pagehide", onPageHide);
+      clearActiveWatch();
+    };
+  }, [videoId]);
 
   const startSeconds =
     startSecondsFromWatchPageQuery({
