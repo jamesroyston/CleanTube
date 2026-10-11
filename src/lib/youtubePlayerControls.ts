@@ -312,17 +312,8 @@ export function resyncPlayerSize(
   iframe.setAttribute("height", String(h));
   iframe.style.width = `${w}px`;
   iframe.style.height = `${h}px`;
-  /**
-   * An explicit size may be larger than the clip parent (landscape overscan).
-   * `max-width: 100%` would shrink it back and re-crop the picture.
-   */
-  if (size) {
-    iframe.style.maxWidth = "none";
-    iframe.style.maxHeight = "none";
-  } else {
-    iframe.style.maxWidth = "100%";
-    iframe.style.maxHeight = "100%";
-  }
+  iframe.style.maxWidth = "100%";
+  iframe.style.maxHeight = "100%";
   try {
     player.setSize(w, h);
   } catch {

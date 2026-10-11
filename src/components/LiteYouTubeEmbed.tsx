@@ -29,7 +29,6 @@ import {
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
 import {
-  landscapeWindowVideoRect,
   MOBILE_LANDSCAPE,
   MOBILE_LANDSCAPE_QUERY,
 } from "@/lib/mobileLandscape";
@@ -70,8 +69,7 @@ export function preloadLiteYoutubeEmbed() {
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
 /**
- * Landscape: the shell is the window-centered 16:9 clip. JS sizes the iframe
- * to the window and offsets it so YouTube's picture lines up.
+ * Landscape: fill the shell. JS pins the iframe to that pixel size.
  */
 const LANDSCAPE_FIT_SX = {
   height: "100%",
@@ -79,6 +77,7 @@ const LANDSCAPE_FIT_SX = {
   maxWidth: "100%",
   maxHeight: "100%",
   overflow: "hidden",
+  transform: "translate3d(0, 0, 0)",
 } as const;
 
 /** Give up on a hung `getYTPlayer()` (iOS after background) and remount. */
@@ -198,9 +197,9 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Visible clip is the window-centered 16:9. The iframe is the full window,
-   * shifted so its origin is the window origin. iOS YouTube sizes the picture
-   * to the window; matching that stops the left bar / right crop.
+   * Pin the player to the largest 16:9 box inside the shell's padded area;
+   * the shell centers it. A wider box makes YouTube pillarbox, and on iOS it
+   * places that picture unevenly inside the iframe, so leave it no slack.
    */
   useEffect(() => {
     if (!ready) return;
@@ -216,6 +215,7 @@ export function LiteYouTubeEmbed({
       box.style.removeProperty("margin-left");
       box.style.removeProperty("max-width");
       box.style.removeProperty("overflow");
+      box.style.removeProperty("transform");
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.removeProperty("width");
@@ -225,6 +225,7 @@ export function LiteYouTubeEmbed({
         embed.style.removeProperty("margin-top");
         embed.style.removeProperty("overflow");
         embed.style.removeProperty("contain");
+        embed.style.removeProperty("transform");
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
@@ -232,53 +233,60 @@ export function LiteYouTubeEmbed({
         iframe.removeAttribute("height");
         iframe.style.removeProperty("width");
         iframe.style.removeProperty("height");
-        iframe.style.removeProperty("max-width");
-        iframe.style.removeProperty("max-height");
         iframe.style.removeProperty("margin-left");
         iframe.style.removeProperty("left");
         iframe.style.removeProperty("margin-top");
         iframe.style.removeProperty("top");
-        iframe.style.removeProperty("position");
+        iframe.style.removeProperty("transform");
       }
     };
 
     const applyFit = () => {
       if (!orientation.matches) {
         clearFit();
-        resyncPlayerSize(ytPlayerRef.current);
         return;
       }
-      const { vw, vh, fitW, fitH, left, top } = landscapeWindowVideoRect();
+      const style = getComputedStyle(container);
+      const maxW =
+        container.clientWidth -
+        parseFloat(style.paddingLeft) -
+        parseFloat(style.paddingRight);
+      const maxH =
+        container.clientHeight -
+        parseFloat(style.paddingTop) -
+        parseFloat(style.paddingBottom);
+      if (!(maxW > 0) || !(maxH > 0)) return;
+      const fitW = Math.floor(Math.min(maxW, (maxH * 16) / 9));
+      const fitH = Math.min(Math.floor(maxH), Math.round((fitW * 9) / 16));
       if (!(fitW > 0) || !(fitH > 0)) return;
       box.style.overflow = "hidden";
       box.style.maxWidth = "none";
       box.style.width = `${fitW}px`;
       box.style.height = `${fitH}px`;
+      box.style.transform = "translate3d(0, 0, 0)";
       const embed = box.querySelector("lite-youtube");
       if (embed instanceof HTMLElement) {
         embed.style.contain = "none";
         embed.style.maxWidth = "none";
         embed.style.width = "100%";
         embed.style.height = "100%";
-        embed.style.overflow = "hidden";
         embed.style.marginLeft = "0px";
         embed.style.marginTop = "0px";
+        embed.style.transform = "translate3d(0, 0, 0)";
       }
       const iframe = box.querySelector("iframe");
       if (iframe instanceof HTMLIFrameElement) {
-        iframe.setAttribute("width", String(vw));
-        iframe.setAttribute("height", String(vh));
-        iframe.style.position = "absolute";
-        iframe.style.maxWidth = "none";
-        iframe.style.maxHeight = "none";
-        iframe.style.width = `${vw}px`;
-        iframe.style.height = `${vh}px`;
-        iframe.style.left = `${-left}px`;
+        iframe.setAttribute("width", String(fitW));
+        iframe.setAttribute("height", String(fitH));
+        iframe.style.width = `${fitW}px`;
+        iframe.style.height = `${fitH}px`;
+        iframe.style.left = "0px";
         iframe.style.marginLeft = "0px";
-        iframe.style.top = `${-top}px`;
+        iframe.style.top = "0px";
         iframe.style.marginTop = "0px";
+        iframe.style.transform = "translate3d(0, 0, 0)";
       }
-      resyncPlayerSize(ytPlayerRef.current, { width: vw, height: vh });
+      resyncPlayerSize(ytPlayerRef.current, { width: fitW, height: fitH });
     };
 
     applyFit();
@@ -287,13 +295,11 @@ export function LiteYouTubeEmbed({
     const mutations = new MutationObserver(applyFit);
     mutations.observe(box, { childList: true, subtree: true });
     orientation.addEventListener("change", applyFit);
-    window.visualViewport?.addEventListener("resize", applyFit);
 
     return () => {
       observer.disconnect();
       mutations.disconnect();
       orientation.removeEventListener("change", applyFit);
-      window.visualViewport?.removeEventListener("resize", applyFit);
       clearFit();
     };
   }, [ready]);
@@ -304,21 +310,7 @@ export function LiteYouTubeEmbed({
 
     let raf = 0;
     const timers: number[] = [];
-    const orientation = window.matchMedia(MOBILE_LANDSCAPE_QUERY);
-    const resync = () => {
-      if (orientation.matches) {
-        const { vw, vh, left, top } = landscapeWindowVideoRect();
-        resyncPlayerSize(ytPlayerRef.current, { width: vw, height: vh });
-        const iframe = shellRef.current?.querySelector("iframe");
-        if (iframe instanceof HTMLIFrameElement) {
-          iframe.style.position = "absolute";
-          iframe.style.left = `${-left}px`;
-          iframe.style.top = `${-top}px`;
-        }
-        return;
-      }
-      resyncPlayerSize(ytPlayerRef.current);
-    };
+    const resync = () => resyncPlayerSize(ytPlayerRef.current);
     const scheduleResync = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(resync);
@@ -326,6 +318,7 @@ export function LiteYouTubeEmbed({
       timers.push(window.setTimeout(resync, 300));
     };
 
+    const orientation = window.matchMedia("(orientation: landscape)");
     window.addEventListener("resize", scheduleResync);
     window.addEventListener("orientationchange", scheduleResync);
     orientation.addEventListener("change", scheduleResync);

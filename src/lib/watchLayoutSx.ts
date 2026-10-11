@@ -1,4 +1,8 @@
-import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import {
+  LANDSCAPE_RAIL_CONTENT,
+  MOBILE_LANDSCAPE,
+  SAFE_LEFT,
+} from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
@@ -6,7 +10,8 @@ export const MOBILE_PORTRAIT =
 
 /**
  * Landscape phones: the player is the whole page. Pinned to the viewport so the
- * element never moves in the tree (moving it would reload the YouTube iframe).
+ * element never moves in the tree (moving it would reload the YouTube iframe),
+ * inset by the notch on whichever side it lands and by the right-edge nav rail.
  */
 export const watchPlayerShellSx = {
   mb: { xs: 2, sm: 3 },
@@ -15,18 +20,18 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Full window. JS sizes a 16:9 clip in the center and places the iframe at
-     * the window origin so iOS YouTube's window-sized picture lines up. The
-     * rail stacks above this layer. Island-on-right overrides live in globals.css.
+     * Screen edge to the 56px icon column, padded by the island inset on both
+     * sides so the centered 16:9 player has even margins and never enters the
+     * inset. Island-on-right overrides live in globals.css.
      */
     top: 0,
-    right: 0,
     bottom: 0,
     left: 0,
+    right: LANDSCAPE_RAIL_CONTENT,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
     py: 0,
-    px: 0,
+    px: SAFE_LEFT,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
