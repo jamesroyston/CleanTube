@@ -197,7 +197,7 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * Pin the player to the largest 16:9 box inside the shell (island to rail);
+   * Pin the player to the largest 16:9 box inside the shell's padded area;
    * the shell centers it. A wider box makes YouTube pillarbox, and on iOS it
    * places that picture unevenly inside the iframe, so leave it no slack.
    */

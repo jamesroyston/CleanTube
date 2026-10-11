@@ -20,17 +20,18 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Island inner edge to the 56px icon column. The player is the largest
-     * 16:9 box inside and is centered here. Island-on-right overrides live in
-     * globals.css.
+     * Screen edge to the 56px icon column, padded by the island inset on both
+     * sides so the centered 16:9 player has even margins and never enters the
+     * inset. Island-on-right overrides live in globals.css.
      */
     top: 0,
     bottom: 0,
-    left: SAFE_LEFT,
+    left: 0,
     right: LANDSCAPE_RAIL_CONTENT,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
-    p: 0,
+    py: 0,
+    px: SAFE_LEFT,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
