@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useRef } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
 
 import { useSwrIdbHydrated, useSwrInitialLoad } from "@/hooks/useSwrInitialLoad";
@@ -15,11 +16,14 @@ export type ForYouFeedKey = readonly ["for-you-feed", string];
 
 async function fetchForYouFeed(
   [, userId]: ForYouFeedKey,
+  force = false,
 ): Promise<ForYouFeedResult> {
   void userId;
-  const response = await fetch("/api/for-you", {
+  // `refresh=1` asks the server to rebuild instead of serving its cached feed.
+  const response = await fetch(force ? "/api/for-you?refresh=1" : "/api/for-you", {
     credentials: "same-origin",
     headers: { Accept: "application/json" },
+    cache: force ? "no-store" : "default",
   });
   const payload = await readFetchJson<ForYouApiResponse>(response);
   if (!response.ok) {
@@ -55,9 +59,16 @@ export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
       ? (["for-you-feed", userId] as const)
       : null;
 
+  const forceNextFetchRef = useRef(false);
+  const fetcher = useCallback((key: ForYouFeedKey) => {
+    const force = forceNextFetchRef.current;
+    forceNextFetchRef.current = false;
+    return fetchForYouFeed(key, force);
+  }, []);
+
   const { data, error, isLoading, isValidating, mutate } = useSWR(
     swrKey,
-    fetchForYouFeed,
+    fetcher,
     {
       keepPreviousData: true,
       revalidateOnFocus: false,
@@ -87,7 +98,15 @@ export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
     ),
     /** UTC day key the visible feed was generated for (for dismissal scoping). */
     feedDayKey: data?.generatedDayKey,
-    refreshFeed: () => mutate(),
+    /**
+     * Explicit user refresh. `force` (default) bypasses the server feed cache;
+     * pass `false` when library signals changed and a normal fetch suffices.
+     */
+    refreshFeed: ({ force = true }: { force?: boolean } = {}) => {
+      if (!swrKey) return Promise.resolve(data);
+      forceNextFetchRef.current = force;
+      return mutate();
+    },
   };
 }
 

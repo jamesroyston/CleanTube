@@ -295,7 +295,7 @@ export function ForYouFeedView({
                             query={searchQuery}
                             onRemove={(query) => {
                               void muteSearch(query).then(() =>
-                                void refreshFeed(),
+                                void refreshFeed({ force: false }),
                               );
                             }}
                           />
