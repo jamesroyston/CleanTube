@@ -12,7 +12,17 @@ body {
 
 body {
   min-height: 100dvh;
-  min-height: -webkit-fill-available;
+}
+
+/**
+ * Phone / PWA document scroll: For You carousels bleed past the gutters, and
+ * any sideways document overflow or elastic overscroll lets iOS drag the fixed
+ * bottom nav along with the page.
+ */
+html[data-mobile-experience="1"],
+html[data-mobile-experience="1"] body {
+  overflow-x: clip;
+  overscroll-behavior-y: none;
 }
 
 lite-youtube {

@@ -252,7 +252,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               overflow: "hidden",
             }
           : {
-              minHeight: ["100vh", "-webkit-fill-available", "100dvh"],
+              minHeight: "100dvh",
             }),
       }}
     >
