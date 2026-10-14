@@ -151,8 +151,7 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
     left: 0 !important;
     right: calc(56px + env(safe-area-inset-right, 0px)) !important;
     padding-left: 0 !important;
-    /* Keep in sync with LANDSCAPE_ISLAND_EXTRA_PX in mobileLandscape.ts */
-    padding-right: 32px !important;
+    padding-right: 0 !important;
   }
   html[data-island-side="right"] [data-landscape-rail] {
     width: calc(56px + env(safe-area-inset-right, 0px)) !important;

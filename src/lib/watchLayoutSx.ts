@@ -1,5 +1,4 @@
 import {
-  LANDSCAPE_ISLAND_EXTRA,
   LANDSCAPE_RAIL_CONTENT,
   MOBILE_LANDSCAPE,
   SAFE_LEFT,
@@ -21,9 +20,8 @@ export const watchPlayerShellSx = {
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     /**
-     * Screen edge to the 56px icon column. Extra padding on the island side
-     * pushes the player box away from the notch. Island-on-right overrides
-     * live in globals.css.
+     * Screen edge to the 56px icon column. The 16:9 player is centered in
+     * that leftover space. Island-on-right overrides live in globals.css.
      */
     top: 0,
     bottom: 0,
@@ -32,8 +30,7 @@ export const watchPlayerShellSx = {
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
     py: 0,
-    pl: `calc(${SAFE_LEFT} + ${LANDSCAPE_ISLAND_EXTRA})`,
-    pr: SAFE_LEFT,
+    px: SAFE_LEFT,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",

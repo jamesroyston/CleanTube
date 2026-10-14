@@ -29,10 +29,6 @@ export const SAFE_RIGHT = "env(safe-area-inset-right, 0px)";
 export const SAFE_TOP = "env(safe-area-inset-top, 0px)";
 export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
 
-/** Extra gap between the player box and the island, on top of the safe-area. */
-export const LANDSCAPE_ISLAND_EXTRA_PX = 32;
-export const LANDSCAPE_ISLAND_EXTRA = `${LANDSCAPE_ISLAND_EXTRA_PX}px`;
-
 /** 56px icon column — video's right edge and default rail width. */
 export const LANDSCAPE_RAIL_CONTENT = `${LANDSCAPE_RAIL_WIDTH_PX}px`;
 
