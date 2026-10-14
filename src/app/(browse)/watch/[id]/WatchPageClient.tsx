@@ -69,7 +69,7 @@ function WatchPageSkeletonBody({
     <Grid container spacing={{ xs: 0, sm: 3 }} sx={watchPageGridSx}>
       <Grid size={{ xs: 12, lg: reserveUpNextColumn ? 8 : 12 }}>
         <Stack spacing={1.5}>
-          <Box sx={watchPlayerShellSx}>
+          <Box data-watch-player-shell sx={watchPlayerShellSx}>
             <Skeleton
               variant="rectangular"
               animation="wave"

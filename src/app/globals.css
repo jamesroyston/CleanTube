@@ -120,6 +120,19 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
   }
 
   /**
+   * Centered 16:9 width. Watch player and watch-page rail both use this so
+   * the rail sits flush on the video's right edge. Browse pages keep the
+   * rail on the screen edge.
+   */
+  html {
+    --ct-landscape-video-width: min(100vw, calc(100dvh * 16 / 9));
+  }
+  html:has([data-watch-player-shell]) [data-landscape-rail] {
+    left: calc((100vw + var(--ct-landscape-video-width)) / 2) !important;
+    right: auto !important;
+  }
+
+  /**
    * Fill the 16:9 page box. Turn off lite-youtube's padding-bottom size hack
    * and 720px cap so the iframe can be a normal 100% child.
    */
@@ -149,7 +162,7 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
    */
   html[data-island-side="right"] [data-watch-player-shell] {
     left: 0 !important;
-    right: calc(56px + env(safe-area-inset-right, 0px)) !important;
+    right: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
   }

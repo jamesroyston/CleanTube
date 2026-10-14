@@ -27,7 +27,7 @@ import {
   stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
-import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import { LANDSCAPE_VIDEO_WIDTH, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
@@ -69,7 +69,7 @@ const THEATRE_VIEWPORT_RESERVE = "152px";
  * the page around this box). No pixel writes, no YouTube setSize.
  */
 const LANDSCAPE_FIT_SX = {
-  width: "min(100%, calc(100dvh * 16 / 9))",
+  width: LANDSCAPE_VIDEO_WIDTH,
   maxWidth: "100%",
   maxHeight: "100%",
   height: "auto",

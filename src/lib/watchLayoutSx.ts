@@ -1,8 +1,4 @@
-import {
-  LANDSCAPE_RAIL_CONTENT,
-  MOBILE_LANDSCAPE,
-  SAFE_LEFT,
-} from "@/lib/mobileLandscape";
+import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
@@ -10,8 +6,8 @@ export const MOBILE_PORTRAIT =
 
 /**
  * Landscape phones: the player is the whole page. Pinned to the viewport so the
- * element never moves in the tree (moving it would reload the YouTube iframe),
- * inset by the notch on whichever side it lands and by the right-edge nav rail.
+ * element never moves in the tree (moving it would reload the YouTube iframe).
+ * The 16:9 child is centered on the screen; the rail sits on its right edge.
  */
 export const watchPlayerShellSx = {
   mb: { xs: 2, sm: 3 },
@@ -19,18 +15,14 @@ export const watchPlayerShellSx = {
   aspectRatio: "16 / 9",
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
-    /**
-     * Screen edge to the 56px icon column. The 16:9 player is centered in
-     * that leftover space. Island-on-right overrides live in globals.css.
-     */
     top: 0,
     bottom: 0,
     left: 0,
-    right: LANDSCAPE_RAIL_CONTENT,
+    right: 0,
     /** `width: 100%` would over-constrain the box and make `right` a no-op. */
     width: "auto",
     py: 0,
-    px: SAFE_LEFT,
+    px: 0,
     mb: 0,
     aspectRatio: "auto",
     display: "flex",
