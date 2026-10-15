@@ -2,10 +2,12 @@
 
 import { useEffect } from "react";
 
+import { MOBILE_LANDSCAPE_QUERY } from "@/lib/mobileLandscape";
+
 /**
- * `viewport-fit=cover` makes iOS inset YouTube's <video> (left black bar).
- * Keep cover off for the whole watch page so rotate doesn't retarget the
- * viewport (that left portrait chrome untappable). Restore cover on leave.
+ * Portrait watch uses `viewport-fit=cover` like For You so the header and
+ * bottom nav get real safe-area padding. Landscape watch uses `auto` so iOS
+ * does not inset YouTube's video. Mutate the existing meta tag in place.
  */
 function writeViewportFit(fit: "cover" | "auto") {
   const current = document.querySelector('meta[name="viewport"]');
@@ -21,8 +23,16 @@ function writeViewportFit(fit: "cover" | "auto") {
 
 export function WatchLandscapeViewportFit() {
   useEffect(() => {
-    writeViewportFit("auto");
-    return () => writeViewportFit("cover");
+    const orientation = window.matchMedia(MOBILE_LANDSCAPE_QUERY);
+    const apply = () => {
+      writeViewportFit(orientation.matches ? "auto" : "cover");
+    };
+    apply();
+    orientation.addEventListener("change", apply);
+    return () => {
+      orientation.removeEventListener("change", apply);
+      writeViewportFit("cover");
+    };
   }, []);
 
   return null;
