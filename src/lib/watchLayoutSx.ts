@@ -12,6 +12,10 @@ export const watchPlayerShellSx = {
   mb: { xs: 2, sm: 3 },
   width: "100%",
   aspectRatio: "16 / 9",
+  position: "relative",
+  overflow: "hidden",
+  isolation: "isolate",
+  zIndex: 0,
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
     width: `var(--ct-landscape-video-width, ${LANDSCAPE_VIDEO_WIDTH})`,

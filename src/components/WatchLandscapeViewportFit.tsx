@@ -2,40 +2,27 @@
 
 import { useEffect } from "react";
 
-import { MOBILE_LANDSCAPE_QUERY } from "@/lib/mobileLandscape";
-
 /**
- * Other sites' YouTube embeds work in iOS landscape because they don't use
- * `viewport-fit=cover`. With cover on, WebKit insets the <video> inside
- * YouTube's iframe (left black bar) while the player chrome still fills the
- * iframe. Drop cover only while this watch page is in phone landscape.
+ * `viewport-fit=cover` makes iOS inset YouTube's <video> (left black bar).
+ * Keep cover off for the whole watch page so rotate doesn't retarget the
+ * viewport (that left portrait chrome untappable). Restore cover on leave.
  */
 function writeViewportFit(fit: "cover" | "auto") {
   const current = document.querySelector('meta[name="viewport"]');
   if (!(current instanceof HTMLMetaElement)) return;
+  if (current.content.toLowerCase().includes(`viewport-fit=${fit}`)) return;
   const parts = current.content
     .split(",")
     .map((part) => part.trim())
     .filter((part) => part.length > 0 && !part.toLowerCase().startsWith("viewport-fit"));
   parts.push(`viewport-fit=${fit}`);
-  const next = document.createElement("meta");
-  next.name = "viewport";
-  next.content = parts.join(", ");
-  current.replaceWith(next);
+  current.content = parts.join(", ");
 }
 
 export function WatchLandscapeViewportFit() {
   useEffect(() => {
-    const orientation = window.matchMedia(MOBILE_LANDSCAPE_QUERY);
-    const apply = () => {
-      writeViewportFit(orientation.matches ? "auto" : "cover");
-    };
-    apply();
-    orientation.addEventListener("change", apply);
-    return () => {
-      orientation.removeEventListener("change", apply);
-      writeViewportFit("cover");
-    };
+    writeViewportFit("auto");
+    return () => writeViewportFit("cover");
   }, []);
 
   return null;

@@ -187,6 +187,25 @@ export function LiteYouTubeEmbed({
     playerApiReadyRef,
   );
 
+  /** iOS can leave the iframe's hit target fullscreen after rotate. */
+  useEffect(() => {
+    const clipIframe = () => {
+      const iframe = shellRef.current?.querySelector("iframe");
+      if (!(iframe instanceof HTMLIFrameElement)) return;
+      iframe.style.width = "100%";
+      iframe.style.height = "100%";
+      iframe.removeAttribute("width");
+      iframe.removeAttribute("height");
+    };
+    clipIframe();
+    window.addEventListener("orientationchange", clipIframe);
+    window.addEventListener("resize", clipIframe);
+    return () => {
+      window.removeEventListener("orientationchange", clipIframe);
+      window.removeEventListener("resize", clipIframe);
+    };
+  }, [ready, videoId]);
+
   const iframeStart =
     resumeSeconds != null && resumeSeconds > 0 ? resumeSeconds : start;
   const params = new URLSearchParams();
