@@ -129,7 +129,8 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
   }
   html:has([data-watch-player-shell]) [data-landscape-rail] {
     left: calc((100vw + var(--ct-landscape-video-width)) / 2) !important;
-    right: auto !important;
+    right: 0 !important;
+    width: auto !important;
   }
 
   /**
@@ -165,8 +166,21 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
     padding-right: 0 !important;
   }
   html[data-island-side="right"] [data-landscape-rail] {
-    width: calc(56px + env(safe-area-inset-right, 0px)) !important;
-    padding-right: env(safe-area-inset-right, 0px) !important;
+    width: calc(56px + max(59px, env(safe-area-inset-right, 0px))) !important;
+    padding-right: max(59px, env(safe-area-inset-right, 0px)) !important;
+  }
+  /**
+   * Watch + island on the right: fill to the screen edge, keep the 56px
+   * icons left of the island (viewport-fit=auto often zeros env()).
+   */
+  html[data-island-side="right"]:has([data-watch-player-shell]) [data-landscape-rail] {
+    left: min(
+      calc((100vw + var(--ct-landscape-video-width)) / 2),
+      calc(100vw - 56px - max(59px, env(safe-area-inset-right, 0px)))
+    ) !important;
+    right: 0 !important;
+    width: auto !important;
+    padding-right: max(59px, env(safe-area-inset-right, 0px)) !important;
   }
   html[data-island-side="right"] [data-landscape-main] {
     padding-left: 0 !important;

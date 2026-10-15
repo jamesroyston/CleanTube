@@ -32,6 +32,13 @@ export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
 /** 56px icon column — video's right edge and default rail width. */
 export const LANDSCAPE_RAIL_CONTENT = `${LANDSCAPE_RAIL_WIDTH_PX}px`;
 
+/**
+ * Fallback island inset when `viewport-fit=auto` zeros `env(safe-area-inset-*)`.
+ * Face ID / Dynamic Island landscape is ~59px.
+ */
+export const LANDSCAPE_ISLAND_INSET_FALLBACK = "59px";
+export const LANDSCAPE_ISLAND_PAD = `max(${LANDSCAPE_ISLAND_INSET_FALLBACK}, ${SAFE_RIGHT})`;
+
 /** Largest 16:9 that fits the landscape viewport. Keep in sync with globals.css. */
 export const LANDSCAPE_VIDEO_WIDTH = "min(100vw, calc(100dvh * 16 / 9))";
 

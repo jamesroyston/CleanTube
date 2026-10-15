@@ -56,13 +56,13 @@ export function LandscapeNavRail() {
           top: 0,
           right: 0,
           bottom: 0,
-          /** 56px icon column. Widens only when `data-island-side=right`. */
+          /** 56px icon column; watch CSS stretches the rail to the screen edge. */
           width: LANDSCAPE_RAIL_CONTENT,
           pt: `max(3px, ${SAFE_TOP})`,
           pb: `max(3px, ${SAFE_BOTTOM})`,
           boxSizing: "border-box",
           flexDirection: "column",
-          alignItems: "center",
+          alignItems: "flex-start",
           gap: 0.375,
           bgcolor: "background.paper",
           borderLeft: (t) => `1px solid ${t.palette.divider}`,
@@ -76,9 +76,10 @@ export function LandscapeNavRail() {
     >
       <Box
         sx={{
-          /** Fill the icon column exactly; a fixed 56px overflows the 1px left border. */
-          width: "100%",
-          flexShrink: 0,
+          width: LANDSCAPE_RAIL_CONTENT,
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
