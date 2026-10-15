@@ -161,8 +161,6 @@ html[data-mobile-experience="1"] [data-browse-header] .MuiToolbar-root {
    * column and the island is the video's left edge.
    */
   html[data-island-side="right"] [data-watch-player-shell] {
-    left: 0 !important;
-    right: 0 !important;
     padding-left: 0 !important;
     padding-right: 0 !important;
   }

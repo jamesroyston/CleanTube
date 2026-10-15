@@ -1,13 +1,12 @@
-import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import { LANDSCAPE_VIDEO_WIDTH, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
   "@media (max-width: 599.95px) and (orientation: portrait)";
 
 /**
- * Landscape phones: the player is the whole page. Pinned to the viewport so the
- * element never moves in the tree (moving it would reload the YouTube iframe).
- * The 16:9 child is centered on the screen; the rail sits on its right edge.
+ * Landscape phones: the player is a centered 16:9 box, not a full-screen
+ * overlay (that overlay ate taps and sat the skeleton under the rail).
  */
 export const watchPlayerShellSx = {
   mb: { xs: 2, sm: 3 },
@@ -15,21 +14,21 @@ export const watchPlayerShellSx = {
   aspectRatio: "16 / 9",
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    /** `width: 100%` would over-constrain the box and make `right` a no-op. */
-    width: "auto",
+    width: `var(--ct-landscape-video-width, ${LANDSCAPE_VIDEO_WIDTH})`,
+    aspectRatio: "16 / 9",
+    height: "auto",
+    left: "calc((100vw - var(--ct-landscape-video-width, min(100vw, calc(100dvh * 16 / 9)))) / 2)",
+    top: "calc((100dvh - var(--ct-landscape-video-width, min(100vw, calc(100dvh * 16 / 9))) * 9 / 16) / 2)",
+    right: "auto",
+    bottom: "auto",
     py: 0,
     px: 0,
     mb: 0,
-    aspectRatio: "auto",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
     overflow: "hidden",
     bgcolor: "background.default",
+    boxSizing: "border-box",
+    border: "2px solid",
+    borderColor: "primary.main",
     zIndex: 1,
   },
 } as const;

@@ -27,7 +27,7 @@ import {
   stopLiteYoutubePlayer,
 } from "@/lib/youtubePlayer";
 import { registerWatchPlayerStop } from "@/lib/watchPlayerLifecycle";
-import { LANDSCAPE_VIDEO_WIDTH, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { MOBILE_PORTRAIT } from "@/lib/watchLayoutSx";
 
 import "lite-youtube-embed/src/lite-yt-embed.css";
@@ -64,20 +64,11 @@ export function preloadLiteYoutubeEmbed() {
 
 const THEATRE_VIEWPORT_RESERVE = "152px";
 
-/**
- * Largest 16:9 that fits the leftover landscape area (island + rail are on
- * the page around this box). No pixel writes, no YouTube setSize.
- */
+/** Fill the landscape 16:9 shell. */
 const LANDSCAPE_FIT_SX = {
-  width: LANDSCAPE_VIDEO_WIDTH,
-  maxWidth: "100%",
-  maxHeight: "100%",
-  height: "auto",
-  aspectRatio: "16 / 9",
+  width: "100%",
+  height: "100%",
   overflow: "hidden",
-  boxSizing: "border-box",
-  border: "2px solid",
-  borderColor: "primary.main",
 } as const;
 
 /** Give up on a hung `getYTPlayer()` (iOS after background) and remount. */
