@@ -12,9 +12,9 @@ export default function BrowseLayout({
 }>) {
   return (
     <AppShell>
-      <WatchLandscapeViewportFit />
       <WatchRestoreOnLaunch />
       <Suspense fallback={null}>
+        <WatchLandscapeViewportFit />
         <SearchScrollRestore />
       </Suspense>
       {children}
