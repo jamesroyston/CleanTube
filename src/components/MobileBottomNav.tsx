@@ -14,7 +14,7 @@ import { useEffect } from "react";
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useCompactViewport } from "@/hooks/useCompactViewport";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/lib/compactLayout";
-import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import { CT_SAFE_BOTTOM, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { bottomNavValueFromPathname } from "@/lib/mobileNavRoutes";
 
 const PREFETCH_ROUTES = ["/", "/library", "/account", "/history", "/watch-later"] as const;
@@ -46,7 +46,7 @@ export function MobileBottomNav() {
         left: 0,
         right: 0,
         zIndex: theme.zIndex.drawer,
-        pb: "env(safe-area-inset-bottom, 0px)",
+        pb: CT_SAFE_BOTTOM,
         boxSizing: "border-box",
         /** Landscape moves nav to the right-edge rail. */
         [MOBILE_LANDSCAPE]: { display: "none" },

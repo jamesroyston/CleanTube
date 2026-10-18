@@ -45,7 +45,7 @@ import {
   extractVideoIdFromUrl,
   isLikelyYouTubeUrl,
 } from "@/lib/youtube";
-import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import { CT_SAFE_LEFT, CT_SAFE_RIGHT, CT_SAFE_TOP, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { extractStartSecondsFromYoutubeInput } from "@/lib/youtubeTime";
 import {
   normalizeResultSortParam,
@@ -308,9 +308,9 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
           color="default"
           sx={[
             {
-              pt: "env(safe-area-inset-top, 0px)",
-              pl: "env(safe-area-inset-left, 0px)",
-              pr: "env(safe-area-inset-right, 0px)",
+              pt: CT_SAFE_TOP,
+              pl: CT_SAFE_LEFT,
+              pr: CT_SAFE_RIGHT,
               boxSizing: "border-box",
               zIndex: showScrollRevealHeader
                 ? (t) => t.zIndex.modal - 1

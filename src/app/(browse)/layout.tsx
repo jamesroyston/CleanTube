@@ -2,6 +2,7 @@ import { Suspense } from "react";
 
 import { AppShell } from "@/components/AppShell";
 import { SearchScrollRestore } from "@/components/SearchScrollRestore";
+import { WatchLandscapeViewportFit } from "@/components/WatchLandscapeViewportFit";
 import { WatchRestoreOnLaunch } from "@/components/WatchRestoreOnLaunch";
 
 export default function BrowseLayout({
@@ -11,6 +12,7 @@ export default function BrowseLayout({
 }>) {
   return (
     <AppShell>
+      <WatchLandscapeViewportFit />
       <WatchRestoreOnLaunch />
       <Suspense fallback={null}>
         <SearchScrollRestore />

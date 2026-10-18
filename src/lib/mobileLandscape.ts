@@ -29,6 +29,11 @@ export const SAFE_RIGHT = "env(safe-area-inset-right, 0px)";
 export const SAFE_TOP = "env(safe-area-inset-top, 0px)";
 export const SAFE_BOTTOM = "env(safe-area-inset-bottom, 0px)";
 
+export const CT_SAFE_TOP = "var(--ct-safe-top, env(safe-area-inset-top, 0px))";
+export const CT_SAFE_RIGHT = "var(--ct-safe-right, env(safe-area-inset-right, 0px))";
+export const CT_SAFE_BOTTOM = "var(--ct-safe-bottom, env(safe-area-inset-bottom, 0px))";
+export const CT_SAFE_LEFT = "var(--ct-safe-left, env(safe-area-inset-left, 0px))";
+
 /** 56px icon column — video's right edge and default rail width. */
 export const LANDSCAPE_RAIL_CONTENT = `${LANDSCAPE_RAIL_WIDTH_PX}px`;
 
@@ -91,4 +96,47 @@ export function syncLandscapeIslandSide(): void {
     ISLAND_SIDE_ATTR,
     landscapeIslandSide(),
   );
+}
+
+/**
+ * iOS PWA often reports 0 safe-area after we toggle `viewport-fit` for
+ * landscape watch. Floor standalone insets so the header and rail cannot sit
+ * under the island / home bar / rounded corners.
+ */
+export function applySafeAreaCssVars(): void {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  const standalone = root.getAttribute("data-pwa-standalone") === "1";
+  const landscape = window.matchMedia("(orientation: landscape)").matches;
+  const top = readSafeAreaInset("top");
+  const right = readSafeAreaInset("right");
+  const bottom = readSafeAreaInset("bottom");
+  const left = readSafeAreaInset("left");
+  const extra = standalone ? 8 : 0;
+  let sat = top;
+  let sab = bottom;
+  let sal = left;
+  let sar = right;
+  if (standalone) {
+    if (landscape) {
+      if (top < 8) sat = 16;
+      if (bottom < 8) sab = 21;
+      if (left < 8) sal = 59;
+      if (right < 8) sar = 59;
+    } else {
+      if (top < 20) sat = 59;
+      if (bottom < 12) sab = 34;
+      if (left < 8) sal = 16;
+      if (right < 8) sar = 16;
+    }
+  }
+  root.style.setProperty("--ct-safe-top", `${sat + extra}px`);
+  root.style.setProperty("--ct-safe-right", `${sar + extra}px`);
+  root.style.setProperty("--ct-safe-bottom", `${sab + extra}px`);
+  root.style.setProperty("--ct-safe-left", `${sal + extra}px`);
+}
+
+export function syncMobileSafeArea(): void {
+  syncLandscapeIslandSide();
+  applySafeAreaCssVars();
 }

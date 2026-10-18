@@ -15,10 +15,10 @@ import { WatchHeaderBackButton } from "@/components/WatchHeaderBackButton";
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useWatchBackTarget } from "@/hooks/useWatchBackTarget";
 import {
+  CT_SAFE_BOTTOM,
+  CT_SAFE_TOP,
   LANDSCAPE_RAIL_CONTENT,
   MOBILE_LANDSCAPE,
-  SAFE_BOTTOM,
-  SAFE_TOP,
 } from "@/lib/mobileLandscape";
 import { bottomNavValueFromPathname } from "@/lib/mobileNavRoutes";
 import { stopActiveWatchPlayer } from "@/lib/watchPlayerLifecycle";
@@ -58,8 +58,8 @@ export function LandscapeNavRail() {
           bottom: 0,
           /** 56px icon column; watch CSS stretches the rail to the screen edge. */
           width: LANDSCAPE_RAIL_CONTENT,
-          pt: `max(3px, ${SAFE_TOP})`,
-          pb: `max(3px, ${SAFE_BOTTOM})`,
+          pt: `max(16px, ${CT_SAFE_TOP})`,
+          pb: `max(16px, ${CT_SAFE_BOTTOM})`,
           boxSizing: "border-box",
           flexDirection: "column",
           alignItems: "flex-start",

@@ -36,10 +36,10 @@ import {
 } from "@/hooks/useCompactViewport";
 import { useMobileExperience } from "@/hooks/useMobileExperience";
 import {
+  CT_SAFE_BOTTOM,
+  CT_SAFE_LEFT,
   LANDSCAPE_RAIL_CONTENT,
   MOBILE_LANDSCAPE,
-  SAFE_BOTTOM,
-  SAFE_LEFT,
 } from "@/lib/mobileLandscape";
 import { registerScrollElementGetter } from "@/lib/watchReturnNavigation";
 
@@ -223,8 +223,8 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
          * and the island when it is on the left. Island-on-right is in CSS.
          */
         [MOBILE_LANDSCAPE]: {
-          pb: SAFE_BOTTOM,
-          pl: SAFE_LEFT,
+          pb: CT_SAFE_BOTTOM,
+          pl: CT_SAFE_LEFT,
           pr: LANDSCAPE_RAIL_CONTENT,
         },
       }}
