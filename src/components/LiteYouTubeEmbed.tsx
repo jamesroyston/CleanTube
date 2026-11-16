@@ -187,9 +187,14 @@ export function LiteYouTubeEmbed({
     playerApiReadyRef,
   );
 
-  /** iOS can leave the iframe's hit target fullscreen after rotate. */
+  /** iOS can leave the iframe's hit target fullscreen after rotate. Skip while fullscreen or scrubbing — resizing the iframe makes YouTube rebuffer. */
   useEffect(() => {
     const clipIframe = () => {
+      if (document.fullscreenElement) return;
+      const webkitFs = (
+        document as Document & { webkitFullscreenElement?: Element | null }
+      ).webkitFullscreenElement;
+      if (webkitFs) return;
       const iframe = shellRef.current?.querySelector("iframe");
       if (!(iframe instanceof HTMLIFrameElement)) return;
       iframe.style.width = "100%";
@@ -199,10 +204,8 @@ export function LiteYouTubeEmbed({
     };
     clipIframe();
     window.addEventListener("orientationchange", clipIframe);
-    window.addEventListener("resize", clipIframe);
     return () => {
       window.removeEventListener("orientationchange", clipIframe);
-      window.removeEventListener("resize", clipIframe);
     };
   }, [ready, videoId]);
 
@@ -331,11 +334,15 @@ export function LiteYouTubeEmbed({
           playingRef.current = false;
           return;
         }
+        /**
+         * Scrubbing reports BUFFERING. Sampling `getCurrentTime` during that
+         * window posts into the player while it is fetching the new range.
+         */
+        playingRef.current = state === YT.PlayerState.PLAYING;
         if (state === YT.PlayerState.PLAYING) {
           userPausedRef.current = false;
           void recordProgressRef.current();
         }
-        playingRef.current = true;
         return;
       }
       playingRef.current = false;
@@ -451,25 +458,35 @@ export function LiteYouTubeEmbed({
       }
     };
 
+    let recoverTimer = 0;
     const recoverIfDead = () => {
-      if (playerLooksAlive()) return;
-      if (
-        !playerApiReadyRef.current &&
-        !isLiteYoutubeElementActivated(shellRef.current)
-      ) {
-        return;
-      }
-      captureResumeSeconds();
-      const captured = resumeSecondsRef.current;
-      if (captured != null && captured > 0) {
-        setResumeSeconds(captured);
-      }
-      ytPlayerRef.current = null;
-      playerApiReadyRef.current = false;
-      onPlayerApiReady?.(false);
-      playingRef.current = false;
-      attachFailRef.current = 0;
-      setPlayerGeneration((g) => g + 1);
+      window.clearTimeout(recoverTimer);
+      /**
+       * Fullscreen scrubbing can make a player read fail for a moment. Wait
+       * and re-check so we don't tear the iframe down and force a rebuffer.
+       */
+      recoverTimer = window.setTimeout(() => {
+        if (document.visibilityState !== "visible") return;
+        if (document.fullscreenElement) return;
+        if (playerLooksAlive()) return;
+        if (
+          !playerApiReadyRef.current &&
+          !isLiteYoutubeElementActivated(shellRef.current)
+        ) {
+          return;
+        }
+        captureResumeSeconds();
+        const captured = resumeSecondsRef.current;
+        if (captured != null && captured > 0) {
+          setResumeSeconds(captured);
+        }
+        ytPlayerRef.current = null;
+        playerApiReadyRef.current = false;
+        onPlayerApiReady?.(false);
+        playingRef.current = false;
+        attachFailRef.current = 0;
+        setPlayerGeneration((g) => g + 1);
+      }, 700);
     };
 
     const onVisibilityChange = () => {
@@ -493,16 +510,15 @@ export function LiteYouTubeEmbed({
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pagehide", onPageHide);
     window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("focus", recoverIfDead);
     if ("onresume" in document) {
       document.addEventListener("resume", recoverIfDead);
     }
 
     return () => {
+      window.clearTimeout(recoverTimer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pagehide", onPageHide);
       window.removeEventListener("pageshow", onPageShow);
-      window.removeEventListener("focus", recoverIfDead);
       if ("onresume" in document) {
         document.removeEventListener("resume", recoverIfDead);
       }

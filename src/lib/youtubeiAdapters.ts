@@ -270,8 +270,15 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
     }
   }
 
-  const live = isLiveFeedEntry(o);
-  const durationFormatted = live ? "LIVE" : durationTextFromFeedEntry(o);
+  let live = false;
+  let durationFormatted = "—";
+  try {
+    live = isLiveFeedEntry(o);
+    durationFormatted = live ? "LIVE" : durationTextFromFeedEntry(o);
+  } catch {
+    live = false;
+    durationFormatted = "—";
+  }
 
   return {
     id,
@@ -282,6 +289,140 @@ export function feedVideoToVideoLike(v: unknown): VideoLikeForSummary | null {
     live,
     thumbnailUrls,
   };
+}
+
+const SHELF_TYPES = new Set([
+  "GridShelfView",
+  "Shelf",
+  "RichShelf",
+  "ReelShelf",
+  "HorizontalCardList",
+  "HorizontalList",
+  "ExpandedShelfContents",
+  "VerticalList",
+]);
+
+function nodeType(node: unknown): string {
+  if (!node || typeof node !== "object") return "";
+  const type = (node as { type?: unknown }).type;
+  return typeof type === "string" ? type : "";
+}
+
+function videoIdFromNode(node: unknown): string | null {
+  if (!node || typeof node !== "object") return null;
+  const o = node as Record<string, unknown>;
+  const endpoint = o.on_tap_endpoint as
+    | { payload?: { videoId?: unknown } }
+    | undefined;
+  const candidates = [
+    o.id,
+    o.video_id,
+    o.content_id,
+    endpoint?.payload?.videoId,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && FEED_VIDEO_ID.test(candidate)) {
+      return candidate;
+    }
+  }
+  if (typeof o.entity_id === "string") {
+    const fromEntity = o.entity_id.replace(/^shorts-shelf-item-/, "");
+    if (FEED_VIDEO_ID.test(fromEntity)) return fromEntity;
+  }
+  return null;
+}
+
+/** Shorts shelf tiles use `entity_id` / a reel endpoint, not `id`. */
+export function shortsLockupToVideoLike(v: unknown): VideoLikeForSummary | null {
+  if (nodeType(v) !== "ShortsLockupView") return null;
+  const id = videoIdFromNode(v);
+  if (!id) return null;
+  const o = v as Record<string, unknown>;
+  const overlay = o.overlay_metadata as
+    | { primary_text?: unknown; secondary_text?: unknown }
+    | undefined;
+  const title =
+    cleanYtText(overlay?.primary_text) ||
+    cleanYtText(o.accessibility_text) ||
+    "Short";
+  const secondary = cleanYtText(overlay?.secondary_text);
+  const uploadedAt = secondary
+    ?.split("·")
+    .map((part) => part.trim())
+    .find((part) => isRelativeDateText(part));
+  const thumbs = o.thumbnail as { url?: string }[] | undefined;
+  const thumbnailUrls = Array.isArray(thumbs)
+    ? collectThumbnailUrls(
+        thumbs.flatMap((thumb) =>
+          thumb && typeof thumb.url === "string" && thumb.url
+            ? [{ url: thumb.url }]
+            : [],
+        ),
+      )
+    : [];
+
+  return {
+    id,
+    title,
+    channelName: "Unknown channel",
+    durationFormatted: "SHORT",
+    uploadedAt,
+    live: false,
+    thumbnailUrls: thumbnailUrls.length
+      ? thumbnailUrls
+      : [preferredYoutubeThumbnailPath(id)],
+  };
+}
+
+export function isShortSearchNode(node: unknown): boolean {
+  const type = nodeType(node);
+  if (type === "ShortsLockupView" || type === "ReelItem") return true;
+  if (type === "LockupView") {
+    const contentType = (node as { content_type?: unknown }).content_type;
+    return contentType === "SHORTS" || contentType === "SHORT";
+  }
+  return false;
+}
+
+/**
+ * One search-result node in YouTube's visual order.
+ * Shelves are expanded by the caller; this maps a single video-like node.
+ */
+export function mapSearchFeedNode(node: unknown): VideoLikeForSummary | null {
+  try {
+    const short = shortsLockupToVideoLike(node);
+    if (short) return short;
+    const lockup = lockupViewVideoToVideoLike(node);
+    if (lockup) return lockup;
+    if (nodeType(node) === "LockupView") {
+      const contentType = (node as { content_type?: unknown }).content_type;
+      if (contentType === "SHORTS" || contentType === "SHORT") {
+        const id = videoIdFromNode(node);
+        if (!id) return null;
+        const asVideo = { ...(node as object), content_type: "VIDEO", content_id: id };
+        return lockupViewVideoToVideoLike(asVideo);
+      }
+    }
+    return feedVideoToVideoLike(node);
+  } catch {
+    return null;
+  }
+}
+
+/** Child nodes of a search shelf, in display order. */
+export function searchShelfChildren(node: unknown): unknown[] {
+  if (!SHELF_TYPES.has(nodeType(node))) return [];
+  const o = node as Record<string, unknown>;
+  const out: unknown[] = [];
+  for (const bucket of [o.contents, o.items, o.cards, o.content]) {
+    if (Array.isArray(bucket)) out.push(...bucket);
+    else if (bucket && typeof bucket === "object") out.push(bucket);
+  }
+  return out;
+}
+
+export function isSearchShelfNode(node: unknown): boolean {
+  return SHELF_TYPES.has(nodeType(node));
 }
 
 /**

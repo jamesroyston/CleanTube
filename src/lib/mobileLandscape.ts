@@ -99,9 +99,18 @@ export function syncLandscapeIslandSide(): void {
 }
 
 /**
- * iOS PWA often reports 0 safe-area after we toggle `viewport-fit` for
- * landscape watch. Floor standalone insets so the header and rail cannot sit
- * under the island / home bar / rounded corners.
+ * Portrait Dynamic Island / status-bar inset. Values above this after a
+ * rotation are a stale landscape inset, which drops the header until a swipe
+ * forces iOS to recompute `env(safe-area-inset-top)`.
+ */
+const PORTRAIT_TOP_MAX = 62;
+const PORTRAIT_TOP_FALLBACK = 59;
+const LANDSCAPE_ISLAND_FALLBACK = 59;
+
+/**
+ * iOS reports the island inset on both landscape edges, and after rotation it
+ * can report a portrait top inset that is much too large. Keep one island
+ * side, and ignore portrait tops that would push the nav bar down.
  */
 export function applySafeAreaCssVars(): void {
   if (typeof document === "undefined") return;
@@ -117,23 +126,55 @@ export function applySafeAreaCssVars(): void {
   let sab = bottom;
   let sal = left;
   let sar = right;
-  if (standalone) {
-    if (landscape) {
-      if (top < 8) sat = 16;
-      if (bottom < 8) sab = 21;
-      if (left < 8) sal = 59;
-      if (right < 8) sar = 59;
-    } else {
-      if (top < 20) sat = 59;
-      if (bottom < 12) sab = 34;
-      if (left < 8) sal = 16;
-      if (right < 8) sar = 16;
-    }
+  let islandLeft = 0;
+  let islandRight = 0;
+
+  if (landscape) {
+    const side = landscapeIslandSide();
+    const island = Math.max(LANDSCAPE_ISLAND_FALLBACK, left, right);
+    islandLeft = side === "left" ? island : 0;
+    islandRight = side === "right" ? island : 0;
+    sat = top >= 1 && top <= 24 ? top : 0;
+    sab = bottom >= 1 && bottom <= 34 ? bottom : standalone ? 21 : 0;
+    sal = islandLeft;
+    sar = islandRight;
+  } else if (standalone) {
+    const saneTop = top >= 20 && top <= PORTRAIT_TOP_MAX;
+    sat = (saneTop ? top : PORTRAIT_TOP_FALLBACK) + extra;
+    sab = (bottom >= 12 && bottom <= 40 ? bottom : 34) + extra;
+    sal = left >= 1 && left <= 20 ? left : 0;
+    sar = right >= 1 && right <= 20 ? right : 0;
   }
-  root.style.setProperty("--ct-safe-top", `${sat + extra}px`);
-  root.style.setProperty("--ct-safe-right", `${sar + extra}px`);
-  root.style.setProperty("--ct-safe-bottom", `${sab + extra}px`);
-  root.style.setProperty("--ct-safe-left", `${sal + extra}px`);
+
+  root.style.setProperty("--ct-safe-top", `${sat}px`);
+  root.style.setProperty("--ct-safe-right", `${sar}px`);
+  root.style.setProperty("--ct-safe-bottom", `${sab}px`);
+  root.style.setProperty("--ct-safe-left", `${sal}px`);
+  root.style.setProperty("--ct-island-left", `${islandLeft}px`);
+  root.style.setProperty("--ct-island-right", `${islandRight}px`);
+}
+
+/**
+ * After rotating back to portrait, iOS can leave the visual viewport shifted
+ * down. The sticky header then sits below its usual spot until the next swipe.
+ * Call this from orientation changes only — a resize (keyboard, URL bar) must
+ * not yank the page back to the top.
+ */
+export function settlePortraitViewport(): void {
+  if (typeof window === "undefined") return;
+  syncMobileSafeArea();
+  if (window.matchMedia("(orientation: landscape)").matches) return;
+
+  const offset = window.visualViewport?.offsetTop ?? 0;
+  if (offset > 1) {
+    window.scrollBy(0, -offset);
+  }
+  if (window.scrollY > 0 && window.scrollY < 160) {
+    window.scrollTo(0, 0);
+  } else if (window.scrollY < 2) {
+    window.scrollTo(0, 1);
+    window.scrollTo(0, 0);
+  }
 }
 
 export function syncMobileSafeArea(): void {

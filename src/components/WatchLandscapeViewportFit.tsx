@@ -3,49 +3,39 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-import {
-  MOBILE_LANDSCAPE_QUERY,
-  syncMobileSafeArea,
-} from "@/lib/mobileLandscape";
+import { syncMobileSafeArea } from "@/lib/mobileLandscape";
 
 /**
- * Portrait (and every non-watch page) uses `viewport-fit=cover` so chrome
- * gets real safe-area padding. Landscape watch uses `auto` so iOS does not
- * inset YouTube's video. Always re-apply CSS safe-area floors afterward —
- * toggling fit can leave env() at 0 in the iOS PWA.
+ * Keep `viewport-fit=cover` stable. Toggling it to `auto` on landscape watch
+ * made iOS report 0 (or both edges) for safe-area, which padded the video and
+ * clipped the nav rail. Portrait re-entry also left the sticky header low
+ * until the next swipe; settling the visual viewport puts it back.
  */
-function writeViewportFit(fit: "cover" | "auto") {
+function ensureViewportFitCover() {
   const current = document.querySelector('meta[name="viewport"]');
   if (!(current instanceof HTMLMetaElement)) return;
-  if (!current.content.toLowerCase().includes(`viewport-fit=${fit}`)) {
-    const parts = current.content
-      .split(",")
-      .map((part) => part.trim())
-      .filter((part) => part.length > 0 && !part.toLowerCase().startsWith("viewport-fit"));
-    parts.push(`viewport-fit=${fit}`);
-    current.content = parts.join(", ");
-  }
+  if (current.content.toLowerCase().includes("viewport-fit=cover")) return;
+  const parts = current.content
+    .split(",")
+    .map((part) => part.trim())
+    .filter(
+      (part) => part.length > 0 && !part.toLowerCase().startsWith("viewport-fit"),
+    );
+  parts.push("viewport-fit=cover");
+  current.content = parts.join(", ");
   syncMobileSafeArea();
-  requestAnimationFrame(() => syncMobileSafeArea());
 }
 
 export function WatchLandscapeViewportFit() {
   const pathname = usePathname();
 
   useEffect(() => {
-    const orientation = window.matchMedia(MOBILE_LANDSCAPE_QUERY);
-    const apply = () => {
-      const landscapeWatch =
-        pathname.startsWith("/watch/") && orientation.matches;
-      writeViewportFit(landscapeWatch ? "auto" : "cover");
-    };
-    apply();
-    orientation.addEventListener("change", apply);
-    window.addEventListener("pageshow", apply);
+    ensureViewportFitCover();
+    window.addEventListener("orientationchange", ensureViewportFitCover);
+    window.addEventListener("pageshow", ensureViewportFitCover);
     return () => {
-      orientation.removeEventListener("change", apply);
-      window.removeEventListener("pageshow", apply);
-      writeViewportFit("cover");
+      window.removeEventListener("orientationchange", ensureViewportFitCover);
+      window.removeEventListener("pageshow", ensureViewportFitCover);
     };
   }, [pathname]);
 

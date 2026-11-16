@@ -31,9 +31,16 @@ export function WatchDescription({ description }: WatchDescriptionProps) {
     >
       <Box
         sx={{
-          position: "relative",
           maxHeight: !expanded && shouldCollapse ? COLLAPSED_HEIGHT : "none",
           overflow: "hidden",
+          ...(!expanded && shouldCollapse
+            ? {
+                WebkitMaskImage:
+                  "linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)",
+                maskImage:
+                  "linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%)",
+              }
+            : {}),
         }}
       >
         <Typography
@@ -47,18 +54,6 @@ export function WatchDescription({ description }: WatchDescriptionProps) {
         >
           {trimmed}
         </Typography>
-        {!expanded && shouldCollapse ? (
-          <Box
-            sx={{
-              position: "absolute",
-              insetInline: 0,
-              bottom: 0,
-              height: 48,
-              background: (theme) =>
-                `linear-gradient(to bottom, transparent, ${theme.palette.background.default})`,
-            }}
-          />
-        ) : null}
       </Box>
 
       {shouldCollapse ? (

@@ -1,4 +1,4 @@
-import { LANDSCAPE_VIDEO_WIDTH, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
+import { MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 
 /** Phones in portrait: edge-to-edge video; text/sidebar keep horizontal inset. */
 export const MOBILE_PORTRAIT =
@@ -18,11 +18,11 @@ export const watchPlayerShellSx = {
   zIndex: 0,
   [MOBILE_LANDSCAPE]: {
     position: "fixed",
-    width: `var(--ct-landscape-video-width, ${LANDSCAPE_VIDEO_WIDTH})`,
-    aspectRatio: "16 / 9",
-    height: "auto",
-    left: "calc((100vw - var(--ct-landscape-video-width, min(100vw, calc(100dvh * 16 / 9)))) / 2)",
-    top: "calc((100dvh - var(--ct-landscape-video-width, min(100vw, calc(100dvh * 16 / 9))) * 9 / 16) / 2)",
+    width: "var(--ct-land-video-w, min(100vw, calc(100dvh * 16 / 9)))",
+    height: "var(--ct-land-video-h, auto)",
+    aspectRatio: "auto",
+    left: "var(--ct-land-video-left, 0px)",
+    top: "var(--ct-land-video-top, 0px)",
     right: "auto",
     bottom: "auto",
     py: 0,
