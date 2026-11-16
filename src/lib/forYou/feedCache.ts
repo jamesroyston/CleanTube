@@ -15,6 +15,14 @@ const FOR_YOU_FEED_CACHE_SECONDS = (() => {
 
 const HOUR_MS = 60 * 60 * 1000;
 
+function fingerprint(value: string): string {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return (hash >>> 0).toString(36);
+}
+
 function floorIsoToHour(value: string): string {
   const t = Date.parse(value);
   if (!Number.isFinite(t)) return value;
@@ -59,6 +67,10 @@ export function libraryFeedRevision(signals: ForYouLibrarySignals): string {
     .sort()
     .join("|");
 
+  const dismissedFingerprint = fingerprint(
+    (signals.dismissedVideoIds ?? []).join("|"),
+  );
+
   return [
     forYouDayKey(),
     snapshot.savedChannels.length,
@@ -67,6 +79,7 @@ export function libraryFeedRevision(signals: ForYouLibrarySignals): string {
     recentSearchQueries.length,
     recentSearchFingerprint,
     mutedSearchFingerprint,
+    dismissedFingerprint,
   ].join(":");
 }
 
@@ -81,8 +94,7 @@ async function buildForYouFeedCachedInner(
   cacheLife({ revalidate: FOR_YOU_FEED_CACHE_SECONDS });
   void userId;
   void revision;
-  void refreshEpoch;
-  return buildForYouFeed(signals);
+  return buildForYouFeed(signals, `${forYouDayKey()}:${refreshEpoch}`);
 }
 
 /**

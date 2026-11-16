@@ -39,12 +39,6 @@ async function fetchForYouFeed(
   };
 }
 
-/** UTC day key, matching the server's `forYouDayKey` (kept inline to avoid
- * pulling server-only selection deps into the client bundle). */
-function currentForYouDayKey(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 type UseForYouFeedOptions = {
   userId: string | null | undefined;
   enabled: boolean;
@@ -75,8 +69,8 @@ export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
       // Stability on revisit: when a cached feed already exists, don't silently
       // refetch and reshuffle it under the user (the server re-ranks fresh
       // candidates, so a revalidation visibly changes recommendations). A genuine
-      // cold start (empty cache, or expired 24h IndexedDB entry) still fetches,
-      // and the "Refresh recommendations" button remains the explicit opt-in.
+      // cold start (empty cache, or expired 24h IndexedDB entry) still fetches.
+      // Pull to refresh, or the button at the bottom of the feed, is the opt-in.
       revalidateIfStale: false,
       revalidateOnReconnect: false,
       dedupingInterval: 30_000,
@@ -91,13 +85,6 @@ export function useForYouFeed({ userId, enabled }: UseForYouFeedOptions) {
     isInitialLoad: useSwrInitialLoad(isLoading, Boolean(data)),
     /** Background refetch while stale sections remain visible. */
     isRefreshing: isValidating && Boolean(data),
-    /** Cached feed was generated on an earlier day; fresher picks are available
-     * but we don't auto-swap — the UI offers an opt-in refresh instead. */
-    feedStale: Boolean(
-      data?.generatedDayKey && data.generatedDayKey !== currentForYouDayKey(),
-    ),
-    /** UTC day key the visible feed was generated for (for dismissal scoping). */
-    feedDayKey: data?.generatedDayKey,
     /**
      * Explicit user refresh. `force` (default) bypasses the server feed cache;
      * pass `false` when library signals changed and a normal fetch suffices.

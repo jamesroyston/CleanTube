@@ -23,6 +23,21 @@ function isCompletedProgress(entry: WatchProgressEntry | undefined): boolean {
   return entry.completed === true || entry.everCompleted === true;
 }
 
+/**
+ * Continue watching already surfaces in-progress videos. Recommending them
+ * again, or a video the user hid, is what makes the feed feel repetitive.
+ */
+function alreadySeen(
+  videoId: string,
+  entry: WatchProgressEntry | undefined,
+  dismissedVideoIds: ReadonlySet<string>,
+): boolean {
+  if (dismissedVideoIds.has(videoId)) return true;
+  if (!entry) return false;
+  if (isCompletedProgress(entry)) return true;
+  return entry.lastPositionSeconds > 0;
+}
+
 function channelAffinityBoost(
   channelName: string,
   savedChannels: SavedChannel[],
@@ -61,10 +76,12 @@ function scoreCandidate(
   savedChannels: SavedChannel[],
   historyChannelCounts: Map<string, number>,
   progressByVideoId: Map<string, WatchProgressEntry>,
+  dismissedVideoIds: ReadonlySet<string>,
 ): number {
   const video = candidate.video;
-  const progress = progressByVideoId.get(video.id);
-  if (isCompletedProgress(progress)) return -1;
+  const videoId = video.id.trim();
+  const progress = progressByVideoId.get(videoId);
+  if (alreadySeen(videoId, progress, dismissedVideoIds)) return -1;
 
   let score = SOURCE_WEIGHT[candidate.source] ?? 0;
   score += channelAffinityBoost(
@@ -74,8 +91,15 @@ function scoreCandidate(
   );
   score += uploadRecencyBoost(video.uploadedAt);
 
-  if (progress && !progress.completed && progress.lastPositionSeconds > 0) {
-    score -= 4;
+  // Related rows are mostly "more from this channel" unless we prefer
+  // other creators. The channel's own uploads already have a section.
+  if (
+    candidate.source === "watch_next" &&
+    normalizeChannelName(video.channelName) &&
+    normalizeChannelName(video.channelName) ===
+      normalizeChannelName(candidate.seedChannelName)
+  ) {
+    score -= 16;
   }
 
   if (video.live) score += 2;
@@ -95,22 +119,132 @@ function buildHistoryChannelCounts(
   return counts;
 }
 
+type ScoredVideo = {
+  video: VideoLikeForSummary;
+  score: number;
+  channelKey: string;
+};
+
+function channelKeyFor(video: VideoLikeForSummary): string {
+  const name = normalizeChannelName(video.channelName);
+  return name || `video:${video.id}`;
+}
+
+function rotationOffset(
+  rotationKey: string,
+  channelKey: string,
+  length: number,
+): number {
+  if (length <= 1) return 0;
+  let hash = 0;
+  const value = `${rotationKey}\0${channelKey}`;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) % length;
+}
+
+/** Keep the freshest couple of uploads, rotate the rest so a refresh isn't a rerun. */
+function rotateScored(rows: ScoredVideo[], rotationKey: string): ScoredVideo[] {
+  const anchorCount = Math.min(2, rows.length);
+  const rest = rows.slice(anchorCount);
+  if (rest.length <= 1) return rows;
+  const offset = rotationOffset(
+    rotationKey,
+    rows[0]?.channelKey ?? "",
+    rest.length,
+  );
+  if (offset === 0) return rows;
+  return [
+    ...rows.slice(0, anchorCount),
+    ...rest.slice(offset),
+    ...rest.slice(0, offset),
+  ];
+}
+
+/**
+ * Round-robin channels so a mixed row can't collapse to one creator.
+ * A single-channel pool still fills every slot. If the mixed row is still
+ * short, a second pass may pull more from whoever has videos left.
+ */
+function interleaveByChannel(
+  scored: ScoredVideo[],
+  maxResults: number,
+  rotationKey: string,
+): VideoLikeForSummary[] {
+  if (maxResults <= 0) return [];
+
+  const byChannel = new Map<string, ScoredVideo[]>();
+  for (const row of scored) {
+    const list = byChannel.get(row.channelKey);
+    if (list) list.push(row);
+    else byChannel.set(row.channelKey, [row]);
+  }
+
+  const groups = [...byChannel.values()]
+    .map((rows) => {
+      rows.sort((a, b) => b.score - a.score);
+      return rotateScored(rows, rotationKey);
+    })
+    .sort((a, b) => (b[0]?.score ?? 0) - (a[0]?.score ?? 0));
+
+  const only = groups[0];
+  if (!only) return [];
+  if (groups.length === 1) {
+    return only.slice(0, maxResults).map((row) => row.video);
+  }
+
+  const targetChannels = Math.min(groups.length, 6);
+  const perChannel = Math.max(
+    3,
+    Math.min(8, Math.ceil(maxResults / targetChannels)),
+  );
+  const cursors = groups.map(() => 0);
+  const out: ScoredVideo[] = [];
+
+  const pull = (cap: number | null) => {
+    let progressed = true;
+    while (out.length < maxResults && progressed) {
+      progressed = false;
+      for (let i = 0; i < groups.length && out.length < maxResults; i++) {
+        const cursor = cursors[i] ?? 0;
+        if (cap != null && cursor >= cap) continue;
+        const row = groups[i]?.[cursor];
+        if (!row) continue;
+        cursors[i] = cursor + 1;
+        out.push(row);
+        progressed = true;
+      }
+    }
+  };
+
+  pull(perChannel);
+  // Only dip back into a dominant channel when the mixed row is still tiny.
+  if (out.length < Math.min(maxResults, 8)) pull(null);
+  return out.map((row) => row.video);
+}
+
+export type RankForYouOptions = {
+  /** Day key, or day key plus refresh epoch. Same key ⇒ same order. */
+  rotationKey?: string;
+  dismissedVideoIds?: readonly string[];
+};
+
 /** Rank, dedupe, and return video candidates for the feed. */
 export function rankForYouCandidates(
   candidates: ForYouCandidate[],
   savedChannels: SavedChannel[],
   watchProgress: WatchProgressEntry[],
   limits: ForYouFeedLimits = DEFAULT_FOR_YOU_LIMITS,
+  options: RankForYouOptions = {},
 ): VideoLikeForSummary[] {
   const progressByVideoId = new Map(
     watchProgress.map((entry) => [entry.videoId, entry]),
   );
   const historyChannelCounts = buildHistoryChannelCounts(watchProgress);
+  const dismissedVideoIds = new Set(options.dismissedVideoIds ?? []);
 
-  const bestByVideoId = new Map<
-    string,
-    { video: VideoLikeForSummary; score: number }
-  >();
+  const bestByVideoId = new Map<string, ScoredVideo>();
 
   for (const candidate of candidates) {
     const id = candidate.video.id?.trim();
@@ -121,19 +255,24 @@ export function rankForYouCandidates(
       savedChannels,
       historyChannelCounts,
       progressByVideoId,
+      dismissedVideoIds,
     );
     if (score < 0) continue;
 
+    const row: ScoredVideo = {
+      video: candidate.video,
+      score,
+      channelKey: channelKeyFor(candidate.video),
+    };
     const cur = bestByVideoId.get(id);
-    if (!cur || score > cur.score) {
-      bestByVideoId.set(id, { video: candidate.video, score });
-    }
+    if (!cur || score > cur.score) bestByVideoId.set(id, row);
   }
 
-  return Array.from(bestByVideoId.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limits.maxResults)
-    .map((row) => row.video);
+  return interleaveByChannel(
+    [...bestByVideoId.values()],
+    limits.maxResults,
+    options.rotationKey ?? "",
+  );
 }
 
 /** True when the user has no signals to build a feed from. */

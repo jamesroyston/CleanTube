@@ -1,7 +1,6 @@
 import type { CloudSnapshot } from "@/lib/cloudLibrary/cloudStore";
 import { toVideoSummaries } from "@/lib/serializeVideo";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
-import type { SavedChannel } from "@/types/savedChannel";
 
 import { fetchForYouCandidates, recentHistorySeeds } from "./fetchCandidates";
 import type { ForYouLibrarySignals } from "./loadLibrarySignals";
@@ -45,12 +44,22 @@ function rankSection(
   candidates: ForYouCandidate[],
   snapshot: CloudSnapshot,
   maxResults: number,
+  rotationKey: string,
+  dismissedVideoIds: readonly string[],
+  excludeVideoIds?: ReadonlySet<string>,
 ): ForYouSection["videos"] {
+  const pool = excludeVideoIds?.size
+    ? candidates.filter((candidate) => {
+        const id = candidate.video.id?.trim();
+        return Boolean(id) && !excludeVideoIds.has(id);
+      })
+    : candidates;
   const ranked = rankForYouCandidates(
-    candidates,
+    pool,
     snapshot.savedChannels,
     snapshot.watchProgress,
     { ...DEFAULT_FOR_YOU_LIMITS, maxResults },
+    { rotationKey, dismissedVideoIds },
   );
   return toVideoSummaries(ranked);
 }
@@ -82,13 +91,14 @@ function buildChannelSections(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
   limits: typeof DEFAULT_FOR_YOU_LIMITS,
-  dayKey: string,
+  rotationKey: string,
+  dismissedVideoIds: readonly string[],
 ): ForYouSection[] {
   const channelEntries = selectSavedChannelsForFeed(
     snapshot.savedChannels,
     snapshot.watchProgress,
     limits.maxSavedChannels,
-    dayKey,
+    rotationKey,
   );
 
   const sections: ForYouSection[] = [];
@@ -98,6 +108,8 @@ function buildChannelSections(
       candidates,
       snapshot,
       limits.maxVideosPerChannel,
+      rotationKey,
+      dismissedVideoIds,
     );
     if (videos.length === 0) continue;
     sections.push({
@@ -119,6 +131,8 @@ function buildBecauseYouWatchedSections(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
   limits: typeof DEFAULT_FOR_YOU_LIMITS,
+  rotationKey: string,
+  dismissedVideoIds: readonly string[],
 ): ForYouSection[] {
   const seeds = recentHistorySeeds(
     snapshot.watchProgress,
@@ -134,6 +148,8 @@ function buildBecauseYouWatchedSections(
       candidates,
       snapshot,
       limits.maxVideosPerWatchNext,
+      rotationKey,
+      dismissedVideoIds,
     );
     if (videos.length === 0) continue;
 
@@ -154,15 +170,23 @@ function buildPinnedSearchSections(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
   limits: typeof DEFAULT_FOR_YOU_LIMITS,
+  rotationKey: string,
+  dismissedVideoIds: readonly string[],
 ): ForYouSection[] {
   const pins = snapshot.savedChannels
     .filter((c) => effectiveSavedChannelKind(c) === "pinned_search")
-    .slice(0, limits.maxSavedChannels);
+    .slice(0, limits.maxPinnedSearches);
 
   const sections: ForYouSection[] = [];
   for (const pin of pins) {
     const candidates = candidatesForSeed(pool, "pinned_search", pin.name);
-    const videos = rankSection(candidates, snapshot, limits.maxVideosPerSearch);
+    const videos = rankSection(
+      candidates,
+      snapshot,
+      limits.maxVideosPerSearch,
+      rotationKey,
+      dismissedVideoIds,
+    );
     if (videos.length === 0) continue;
     sections.push({
       id: `pin-${pin.id}`,
@@ -178,6 +202,9 @@ function buildRecentSearchSections(
   pool: ForYouCandidate[],
   recentSearches: ForYouLibrarySignals["recentSearches"],
   mutedSearchQueries: string[],
+  limits: typeof DEFAULT_FOR_YOU_LIMITS,
+  rotationKey: string,
+  dismissedVideoIds: readonly string[],
 ): ForYouSection[] {
   const queries = recentSearchesForFeed(
     recentSearches,
@@ -193,7 +220,13 @@ function buildRecentSearchSections(
         c.source === "recent_search" &&
         normalizeSearchQuery(c.seedSearchQuery) === queryKey,
     );
-    const videos = rankSection(candidates, snapshot, 8);
+    const videos = rankSection(
+      candidates,
+      snapshot,
+      limits.maxVideosPerSearch,
+      rotationKey,
+      dismissedVideoIds,
+    );
     if (videos.length === 0) continue;
 
     sections.push({
@@ -215,12 +248,30 @@ function hashSectionId(value: string): string {
   return Math.abs(hash).toString(36);
 }
 
+function usedVideoIds(sections: ForYouSection[]): Set<string> {
+  const used = new Set<string>();
+  for (const section of sections) {
+    for (const video of section.videos) used.add(video.id);
+  }
+  return used;
+}
+
 function buildMoreForYouSection(
   snapshot: CloudSnapshot,
   pool: ForYouCandidate[],
   limits: typeof DEFAULT_FOR_YOU_LIMITS,
+  rotationKey: string,
+  dismissedVideoIds: readonly string[],
+  excludeVideoIds: ReadonlySet<string>,
 ): ForYouSection | null {
-  const videos = rankSection(pool, snapshot, limits.maxResults);
+  const videos = rankSection(
+    pool,
+    snapshot,
+    limits.maxResults,
+    rotationKey,
+    dismissedVideoIds,
+    excludeVideoIds,
+  );
   if (videos.length === 0) return null;
 
   return {
@@ -232,11 +283,14 @@ function buildMoreForYouSection(
 
 export async function buildForYouFeed(
   signals: ForYouLibrarySignals,
+  rotationKey?: string,
 ): Promise<ForYouFeedResult> {
   const { snapshot, recentSearches, recentSearchQueries, mutedSearchQueries } =
     signals;
+  const dismissedVideoIds = signals.dismissedVideoIds ?? [];
   const limits = DEFAULT_FOR_YOU_LIMITS;
   const dayKey = forYouDayKey();
+  const rotation = rotationKey?.trim() || dayKey;
 
   if (
     !forYouHasLibrarySignals(
@@ -252,33 +306,57 @@ export async function buildForYouFeed(
     snapshot,
     recentSearches,
     limits,
-    dayKey,
+    rotation,
     mutedSearchQueries,
   );
 
-  const channelSections = buildChannelSections(snapshot, pool, limits, dayKey);
+  const channelSections = buildChannelSections(
+    snapshot,
+    pool,
+    limits,
+    rotation,
+    dismissedVideoIds,
+  );
   const becauseYouWatchedSections = buildBecauseYouWatchedSections(
     snapshot,
     pool,
     limits,
+    rotation,
+    dismissedVideoIds,
   );
-  const pinnedSections = buildPinnedSearchSections(snapshot, pool, limits);
+  const pinnedSections = buildPinnedSearchSections(
+    snapshot,
+    pool,
+    limits,
+    rotation,
+    dismissedVideoIds,
+  );
   const recentSections = buildRecentSearchSections(
     snapshot,
     pool,
     recentSearches,
     mutedSearchQueries,
+    limits,
+    rotation,
+    dismissedVideoIds,
   );
-  const moreSection = buildMoreForYouSection(snapshot, pool, limits);
 
-  const primary = [
+  const primary = dedupeSections([
     ...becauseYouWatchedSections,
     ...channelSections,
     ...pinnedSections,
     ...recentSections,
-  ];
+  ]);
+  const moreSection = buildMoreForYouSection(
+    snapshot,
+    pool,
+    limits,
+    rotation,
+    dismissedVideoIds,
+    usedVideoIds(primary),
+  );
 
-  const sections = dedupeSections(primary, moreSection ?? undefined);
+  const sections = moreSection ? [...primary, moreSection] : primary;
   return {
     sections,
     empty: sections.length === 0,

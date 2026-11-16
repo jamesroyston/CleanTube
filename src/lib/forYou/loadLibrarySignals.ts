@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 
+import { FOR_YOU_DISMISSED_MAX_ITEMS } from "@/lib/forYouDismissed/types";
 import { fetchCloudSnapshotServer } from "@/lib/cloudLibrary/serverSnapshot";
 import { fetchCloudRecentSearchesServer } from "@/lib/cloudRecentSearches/serverStore";
 import { fetchForYouMutedSearches } from "@/lib/forYouMutedSearches/cloudStore";
@@ -16,6 +17,8 @@ export type ForYouLibrarySignals = {
   recentSearches: RecentSearchEntry[];
   recentSearchQueries: string[];
   mutedSearchQueries: string[];
+  /** Videos the user hid from For You. Ranking skips these and backfills. */
+  dismissedVideoIds: string[];
 };
 
 /** Auth-only check for home shell (avoids library snapshot reads on SSR). */
@@ -60,6 +63,34 @@ async function resolveAuthenticatedUser(supabase: NonNullable<
   return user;
 }
 
+async function loadDismissedVideoIds(
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>,
+): Promise<string[]> {
+  try {
+    const { data, error } = await supabase
+      .from("for_you_dismissed")
+      .select("video_id")
+      .order("dismissed_at", { ascending: false })
+      .limit(FOR_YOU_DISMISSED_MAX_ITEMS);
+    if (error || !Array.isArray(data)) return [];
+
+    const ids = new Set<string>();
+    for (const row of data) {
+      const id =
+        row &&
+        typeof row === "object" &&
+        "video_id" in row &&
+        typeof row.video_id === "string"
+          ? row.video_id.trim()
+          : "";
+      if (id) ids.add(id);
+    }
+    return [...ids].sort();
+  } catch {
+    return [];
+  }
+}
+
 export async function loadForYouLibrarySignals(): Promise<ForYouLibrarySignals | null> {
   const supabase = await createSupabaseServerClient();
   if (!supabase) return null;
@@ -67,11 +98,13 @@ export async function loadForYouLibrarySignals(): Promise<ForYouLibrarySignals |
   const user = await resolveAuthenticatedUser(supabase);
   if (!user) return null;
 
-  const [snapshot, recentSearches, mutedSearches] = await Promise.all([
-    fetchCloudSnapshotServer(supabase),
-    fetchCloudRecentSearchesServer(supabase),
-    fetchForYouMutedSearches(supabase).catch(() => []),
-  ]);
+  const [snapshot, recentSearches, mutedSearches, dismissedVideoIds] =
+    await Promise.all([
+      fetchCloudSnapshotServer(supabase),
+      fetchCloudRecentSearchesServer(supabase),
+      fetchForYouMutedSearches(supabase).catch(() => []),
+      loadDismissedVideoIds(supabase),
+    ]);
 
   return {
     userId: user.id,
@@ -79,5 +112,6 @@ export async function loadForYouLibrarySignals(): Promise<ForYouLibrarySignals |
     recentSearches,
     recentSearchQueries: entriesToQueryList(recentSearches),
     mutedSearchQueries: mutedSearches.map((entry) => entry.queryKey),
+    dismissedVideoIds,
   };
 }

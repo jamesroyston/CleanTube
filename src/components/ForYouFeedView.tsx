@@ -1,16 +1,14 @@
 "use client";
 
-import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import DynamicFeedOutlinedIcon from "@mui/icons-material/DynamicFeedOutlined";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import Chip from "@mui/material/Chip";
 import CircularProgress from "@mui/material/CircularProgress";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { ForYouSearchSectionMenu } from "@/components/ForYouSearchSectionMenu";
 import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
@@ -100,17 +98,11 @@ export function ForYouFeedView({
     feedError,
     isInitialLoad,
     isRefreshing,
-    feedStale,
-    feedDayKey,
     refreshFeed,
   } = useForYouFeed({
     userId: user?.id,
     enabled: effectiveSignedIn && canPersistLibrary && libraryReady,
   });
-
-  const [dismissedFeedDayKey, setDismissedFeedDayKey] = useState<string | null>(
-    null,
-  );
 
   const { dismissVideo, filterFeed: filterDismissed } = useForYouDismissed(
     user?.id,
@@ -154,11 +146,6 @@ export function ForYouFeedView({
       (canPersistLibrary && libraryCloudSyncState === "syncing"));
 
   const showSignInPrompt = authStatus === "ready" && !canPersistLibrary;
-  const showFreshPrompt =
-    feedStale &&
-    hasCachedFeed &&
-    !isRefreshing &&
-    dismissedFeedDayKey !== feedDayKey;
   const resolvedFeedError = feedError ?? initialError ?? null;
   const feedEnabled = effectiveSignedIn && canPersistLibrary && libraryReady;
 
@@ -184,24 +171,10 @@ export function ForYouFeedView({
         </Stack>
         <Typography variant="body2" color="text.secondary">
           {effectiveSignedIn
-            ? "Fresh picks from your watch history, saved channels, and searches — tap ··· on a card to hide one."
+            ? "New picks from your channels, watch history, and searches. Videos you already watched stay in Continue watching — tap ··· to hide one."
             : "Sign in to personalize this page with your library."}
         </Typography>
       </Stack>
-
-      {showFreshPrompt ? (
-        <Box sx={{ mb: 3 }}>
-          <Chip
-            color="primary"
-            variant="filled"
-            icon={<AutorenewRoundedIcon />}
-            label="Fresh recommendations available — tap to update"
-            onClick={() => void refreshFeed()}
-            onDelete={() => setDismissedFeedDayKey(feedDayKey ?? null)}
-            sx={{ maxWidth: "100%", height: "auto", py: 0.75, "& .MuiChip-label": { whiteSpace: "normal" } }}
-          />
-        </Box>
-      ) : null}
 
       {showSignInPrompt ? (
         <LibrarySignInPrompt

@@ -22,6 +22,7 @@ export type ForYouCandidate = {
 
 export type ForYouFeedLimits = {
   maxSavedChannels: number;
+  maxPinnedSearches: number;
   maxHistorySeeds: number;
   maxVideosPerChannel: number;
   maxVideosPerSearch: number;
@@ -30,11 +31,12 @@ export type ForYouFeedLimits = {
 };
 
 export const DEFAULT_FOR_YOU_LIMITS: ForYouFeedLimits = {
-  maxSavedChannels: 6,
-  maxHistorySeeds: 4,
-  maxVideosPerChannel: 8,
-  maxVideosPerSearch: 10,
-  maxVideosPerWatchNext: 6,
+  maxSavedChannels: 10,
+  maxPinnedSearches: 6,
+  maxHistorySeeds: 6,
+  maxVideosPerChannel: 12,
+  maxVideosPerSearch: 12,
+  maxVideosPerWatchNext: 8,
   maxResults: 48,
 };
 
@@ -49,7 +51,6 @@ export type ForYouSection = {
 export type ForYouFeedResult = {
   sections: ForYouSection[];
   empty: boolean;
-  /** UTC day key the feed was generated for; lets the client surface a
-   * non-destructive "fresh recommendations" prompt once it rolls over. */
+  /** UTC day the feed was built for. */
   generatedDayKey?: string;
 };

@@ -11,7 +11,7 @@ export const HISTORY_SEED_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 /** Only searches within this window influence the feed. */
 export const RECENT_SEARCH_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 
-export const RECENT_SEARCH_FEED_MAX_QUERIES = 3;
+export const RECENT_SEARCH_FEED_MAX_QUERIES = 6;
 
 function normalizeChannelName(value: string | undefined): string {
   return value?.trim().toLowerCase() ?? "";
@@ -47,14 +47,16 @@ function latestWatchMsForChannel(
 }
 
 /**
- * Pick saved channels for today's feed: recently watched channels first,
- * then rotate through the rest so sections change day to day.
+ * Pick saved channels for this feed: recently watched channels first,
+ * then rotate through the rest. `rotationKey` is the day, or the day plus a
+ * refresh epoch, so a refresh can swap the long tail without dropping the
+ * channels the user actually watches.
  */
 export function selectSavedChannelsForFeed(
   savedChannels: SavedChannel[],
   watchProgress: WatchProgressEntry[],
   max: number,
-  dayKey: string,
+  rotationKey: string,
 ): SavedChannel[] {
   const channels = savedChannels.filter(
     (c) => effectiveSavedChannelKind(c) === "saved_channel",
@@ -69,12 +71,12 @@ export function selectSavedChannelsForFeed(
     return a.name.localeCompare(b.name);
   });
 
-  const hotCount = Math.min(2, max);
+  const hotCount = Math.min(3, max);
   const hot = ranked.slice(0, hotCount);
   const rest = ranked.slice(hotCount);
   if (rest.length === 0) return hot;
 
-  const offset = hashString(dayKey) % rest.length;
+  const offset = hashString(rotationKey) % rest.length;
   const rotated = [...rest.slice(offset), ...rest.slice(0, offset)];
   const slots = max - hot.length;
   return [...hot, ...rotated.slice(0, slots)];

@@ -17,12 +17,24 @@ import {
 import type { ForYouCandidate, ForYouFeedLimits } from "./types";
 import { DEFAULT_FOR_YOU_LIMITS } from "./types";
 
-const FETCH_CONCURRENCY = 4;
+const FETCH_CONCURRENCY = 6;
 
-/** Per-source budget; a slow InnerTube/search call must not hold the whole feed. */
-const SOURCE_FETCH_TIMEOUT_MS = 3_000;
+/**
+ * Per-source budget. 3s was dropping every cold channel lookup, so the feed
+ * often survived as a single cached channel. Slow calls still can't hold
+ * the request open past this.
+ */
+const SOURCE_FETCH_TIMEOUT_MS = 8_000;
 
 /** Watch-next (`getInfo`) is often bot-challenged from datacenter IPs. */
+const WATCH_NEXT_TIMEOUT_MS = 5_000;
+const RELATED_SEARCH_TIMEOUT_MS = 4_000;
+
+/** First channel grid page is ~30 videos; map extra so ranking can rotate. */
+const CHANNEL_POOL_MIN = 24;
+const SEARCH_POOL_MIN = 16;
+const WATCH_NEXT_POOL_MIN = 16;
+
 const WATCH_NEXT_FAILURE_THRESHOLD = 2;
 const WATCH_NEXT_COOLDOWN_MS = 15 * 60 * 1000;
 
@@ -91,6 +103,18 @@ async function mapWithBoundedConcurrency<T, R>(
   return results;
 }
 
+function channelPoolLimit(limits: ForYouFeedLimits): number {
+  return Math.max(limits.maxVideosPerChannel, CHANNEL_POOL_MIN);
+}
+
+function searchPoolLimit(limits: ForYouFeedLimits): number {
+  return Math.min(50, Math.max(limits.maxVideosPerSearch, SEARCH_POOL_MIN));
+}
+
+function watchNextPoolLimit(limits: ForYouFeedLimits): number {
+  return Math.max(limits.maxVideosPerWatchNext, WATCH_NEXT_POOL_MIN);
+}
+
 function channelLookupForSaved(channel: SavedChannel): string | null {
   const id = channel.channelId?.trim();
   if (id) return id;
@@ -127,7 +151,7 @@ export async function fetchFromSavedChannel(
     try {
       const results = await searchMixedResultsCached(
         query,
-        limits.maxVideosPerSearch,
+        searchPoolLimit(limits),
         "newest",
       );
       return results.videos.map((video) => ({
@@ -144,7 +168,7 @@ export async function fetchFromSavedChannel(
     const page = await getChannelVideosPageCached({
       channelId,
       sort: "latest",
-      limit: limits.maxVideosPerChannel,
+      limit: channelPoolLimit(limits),
     });
     if (!page?.videos.length) return [];
     return page.videos.map((video) => ({
@@ -166,7 +190,7 @@ export async function fetchFromPinnedSearch(
   try {
     const results = await searchMixedResultsCached(
       query,
-      limits.maxVideosPerSearch,
+      searchPoolLimit(limits),
       "newest",
     );
     return results.videos.map((video) => ({
@@ -193,29 +217,77 @@ export function recentHistorySeeds(
     .slice(0, max);
 }
 
-export async function fetchFromHistorySeed(
+function toWatchNextCandidates(
+  videos: Awaited<ReturnType<typeof getWatchNextRelatedVideos>>,
   entry: WatchProgressEntry,
-  limits: ForYouFeedLimits,
-): Promise<ForYouCandidate[]> {
-  if (!acquireWatchNextSlot()) return [];
-  try {
-    const related = await withTimeout(
-      getWatchNextRelatedVideos(entry.videoId),
-      SOURCE_FETCH_TIMEOUT_MS,
-      [],
-    );
-    recordWatchNextResult(related.length > 0);
-    return related.slice(0, limits.maxVideosPerWatchNext).map((video) => ({
+  limit: number,
+): ForYouCandidate[] {
+  const seedId = entry.videoId.trim();
+  return videos
+    .filter((video) => video.id && video.id !== seedId)
+    .slice(0, limit)
+    .map((video) => ({
       video,
       source: "watch_next" as const,
       seedChannelName: entry.channelName,
       seedVideoId: entry.videoId,
       seedHistoryTitle: entry.title,
     }));
+}
+
+/** Title search when the sidebar rail is empty or the breaker is open. */
+async function fetchRelatedSearchFallback(
+  entry: WatchProgressEntry,
+  limits: ForYouFeedLimits,
+): Promise<ForYouCandidate[]> {
+  const query = entry.title?.trim().slice(0, 140);
+  if (!query) return [];
+  try {
+    const results = await searchMixedResultsCached(
+      query,
+      watchNextPoolLimit(limits),
+      "relevance",
+    );
+    return toWatchNextCandidates(
+      results.videos,
+      entry,
+      watchNextPoolLimit(limits),
+    );
   } catch {
-    recordWatchNextResult(false);
     return [];
   }
+}
+
+export async function fetchFromHistorySeed(
+  entry: WatchProgressEntry,
+  limits: ForYouFeedLimits,
+): Promise<ForYouCandidate[]> {
+  const poolLimit = watchNextPoolLimit(limits);
+  let related: Awaited<ReturnType<typeof getWatchNextRelatedVideos>> = [];
+
+  if (acquireWatchNextSlot()) {
+    try {
+      related = await withTimeout(
+        getWatchNextRelatedVideos(entry.videoId),
+        WATCH_NEXT_TIMEOUT_MS,
+        [],
+      );
+      recordWatchNextResult(related.length > 0);
+    } catch {
+      recordWatchNextResult(false);
+      related = [];
+    }
+  }
+
+  const mapped =
+    related.length > 0 ? toWatchNextCandidates(related, entry, poolLimit) : [];
+  if (mapped.length > 0) return mapped;
+
+  return withTimeout(
+    fetchRelatedSearchFallback(entry, limits),
+    RELATED_SEARCH_TIMEOUT_MS,
+    [],
+  );
 }
 
 export async function fetchFromRecentSearch(
@@ -227,7 +299,7 @@ export async function fetchFromRecentSearch(
   try {
     const results = await searchMixedResultsCached(
       q,
-      limits.maxVideosPerSearch,
+      searchPoolLimit(limits),
       "relevance",
     );
     return results.videos.map((video) => ({
@@ -244,7 +316,7 @@ export async function fetchForYouCandidates(
   snapshot: CloudSnapshot,
   recentSearches: RecentSearchEntry[],
   limits: ForYouFeedLimits = DEFAULT_FOR_YOU_LIMITS,
-  dayKey: string = forYouDayKey(),
+  rotationKey: string = forYouDayKey(),
   mutedSearchQueries: string[] = [],
 ): Promise<ForYouCandidate[]> {
   const savedChannels = snapshot.savedChannels;
@@ -252,11 +324,11 @@ export async function fetchForYouCandidates(
     savedChannels,
     snapshot.watchProgress,
     limits.maxSavedChannels,
-    dayKey,
+    rotationKey,
   );
   const pinnedSearches = savedChannels
     .filter((c) => effectiveSavedChannelKind(c) === "pinned_search")
-    .slice(0, limits.maxSavedChannels);
+    .slice(0, limits.maxPinnedSearches);
 
   const historySeeds = recentHistorySeeds(
     snapshot.watchProgress,
