@@ -189,10 +189,9 @@ export function LiteYouTubeEmbed({
   );
 
   /**
-   * YouTube lays the picture out to the window, not the shell. After rotation
-   * the shell is inset for the island, so the picture sits off to one side and
-   * a black bar shows inside the container. Tell the player the shell size
-   * once the layout has settled — not on every resize, which rebuffers a scrub.
+   * iOS can leave the iframe sized to the pre-rotation window, so the player
+   * overflows its shell. Hand the player the shell size once the layout has
+   * settled — not on every resize, which rebuffers a scrub.
    */
   useEffect(() => {
     if (!ready) return;
