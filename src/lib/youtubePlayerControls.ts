@@ -310,10 +310,14 @@ export function resyncPlayerSize(
   const h = Math.round(height);
   iframe.setAttribute("width", String(w));
   iframe.setAttribute("height", String(h));
+  iframe.style.position = "absolute";
+  iframe.style.top = "0";
+  iframe.style.left = "0";
   iframe.style.width = `${w}px`;
   iframe.style.height = `${h}px`;
   iframe.style.maxWidth = "100%";
   iframe.style.maxHeight = "100%";
+  iframe.style.transform = "none";
   try {
     player.setSize(w, h);
   } catch {

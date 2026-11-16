@@ -15,6 +15,7 @@ import { useGlobalYoutubeShortcuts } from "@/hooks/useGlobalYoutubeShortcuts";
 import {
   ensurePlayerVolume100,
   primeCaptionsModule,
+  resyncPlayerSize,
 } from "@/lib/youtubePlayerControls";
 import {
   ensureYoutubeIframeAllowsPiP,
@@ -187,27 +188,43 @@ export function LiteYouTubeEmbed({
     playerApiReadyRef,
   );
 
-  /** iOS can leave the iframe's hit target fullscreen after rotate. Skip while fullscreen or scrubbing — resizing the iframe makes YouTube rebuffer. */
+  /**
+   * YouTube lays the picture out to the window, not the shell. After rotation
+   * the shell is inset for the island, so the picture sits off to one side and
+   * a black bar shows inside the container. Tell the player the shell size
+   * once the layout has settled — not on every resize, which rebuffers a scrub.
+   */
   useEffect(() => {
-    const clipIframe = () => {
+    if (!ready) return;
+    const timers: number[] = [];
+    const fitPlayer = () => {
       if (document.fullscreenElement) return;
       const webkitFs = (
         document as Document & { webkitFullscreenElement?: Element | null }
       ).webkitFullscreenElement;
       if (webkitFs) return;
-      const iframe = shellRef.current?.querySelector("iframe");
-      if (!(iframe instanceof HTMLIFrameElement)) return;
-      iframe.style.width = "100%";
-      iframe.style.height = "100%";
-      iframe.removeAttribute("width");
-      iframe.removeAttribute("height");
+      const shell = shellRef.current;
+      if (!shell) return;
+      const width = shell.clientWidth;
+      const height = shell.clientHeight;
+      if (width < 2 || height < 2) return;
+      resyncPlayerSize(ytPlayerRef.current, { width, height });
     };
-    clipIframe();
-    window.addEventListener("orientationchange", clipIframe);
+    const scheduleFit = () => {
+      for (const timer of timers) window.clearTimeout(timer);
+      timers.length = 0;
+      fitPlayer();
+      for (const delay of [50, 200, 500]) {
+        timers.push(window.setTimeout(fitPlayer, delay));
+      }
+    };
+    scheduleFit();
+    window.addEventListener("orientationchange", scheduleFit);
     return () => {
-      window.removeEventListener("orientationchange", clipIframe);
+      for (const timer of timers) window.clearTimeout(timer);
+      window.removeEventListener("orientationchange", scheduleFit);
     };
-  }, [ready, videoId]);
+  }, [ready, videoId, playerGeneration]);
 
   const iframeStart =
     resumeSeconds != null && resumeSeconds > 0 ? resumeSeconds : start;
@@ -407,6 +424,13 @@ export function LiteYouTubeEmbed({
           playingRef.current = false;
         }
         onPlayerApiReady?.(true);
+        const shell = shellRef.current;
+        if (shell) {
+          resyncPlayerSize(player, {
+            width: shell.clientWidth,
+            height: shell.clientHeight,
+          });
+        }
         player.addEventListener("onStateChange", onStateChange);
         return;
       }

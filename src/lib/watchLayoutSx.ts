@@ -29,10 +29,9 @@ export const watchPlayerShellSx = {
     px: 0,
     mb: 0,
     overflow: "hidden",
-    bgcolor: "background.default",
+    bgcolor: "#000",
     boxSizing: "border-box",
-    border: "2px solid",
-    borderColor: "primary.main",
+    border: "none",
     zIndex: 1,
   },
 } as const;
