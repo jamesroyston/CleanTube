@@ -22,6 +22,17 @@ struct ContentView: View {
                 .ignoresSafeArea()
             WebContainerView(webView: store.webView)
                 .ignoresSafeArea()
+            // WKWebView can't enable back-edge swipe without also enabling forward.
+            // Absorb touches on the trailing edge so swipe-forward never fires.
+            HStack(spacing: 0) {
+                Spacer(minLength: 0)
+                Color.clear
+                    .frame(width: 20)
+                    .contentShape(Rectangle())
+                    .allowsHitTesting(true)
+            }
+            .ignoresSafeArea()
+            .accessibilityHidden(true)
             if store.showDebug {
                 DebugOverlay(
                     stats: store.stats,

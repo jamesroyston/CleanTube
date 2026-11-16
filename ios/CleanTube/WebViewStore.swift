@@ -22,6 +22,8 @@ final class WebViewStore: NSObject, ObservableObject {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.allowsPictureInPictureMediaPlayback = true
+        // Lets the web app detect this shell (`isNativeAppShell`) and use app-like history.
+        config.applicationNameForUserAgent = "CleanTubeNativeShell"
 
         webView = WKWebView(frame: .zero, configuration: config)
         super.init()
@@ -29,6 +31,7 @@ final class WebViewStore: NSObject, ObservableObject {
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isInspectable = true
+        // Edge-swipe back stays on; forward is blocked by a right-edge hit shield in ContentView.
         webView.allowsBackForwardNavigationGestures = true
 
         webView.isOpaque = false

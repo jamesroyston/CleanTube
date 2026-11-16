@@ -15,6 +15,10 @@ import { WatchHeaderBackButton } from "@/components/WatchHeaderBackButton";
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useWatchBackTarget } from "@/hooks/useWatchBackTarget";
 import {
+  navigateAppPath,
+  shouldReplaceAppNavigation,
+} from "@/lib/appShellNavigation";
+import {
   CT_SAFE_BOTTOM,
   CT_SAFE_TOP,
   LANDSCAPE_RAIL_CONTENT,
@@ -102,6 +106,7 @@ export function LandscapeNavRail() {
           <IconButton
             component={Link}
             href="/"
+            replace={shouldReplaceAppNavigation(pathname, "/")}
             prefetch
             scroll={false}
             aria-label="Home"
@@ -118,7 +123,10 @@ export function LandscapeNavRail() {
             aria-label="Library"
             aria-current={active === "library" ? "page" : undefined}
             color={active === "library" ? "primary" : "default"}
-            onClick={() => router.push("/library")}
+            onClick={() => {
+              stopActiveWatchPlayer();
+              navigateAppPath(router, "/library", pathname);
+            }}
             sx={RAIL_BUTTON_SX}
           >
             <VideoLibraryOutlinedIcon />
@@ -142,7 +150,9 @@ export function LandscapeNavRail() {
             aria-current={active === "account" ? "page" : undefined}
             color={active === "account" ? "primary" : "default"}
             onClick={() => {
-              if (!pathname.startsWith("/auth")) router.push("/account");
+              if (pathname.startsWith("/auth")) return;
+              stopActiveWatchPlayer();
+              navigateAppPath(router, "/account", pathname);
             }}
             sx={RAIL_BUTTON_SX}
           >
