@@ -5,6 +5,7 @@ import IconButton from "@mui/material/IconButton";
 import Link from "next/link";
 
 import type { WatchBackTarget } from "@/hooks/useWatchBackTarget";
+import { shouldReplaceWatchBackNavigation } from "@/lib/appShellNavigation";
 import { stopActiveWatchPlayer } from "@/lib/watchPlayerLifecycle";
 
 const TOUCH_TARGET_SX = {
@@ -14,10 +15,13 @@ const TOUCH_TARGET_SX = {
 } as const;
 
 export function WatchHeaderBackButton({ target }: { target: WatchBackTarget }) {
+  const replace = shouldReplaceWatchBackNavigation();
+
   return (
     <IconButton
       component={Link}
       href={target.href}
+      replace={replace}
       prefetch
       scroll={false}
       aria-label={target.label}

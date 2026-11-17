@@ -43,8 +43,9 @@ The library **drawer** remains for **narrow desktop browser** compact mode only 
 **Layer 1 — pre-paint bootstrap** (`src/lib/compactLayoutBootstrap.ts`):
 
 - Blocking inline script in root `<head>` runs before body paint
-- Sets `data-pwa-standalone`, `data-touch-primary`, `data-compact-viewport`, `data-mobile-experience` on `<html>`
+- Sets `data-pwa-standalone`, `data-app-shell`, `data-touch-primary`, `data-compact-viewport`, `data-mobile-experience` on `<html>`
 - Detects `(display-mode: standalone)` and legacy iOS `navigator.standalone` on **first PWA launch** (no cookie required)
+- `data-app-shell` is also set for the native iOS WKWebView (`CleanTubeNativeShell` UA); history uses replace so main/root pages do not stack on `/watch/*` (see `src/lib/appShellNavigation.ts`)
 - `globals.css` hides `[data-desktop-shell]` and desktop header chrome when `data-mobile-experience="1"` or matching native `@media` rules
 
 **Layer 2 — SSR cookie + UA** (`src/lib/compactLayoutHint.ts`):

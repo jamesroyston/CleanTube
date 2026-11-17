@@ -13,9 +13,11 @@ import { useEffect } from "react";
 
 import { useSearchOverlay } from "@/context/SearchOverlayContext";
 import { useCompactViewport } from "@/hooks/useCompactViewport";
+import { navigateAppPath } from "@/lib/appShellNavigation";
 import { BOTTOM_NAV_HEIGHT_PX } from "@/lib/compactLayout";
 import { CT_SAFE_BOTTOM, MOBILE_LANDSCAPE } from "@/lib/mobileLandscape";
 import { bottomNavValueFromPathname } from "@/lib/mobileNavRoutes";
+import { stopActiveWatchPlayer } from "@/lib/watchPlayerLifecycle";
 
 const PREFETCH_ROUTES = ["/", "/library", "/account", "/history", "/watch-later"] as const;
 
@@ -68,15 +70,18 @@ export function MobileBottomNav() {
             return;
           }
           if (next === "home") {
-            router.push("/");
+            stopActiveWatchPlayer();
+            navigateAppPath(router, "/", pathname);
             return;
           }
           if (next === "library") {
-            router.push("/library");
+            stopActiveWatchPlayer();
+            navigateAppPath(router, "/library", pathname);
             return;
           }
           if (next === "account" && !pathname.startsWith("/auth")) {
-            router.push("/account");
+            stopActiveWatchPlayer();
+            navigateAppPath(router, "/account", pathname);
           }
         }}
       >

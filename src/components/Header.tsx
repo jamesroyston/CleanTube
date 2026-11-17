@@ -34,6 +34,10 @@ import {
 import { useNavigationProgress } from "@/context/NavigationProgressContext";
 import { useWatchBackTarget } from "@/hooks/useWatchBackTarget";
 import {
+  navigateAppPath,
+  shouldReplaceAppNavigation,
+} from "@/lib/appShellNavigation";
+import {
   getLastSearchSort,
   setLastSearchQuery,
   setLastSearchSort,
@@ -51,6 +55,7 @@ import {
   normalizeResultSortParam,
   normalizeSearchSortParam,
 } from "@/lib/uploadedAtSort";
+import { stopActiveWatchPlayer } from "@/lib/watchPlayerLifecycle";
 
 import { drawerRailTransition } from "@/components/ChannelsSidebar";
 
@@ -222,7 +227,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
           if (pathname === "/" && searchParams.toString() === "") {
             router.refresh();
           } else {
-            router.push("/");
+            navigateAppPath(router, "/", pathname);
           }
         });
         return;
@@ -248,7 +253,7 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
         if (currentHref === href) {
           router.refresh();
         } else {
-          router.push(href);
+          navigateAppPath(router, href, pathname);
         }
       });
     }
@@ -267,7 +272,11 @@ export const Header = forwardRef<HTMLDivElement, HeaderProps>(
       <Box
         component={Link}
         href="/"
+        replace={shouldReplaceAppNavigation(pathname, "/")}
         aria-label="CleanTube home"
+        onClick={() => {
+          if (pathname.startsWith("/watch/")) stopActiveWatchPlayer();
+        }}
         sx={{
           display: "inline-flex",
           alignItems: "center",
