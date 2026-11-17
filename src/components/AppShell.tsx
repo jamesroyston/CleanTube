@@ -22,6 +22,7 @@ import {
   ChannelsRailContent,
   drawerRailTransition,
 } from "@/components/ChannelsSidebar";
+import { AppShellNavigationPolicy } from "@/components/AppShellNavigationPolicy";
 import { CompactLayoutChrome } from "@/components/CompactLayoutChrome";
 import { Header } from "@/components/Header";
 import { MobileBottomNav } from "@/components/MobileBottomNav";
@@ -259,6 +260,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
       <Suspense fallback={<HeaderFallback />}>
         <AppShellDrawerPathSync onPathChange={resetMobileDrawerOnNavigate} />
         <WatchReturnTracker />
+        <AppShellNavigationPolicy />
         <Header
           ref={appBarRef}
           leading={headerLeading}
