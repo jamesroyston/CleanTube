@@ -19,10 +19,8 @@ import { MobilePageHeader } from "@/components/MobilePageHeader";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { YouTubeThumbnailImage } from "@/components/YouTubeThumbnailImage";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
-import {
-  compactMainPaddingBottom,
-  useShowBottomNav,
-} from "@/hooks/useCompactViewport";
+import { useCompactMainPaddingBottom } from "@/hooks/useAppShellViewport";
+import { useShowBottomNav } from "@/hooks/useCompactViewport";
 import { youtubeThumbnailFallbackUrls } from "@/lib/serializeVideo";
 import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 
@@ -33,6 +31,7 @@ function timestamp(value: string): number {
 
 export function HistoryPageClient() {
   const showBottomNav = useShowBottomNav();
+  const mainPaddingBottom = useCompactMainPaddingBottom(24);
   const {
     canPersistLibrary,
     watchProgress,
@@ -52,7 +51,7 @@ export function HistoryPageClient() {
   return (
     <Box
       component="main"
-      sx={{ pb: compactMainPaddingBottom(showBottomNav, 24) ?? 6 }}
+      sx={{ pb: mainPaddingBottom ?? 6 }}
     >
       <PullToRefresh disabled={!canPersistLibrary} onRefresh={refreshLibrary}>
         <Container maxWidth="lg" sx={{ pt: 2, px: { xs: 2, sm: 3 } }}>

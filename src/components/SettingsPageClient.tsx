@@ -24,12 +24,9 @@ import {
   useWatchUpNextVisible,
 } from "@/app/providers";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
-import {
-  compactMainPaddingBottom,
-  useShowBottomNav,
-} from "@/hooks/useCompactViewport";
+import { useCompactMainPaddingBottom } from "@/hooks/useAppShellViewport";
 export function SettingsPageClient() {
-  const showBottomNav = useShowBottomNav();
+  const mainPaddingBottom = useCompactMainPaddingBottom(24);
   const { mode, toggleMode } = useThemeMode();
   const { visible: commentsVisible, setWatchCommentsVisible } =
     useWatchCommentsVisible();
@@ -45,7 +42,7 @@ export function SettingsPageClient() {
         width: "100%",
         maxWidth: 480,
         mx: "auto",
-        pb: compactMainPaddingBottom(showBottomNav, 24) ?? 3,
+        pb: mainPaddingBottom ?? 3,
       }}
     >
       <MobilePageHeader title="Settings" backHref="/account" backLabel="Back to account" />

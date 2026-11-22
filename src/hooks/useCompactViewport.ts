@@ -110,13 +110,23 @@ export function useScrollRevealHeader(): boolean {
   return compact && headerScrollsAway && !showBottomNav;
 }
 
-/** Main content padding when the fixed bottom app bar is shown. */
+/**
+ * Main content padding when the bottom app bar is shown.
+ *
+ * Prefer `useCompactMainPaddingBottom()` — inside an installed app shell the bar
+ * is an in-flow row below the scroller, so the content must not reserve its
+ * height. Pass `navOverlaysContent` directly only where no hook can run.
+ */
 export function compactMainPaddingBottom(
   showBottomNav: boolean,
   basePaddingPx = 0,
+  navOverlaysContent = true,
 ): string | number | undefined {
   if (!showBottomNav) {
     return basePaddingPx || undefined;
+  }
+  if (!navOverlaysContent) {
+    return basePaddingPx > 0 ? `${basePaddingPx}px` : undefined;
   }
   const base = basePaddingPx > 0 ? `${basePaddingPx}px + ` : "";
   return `calc(${base}${BOTTOM_NAV_HEIGHT_PX}px + env(safe-area-inset-bottom, 0px))`;

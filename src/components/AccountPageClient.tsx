@@ -25,10 +25,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import { PwaInstallButton } from "@/components/PwaInstallButton";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
-import {
-  compactMainPaddingBottom,
-  useShowBottomNav,
-} from "@/hooks/useCompactViewport";
+import { useCompactMainPaddingBottom } from "@/hooks/useAppShellViewport";
 import { buildAuthPageHref } from "@/lib/authReturnNavigation";
 
 function emailLocalPart(email: string | undefined): string {
@@ -38,7 +35,7 @@ function emailLocalPart(email: string | undefined): string {
 }
 
 export function AccountPageClient() {
-  const showBottomNav = useShowBottomNav();
+  const mainPaddingBottom = useCompactMainPaddingBottom(24);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { user, isCloudConfigured, canPersistLibrary, signOutUser, authStatus } =
@@ -59,7 +56,7 @@ export function AccountPageClient() {
         width: "100%",
         maxWidth: 480,
         mx: "auto",
-        pb: compactMainPaddingBottom(showBottomNav, 24) ?? 3,
+        pb: mainPaddingBottom ?? 3,
       }}
     >
       <Typography variant="h5" component="h1" sx={{ fontWeight: 800, mb: 3 }}>
