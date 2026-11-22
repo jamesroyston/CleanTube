@@ -31,8 +31,9 @@ final class WebViewStore: NSObject, ObservableObject {
         webView.navigationDelegate = self
         webView.uiDelegate = self
         webView.isInspectable = true
-        // Edge-swipe back stays on; forward is blocked by a right-edge hit shield in ContentView.
-        webView.allowsBackForwardNavigationGestures = true
+        // Back-only edge swipe is installed in WebContainerUIView. Do not enable
+        // allowsBackForwardNavigationGestures — that API always includes forward.
+        webView.allowsBackForwardNavigationGestures = false
 
         webView.isOpaque = false
         webView.backgroundColor = AppConfig.backgroundColor
