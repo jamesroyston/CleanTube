@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef } from "react";
 
 import {
   isAppShellExperience,
@@ -9,14 +9,58 @@ import {
 } from "@/lib/appShellNavigation";
 import { stopActiveWatchPlayer } from "@/lib/watchPlayerLifecycle";
 
+function fullPath(pathname: string, search: string): string {
+  return search ? `${pathname}?${search}` : pathname;
+}
+
+/**
+ * Drop session-history entries ahead of the current one after leaving watch via
+ * swipe-back / hardware back, so swipe-forward cannot reopen the video.
+ */
+function truncateForwardHistory(): void {
+  const url =
+    window.location.pathname + window.location.search + window.location.hash;
+  window.history.pushState(window.history.state, "", url);
+}
+
 /**
  * PWA / native shell: force replace for root navigations that would otherwise
  * push (e.g. logo, account menu, error CTAs), so main pages never sit on a
- * watch entry in the history stack.
+ * watch entry in the history stack. Also truncates forward history after
+ * swipe-back from `/watch/*`.
  */
 export function AppShellNavigationPolicy() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams.toString();
+  const pathRef = useRef(fullPath(pathname, search));
+
+  useEffect(() => {
+    pathRef.current = fullPath(pathname, search);
+  }, [pathname, search]);
+
+  useEffect(() => {
+    if (!isAppShellExperience()) return;
+
+    const onPopState = () => {
+      const previous = pathRef.current;
+      const next = fullPath(
+        window.location.pathname,
+        window.location.search.replace(/^\?/, ""),
+      );
+      const leftWatch = previous.startsWith("/watch/");
+      const landedOutsideWatch = !window.location.pathname.startsWith("/watch/");
+      pathRef.current = next;
+
+      if (leftWatch && landedOutsideWatch) {
+        truncateForwardHistory();
+      }
+    };
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     if (!isAppShellExperience()) return;
