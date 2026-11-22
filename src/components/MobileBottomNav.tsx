@@ -21,7 +21,15 @@ import { stopActiveWatchPlayer } from "@/lib/watchPlayerLifecycle";
 
 const PREFETCH_ROUTES = ["/", "/library", "/account", "/history", "/watch-later"] as const;
 
-export function MobileBottomNav() {
+type MobileBottomNavProps = {
+  /**
+   * In an installed app shell the bar is the last row of a viewport-sized flex
+   * column rather than a fixed overlay, so iOS can never drift it up the page.
+   */
+  inFlow?: boolean;
+};
+
+export function MobileBottomNav({ inFlow = false }: MobileBottomNavProps) {
   const theme = useTheme();
   const compact = useCompactViewport();
   const pathname = usePathname();
@@ -39,14 +47,13 @@ export function MobileBottomNav() {
 
   return (
     <AppBar
-      position="fixed"
+      position={inFlow ? "static" : "fixed"}
       color="default"
       elevation={0}
       sx={{
-        top: "auto",
-        bottom: 0,
-        left: 0,
-        right: 0,
+        ...(inFlow
+          ? { flexShrink: 0 }
+          : { top: "auto", bottom: 0, left: 0, right: 0 }),
         zIndex: theme.zIndex.drawer,
         pb: CT_SAFE_BOTTOM,
         boxSizing: "border-box",

@@ -30,12 +30,14 @@ import { SavedChannelMigration } from "@/components/SavedChannelMigration";
 import { WatchReturnTracker } from "@/components/WatchReturnTracker";
 import { ScrollContainerProvider } from "@/context/ScrollContainerContext";
 import { useHeaderScroll } from "@/context/HeaderScrollContext";
+import { useAppShellViewport } from "@/hooks/useAppShellViewport";
 import {
   compactMainPaddingBottom,
   useCompactViewport,
   useShowBottomNav,
 } from "@/hooks/useCompactViewport";
 import { useMobileExperience } from "@/hooks/useMobileExperience";
+import { APP_SHELL_SCROLL_ATTR } from "@/lib/compactLayout";
 import {
   CT_SAFE_BOTTOM,
   CT_SAFE_LEFT,
@@ -72,7 +74,14 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const theme = useTheme();
   const compact = useCompactViewport();
   const mobileExperience = useMobileExperience();
+  const appShellViewport = useAppShellViewport();
   const desktopLayout = !compact;
+  /**
+   * Installed app shell: the frame is exactly one viewport tall, scrolling
+   * happens inside it, and the bottom bar is an in-flow row. Browser tabs keep
+   * document scrolling so the URL bar can still collapse.
+   */
+  const innerScroll = desktopLayout || appShellViewport;
   const { headerOverlayActive } = useHeaderScroll();
   const [mobileOpen, setMobileOpen] = useState(false);
   const drawerHistoryPushedRef = useRef(false);
@@ -138,10 +147,22 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     registerScrollElementGetter(() =>
-      desktopLayout ? mainScrollRef.current : window,
+      innerScroll ? mainScrollRef.current : window,
     );
     return () => registerScrollElementGetter(null);
-  }, [desktopLayout]);
+  }, [innerScroll]);
+
+  /**
+   * Nothing outside the shell may scroll once the shell owns its own scroller:
+   * a scrolling document is what lets iOS WebKit drift fixed/sticky chrome
+   * (webkit.org/b/301172).
+   */
+  useEffect(() => {
+    if (!appShellViewport) return;
+    const root = document.documentElement;
+    root.setAttribute(APP_SHELL_SCROLL_ATTR, "1");
+    return () => root.removeAttribute(APP_SHELL_SCROLL_ATTR);
+  }, [appShellViewport]);
 
   useLayoutEffect(() => {
     const el = appBarRef.current;
@@ -189,12 +210,16 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   const railTransition = drawerRailTransition(theme);
   const showBottomNav = useShowBottomNav();
-  const mobileMainPaddingBottom = compactMainPaddingBottom(showBottomNav);
+  const mobileMainPaddingBottom = compactMainPaddingBottom(
+    showBottomNav,
+    0,
+    !appShellViewport,
+  );
 
   /**
-   * Desktop: single inner scroll region (sidebar + split layout).
-   * Mobile (esp. iOS Safari): nested `overflow: auto` under `overflow: hidden` + `100dvh`
-   * often breaks momentum/touch scrolling — use native document scrolling instead.
+   * One scroll region, inside the shell, for desktop and for the installed app
+   * shell. A browser tab keeps native document scrolling so iOS can collapse
+   * its URL bar.
    */
   const mainScroll = desktopLayout ? (
     <Box
@@ -215,10 +240,19 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   ) : (
     <Box
       data-landscape-main
+      ref={appShellViewport ? mainScrollRef : undefined}
       sx={{
         flex: 1,
         minHeight: 0,
         pb: mobileMainPaddingBottom,
+        ...(appShellViewport
+          ? {
+              overflowY: "auto",
+              overflowX: "hidden",
+              overscrollBehavior: "contain",
+              WebkitOverflowScrolling: "touch",
+            }
+          : null),
         /**
          * Landscape: bottom nav is gone, so content only clears the 56px rail
          * and the island when it is on the left. Island-on-right is in CSS.
@@ -240,13 +274,13 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   return (
     <ScrollContainerProvider
       scrollRef={mainScrollRef}
-      mobileDocumentScroll={!desktopLayout}
+      mobileDocumentScroll={!innerScroll}
     >
     <Box
       sx={{
         display: "flex",
         flexDirection: "column",
-        ...(desktopLayout
+        ...(innerScroll
           ? {
               height: "100dvh",
               minHeight: 0,
@@ -287,15 +321,6 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
             : {}),
         }}
       >
-      <CompactLayoutChrome
-        showBottomNav={showBottomNav}
-        bottomNav={
-          <Suspense fallback={null}>
-            <MobileBottomNav />
-          </Suspense>
-        }
-      />
-
       {desktopRailPx != null ? (
         <Box
           data-desktop-shell
@@ -404,12 +429,34 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           </Drawer>
           ) : null}
 
-          <Box component="main" sx={{ flex: 1, minHeight: 0 }}>
+          <Box
+            component="main"
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             {mainScroll}
           </Box>
         </Box>
       )}
       </Box>
+
+      {/**
+       * Last row of the shell column. In an installed app shell the bottom bar
+       * is in normal flow here; in a browser tab it stays a fixed overlay and
+       * the DOM position does not matter.
+       */}
+      <CompactLayoutChrome
+        showBottomNav={showBottomNav}
+        bottomNav={
+          <Suspense fallback={null}>
+            <MobileBottomNav inFlow={appShellViewport} />
+          </Suspense>
+        }
+      />
     </Box>
     </ScrollContainerProvider>
   );

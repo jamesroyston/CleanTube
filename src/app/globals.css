@@ -32,6 +32,21 @@ html[data-mobile-experience="1"] body {
   overscroll-behavior-y: none;
 }
 
+/**
+ * Installed app shell (see AppShell.tsx): the shell is exactly one viewport
+ * tall and scrolls inside itself, so the document must not scroll at all.
+ * A scrolling document is what lets iOS WebKit leave `position: fixed` and
+ * `position: sticky` chrome behind (webkit.org/b/301172) — that is how the
+ * bottom app bar ended up riding up over the middle of the feed.
+ */
+html[data-app-shell-scroll="1"],
+html[data-app-shell-scroll="1"] body {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 lite-youtube {
   max-width: 100%;
   aspect-ratio: 16 / 9;

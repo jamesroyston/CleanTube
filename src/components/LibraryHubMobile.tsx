@@ -27,10 +27,7 @@ import { LibrarySignInPrompt } from "@/components/LibrarySignInPrompt";
 import { useCloudLibrary } from "@/context/CloudLibraryContext";
 import { useSavedChannels } from "@/context/SavedChannelsContext";
 import { useWatchLater } from "@/context/WatchLaterContext";
-import {
-  compactMainPaddingBottom,
-  useShowBottomNav,
-} from "@/hooks/useCompactViewport";
+import { useCompactMainPaddingBottom } from "@/hooks/useAppShellViewport";
 import { savedChannelBrowseHref } from "@/lib/savedChannelNavigation";
 import { watchNavigationCaptureHandlers } from "@/lib/watchReturnNavigation";
 import { effectiveSavedChannelKind } from "@/types/savedChannel";
@@ -75,7 +72,7 @@ function SectionHeader({
 }
 
 export function LibraryHubMobile() {
-  const showBottomNav = useShowBottomNav();
+  const mainPaddingBottom = useCompactMainPaddingBottom(24);
   const { canPersistLibrary, watchProgress, getResumeSeconds } = useCloudLibrary();
   const { entries: watchLaterEntries } = useWatchLater();
   const { channels } = useSavedChannels();
@@ -116,7 +113,7 @@ export function LibraryHubMobile() {
   );
 
   return (
-    <Box sx={{ pb: compactMainPaddingBottom(showBottomNav, 24) ?? 3 }}>
+    <Box sx={{ pb: mainPaddingBottom ?? 3 }}>
       <Typography variant="h5" component="h1" sx={{ fontWeight: 800, mb: 3 }}>
         Library
       </Typography>
